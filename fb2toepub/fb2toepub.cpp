@@ -196,20 +196,23 @@ const char version[]    = "0.10";
 
 static void Logo()
 {
-    printf("%s version %s\n\n", name, version);
+    printf("%s version %s\n", name, version);
 }
 
 static void Usage()
 {
-    printf("Usage:\n");
-    printf("    fb2toepub <options> <input file> <output file>\n");
+    printf("Usage: fb2toepub <options> <input file> <output file>\n");
     printf("Options:\n");
-    printf("    -s <path>           - path to .css style directory\n");
-    printf("    -f <path>           - path to .ttf/.otf font directory\n");
-    printf("    -sf <path>          - path to font and style directory\n");
-    printf("    -t <filename>       - path to transliteration XML file (optional, no more that one)\n");
-    printf("    -h                  - help\n\n");
-    printf("Options are case-sensitive.\nSpace between -s/-s1/-f/-f1/-sf/-t and filename is mandatory.\n");
+    printf("    -s <path>               Path to .css style directory\n");
+    printf("                              (optional, any number)\n");
+    printf("    -f <path>               Path to .ttf/.otf font directory\n");
+    printf("                              (optional, any number)\n");
+    printf("    -sf <path>              Path to font and style directory\n");
+    printf("                              (optional, any number)\n");
+    printf("    -t <path>               Path to transliteration XML file\n");
+    printf("                              (optional, no more than one)\n");
+    printf("    -h, --help              Help and exit\n\n");
+    printf("Options are case-sensitive.\nSpace between -s/-f/-sf/-t and path is mandatory.\n");
 }
 
 static int ErrorExit(const char *err)
@@ -285,7 +288,7 @@ int main(int argc, char **argv)
 
     // check
     if(in.empty() || out.empty())
-        return ErrorExit("input or putput file is not defined");
+        return ErrorExit("input or output file is not defined");
 
     bool fOutputFileCreated = false;
     try
