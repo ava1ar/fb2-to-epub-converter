@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual C++ Express 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fb2toepub", "fb2toepub\fb2toepub.vcproj", "{C2156551-59EE-40F6-A872-286278D358B0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D97BE78A-7A8D-4B75-9760-82E5FD6D6733} = {D97BE78A-7A8D-4B75-9760-82E5FD6D6733}
+		{00EBA693-0C65-4276-BCA3-3B507408AA52} = {00EBA693-0C65-4276-BCA3-3B507408AA52}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "minizip", "fb2toepub\minizip\minizip.vcproj", "{D97BE78A-7A8D-4B75-9760-82E5FD6D6733}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tiniconv", "fb2toepub\tiniconv\tiniconv.vcproj", "{00EBA693-0C65-4276-BCA3-3B507408AA52}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C2156551-59EE-40F6-A872-286278D358B0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C2156551-59EE-40F6-A872-286278D358B0}.Debug|Win32.Build.0 = Debug|Win32
+		{C2156551-59EE-40F6-A872-286278D358B0}.Release|Win32.ActiveCfg = Release|Win32
+		{C2156551-59EE-40F6-A872-286278D358B0}.Release|Win32.Build.0 = Release|Win32
+		{D97BE78A-7A8D-4B75-9760-82E5FD6D6733}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D97BE78A-7A8D-4B75-9760-82E5FD6D6733}.Debug|Win32.Build.0 = Debug|Win32
+		{D97BE78A-7A8D-4B75-9760-82E5FD6D6733}.Release|Win32.ActiveCfg = Release|Win32
+		{D97BE78A-7A8D-4B75-9760-82E5FD6D6733}.Release|Win32.Build.0 = Release|Win32
+		{00EBA693-0C65-4276-BCA3-3B507408AA52}.Debug|Win32.ActiveCfg = Debug|Win32
+		{00EBA693-0C65-4276-BCA3-3B507408AA52}.Debug|Win32.Build.0 = Debug|Win32
+		{00EBA693-0C65-4276-BCA3-3B507408AA52}.Release|Win32.ActiveCfg = Release|Win32
+		{00EBA693-0C65-4276-BCA3-3B507408AA52}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
