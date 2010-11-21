@@ -716,7 +716,7 @@ void ConverterPass2::AddTocNcx()
     pout_->WriteStr("<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">\n");
 
     pout_->WriteStr("<head>\n");
-    pout_->WriteStr("  <meta name=\"dtb:uid\" content=\"http://www.hxa7241.org/articles/content/epup-guide_hxa7241_2007_1.epub\"/>\n");
+    pout_->WriteFmt("  <meta name=\"dtb:uid\" content=\"%s\"/>\n", id_.c_str());
     pout_->WriteFmt("  <meta name=\"dtb:depth\" content=\"%d\"/>\n", tocLevels_);
     pout_->WriteStr("  <meta name=\"dtb:totalPageCount\" content=\"0\"/>\n");
     pout_->WriteStr("  <meta name=\"dtb:maxPageNumber\" content=\"0\"/>\n");
