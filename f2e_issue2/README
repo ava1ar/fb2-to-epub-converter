@@ -1,0 +1,15 @@
+fb2toepub is a converter from FB2 to EPUB. FB2 and EPUB are two popular eBook formats.
+This converter is intended to be used in embedded systems and other resource-critical facilities, however of course it can be used as a standalone application.
+
+Tested on Windows Vista 32 and Cygwin.
+
+How to build the converter:
+
+1) For Linux, use Makefile.
+
+2) For Windows, use fb2toepub.sln which is a solution file for MSVS 9.
+There are build problems for Windows with scanner.l and scanner.cpp. The cause is that there is no flex for Windows working properly in C++ mode and compatible with modern C++.
+Possible solutions:
+ - Install cygwin and use cygwin flex. File FlexLexer.h deployed with cygwin-1.7.7-1 is compatible with MSVC++. Copy it to some directory and add this directory to Visual C++ include directory list.
+ - If you don't want to install cygwin, you can use existent scanner.cpp and the header file FlexLexer.h in source directory fb2toepub/win_FlexLexer. However keep in mind that this file is from cygwin-1.7.7-1 package and it may not be refreshed later if I decide to switch to next version of cygwin.
+
