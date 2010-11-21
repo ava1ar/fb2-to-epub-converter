@@ -329,6 +329,7 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories=""
+						PreprocessorDefinitions="YY_NO_UNISTD_H"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -337,6 +338,7 @@
 					<Tool
 						Name="VCCLCompilerTool"
 						AdditionalIncludeDirectories=""
+						PreprocessorDefinitions="YY_NO_UNISTD_H"
 					/>
 				</FileConfiguration>
 			</File>
