@@ -1,0 +1,7 @@
+fb2toepub is a converter from FB2 to EPUB. FB2 and EPUB are two popular eBook formats.
+This converter is intended to be used in embedded systems and other resource-critical facilities, however of course it can be used as a standalone application.
+
+Tested on Windows Vista 32 and Cygwin.
+
+For Windows, use fb2toepub.sln which is a solution file for MSVS 9.
+For Linux, use Makefile.
