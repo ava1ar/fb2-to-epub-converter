@@ -108,7 +108,7 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 0
+#if 1
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)
@@ -377,7 +377,7 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
     Unit::Type prevType = Unit::UNIT_NONE;
     for(it = units_.begin(); it < it_end; ++it)
     {
-        if ((it->type_ != prevType) ||
+        if ((it->type_ != prevType && (prevType != Unit::TITLE || it->type_ != Unit::SECTION)) ||
             (it->level_ <= levelToSplit && prevLevel >= levelToSplit) ||
             (it->level_ <= prevLevel && prevLevel <= levelToSplit))
         {
@@ -538,9 +538,9 @@ void ConverterPass2::StartUnit(Unit::Type unitType)
 
         switch(unit.bodyType_)
         {
-        case Unit::MAIN:        pout_->WriteFmt("<div class=\"body_main\">", unit.fileId_.c_str()); break;
-        case Unit::NOTES:       pout_->WriteFmt("<div class=\"body_notes\">", unit.fileId_.c_str()); break;
-        case Unit::COMMENTS:    pout_->WriteFmt("<div class=\"body_comments\">", unit.fileId_.c_str()); break;
+        case Unit::MAIN:        pout_->WriteStr("<div class=\"body_main\">"); break;
+        case Unit::NOTES:       pout_->WriteStr("<div class=\"body_notes\">"); break;
+        case Unit::COMMENTS:    pout_->WriteStr("<div class=\"body_comments\">"); break;
         case Unit::BODY_NONE:   break;
         default:                Error("StartUnit internal error");
         }
