@@ -43,7 +43,7 @@ makedirs :
 	mkdir -p $(distdir)
 
 $(distdir)/fb2toepub : $(COBJ)
-	g++ -o $@ $(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC))))) -lz
+	g++ -o $@ $(COBJ) -lz
 	strip $@
 
 $(srcdir)/scanner.cpp : $(srcdir)/scanner.l
