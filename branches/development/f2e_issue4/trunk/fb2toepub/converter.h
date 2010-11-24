@@ -164,7 +164,6 @@ namespace Fb2ToEpub
                                             const strvector &fonts,
                                             XlitConv *xlitConv,
                                             UnitArray *units,
-                                            bool suppressEmptyTitles,
                                             OutPackStm *pout);
 
 

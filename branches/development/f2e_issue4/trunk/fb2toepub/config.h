@@ -22,19 +22,21 @@
 #define FB2TOEPUB__CONFIG_H
 
 #define FB2TOEPUB_DECL
-#include <string>
 
-//#define Error(a) do {printf("%s\n", a); exit(1);} while(0)
+//-----------------------------------------------------------------------
+// SUPPRESS EMPTY TITLES IN TABLE OF CONTENTS
+// If the value is nonzero, fb2 section without title don't appear in TOC,
+// and their nested section are moved one level up.
+// Otherwise, every section without title is assigned a title "- - - - -"
+//-----------------------------------------------------------------------
+#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES     1
 
-namespace Fb2ToEpub
-{
+//-----------------------------------------------------------------------
+// ENABLE IDS IN TABLE OF CONTENTS
+// If the value is nonzero, TOC contains references to file only
+// Otherwise, TOC contains "file#id" references.
+//-----------------------------------------------------------------------
+#define FB2TOEPUB_TOC_REFERS_FILES_ONLY     1
 
-    //-----------------------------------------------------------------------
-    inline void Error(const char *s)
-    {
-        throw std::string(s);
-    }
-
-}
 
 #endif
