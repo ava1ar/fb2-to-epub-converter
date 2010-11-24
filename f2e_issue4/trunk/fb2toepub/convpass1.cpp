@@ -47,7 +47,7 @@ private:
     std::set<std::string>   xlns_;      // xlink namespaces
     std::set<std::string>   allRefIds_; // all ref ids
 
-    const std::string* AddId    (const AttrMap &attrmap, bool setFileId = false);
+    const std::string* AddId    (const AttrMap &attrmap);
     std::string Findhref        (const AttrMap &attrmap) const;
     void ParseTextAndEndElement (const std::string &element, std::string *plainText);
 
@@ -127,7 +127,7 @@ void ConverterPass1::Scan()
 }
 
 //-----------------------------------------------------------------------
-const std::string* ConverterPass1::AddId(const AttrMap &attrmap, bool setFileId)
+const std::string* ConverterPass1::AddId(const AttrMap &attrmap)
 {
     AttrMap::const_iterator cit = attrmap.find("id");
     if(cit == attrmap.end())
@@ -137,9 +137,6 @@ const std::string* ConverterPass1::AddId(const AttrMap &attrmap, bool setFileId)
         return NULL;    // ignore second instance
 
     units_->back().refIds_.push_back(cit->second);
-    if(setFileId)
-        units_->back().fileId_ = cit->second;
-
     return &cit->second;
 }
 
@@ -328,7 +325,7 @@ void ConverterPass1::annotation(bool startUnit)
     bool notempty = s_->BeginElement("annotation", &attrmap);
     if(startUnit)
         units_->push_back(Unit(bodyType_, Unit::ANNOTATION, 0, -1));
-    AddId(attrmap, startUnit);
+    AddId(attrmap);
     if(!notempty)
         return;
 
@@ -532,7 +529,7 @@ void ConverterPass1::image(bool in_line, Unit::Type unitType)
     if(unitType != Unit::UNIT_NONE)
         units_->push_back(Unit(bodyType_, unitType, 0, -1));
     if(!in_line)
-        AddId(attrmap, unitType != Unit::UNIT_NONE);
+        AddId(attrmap);
     if(notempty)
     {
         ClrScannerDataMode clrDataMode(s_);
@@ -594,7 +591,7 @@ void ConverterPass1::section(int parent)
 
     int idx = units_->size();
     units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, parent));
-    const std::string *id = AddId(attrmap, true);
+    const std::string *id = AddId(attrmap);
     if(!notempty)
         return;
 

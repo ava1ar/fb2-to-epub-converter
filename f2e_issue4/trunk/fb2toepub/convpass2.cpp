@@ -93,7 +93,8 @@ public:
                             tocLevels_          (0),
                             uniqueIdIdx_        (0),
                             unitIdx_            (0),
-                            active_             (0),
+                            unitActive_         (false),
+                            unitHasId_          (false),
                             xlitConv_           (xlitConv)
     {
         coverPgIt_ = units_.end();
@@ -173,7 +174,8 @@ private:
 
     std::string             prevUnitFile_;
     int                     unitIdx_;
-    bool                    active_;
+    bool                    unitActive_;
+    bool                    unitHasId_;
     Ptr<XlitConv>           xlitConv_;
 
 
@@ -188,7 +190,7 @@ private:
 
     std::string Findhref        (const AttrMap &attrmap) const;
 
-    void StartUnit              (Unit::Type unitType);
+    void StartUnit              (Unit::Type unitType, AttrMap *attrmap = NULL);
     void EndUnit                ();
 
     void AddMimetype            ();
@@ -393,10 +395,6 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
         // make unique id
         std::string id = MakeUniqueId();
 
-        // if there was original id, remap it to our new id
-        if(!it->fileId_.empty())
-            refidToNew_[it->fileId_] = id;
-
         // assing new unit id
         it->fileId_ = id;
 
@@ -497,12 +495,14 @@ std::string ConverterPass2::Findhref(const AttrMap &attrmap) const
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::StartUnit(Unit::Type unitType)
+void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
 {
     // close previous section
-    if(active_)
+    if(unitActive_)
     {
-        pout_->WriteFmt("</div>\n");            // <div id=...>
+        if(unitHasId_)
+            pout_->WriteFmt("</div>\n");        // <div id=...> - original id
+        pout_->WriteFmt("</div>\n");            // <div id=...> - file id
         if(units_[unitIdx_].type_ == Unit::SECTION)
             pout_->WriteFmt("</div>\n");    // <div class="section...>
         ++unitIdx_;
@@ -514,7 +514,7 @@ void ConverterPass2::StartUnit(Unit::Type unitType)
         prevUnitFile_ = unit.file_;
 
         // close previous file
-        if(active_)
+        if(unitActive_)
         {
             if(units_[unitIdx_-1].bodyType_ != Unit::BODY_NONE)
                 pout_->WriteFmt("</div>\n");    // <div class="body...>
@@ -547,18 +547,30 @@ void ConverterPass2::StartUnit(Unit::Type unitType)
     }
     if(unit.type_ == Unit::SECTION)
         pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
-    pout_->WriteFmt("<div id=\"%s\">\n", unit.fileId_.c_str());
+    pout_->WriteFmt("<div id=\"%s\">\n", unit.fileId_.c_str()); // file id
 
-    active_ = true;
+    unitHasId_ = false;
+    if(attrmap)
+    {
+        std::string id = (*attrmap)["id"];
+        if(!id.empty())
+        {
+            unitHasId_ = true;
+            pout_->WriteFmt("<div id=\"%s\">\n", refidToNew_[id].c_str()); // original id (remapped)
+        }
+    }
+    unitActive_ = true;
 }
 
 //-----------------------------------------------------------------------
 void ConverterPass2::EndUnit()
 {
-    if(active_)
+    if(unitActive_)
     {
         // close last section and file
-        pout_->WriteFmt("</div>\n");        // <div id=...>
+        if(unitHasId_)
+            pout_->WriteFmt("</div>\n");    // <div id=...> - original id
+        pout_->WriteFmt("</div>\n");        // <div id=...> - file id
         if(units_[unitIdx_].type_ == Unit::SECTION)
             pout_->WriteFmt("</div>\n");    // <div class="section...">
         if(units_[unitIdx_].bodyType_ != Unit::BODY_NONE)
@@ -566,7 +578,7 @@ void ConverterPass2::EndUnit()
         pout_->WriteFmt("</body>\n");
         pout_->WriteFmt("</html>\n");
 
-        active_ = false;
+        unitActive_ = false;
         ++unitIdx_;
     }
 }
@@ -1475,7 +1487,7 @@ void ConverterPass2::section()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("section", &attrmap);
 
-    StartUnit(Unit::SECTION);
+    StartUnit(Unit::SECTION, &attrmap);
 
     if(!notempty)
         return;
