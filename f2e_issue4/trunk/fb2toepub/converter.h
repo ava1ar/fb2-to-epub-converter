@@ -138,7 +138,9 @@ namespace Fb2ToEpub
 
         // pass 2 data
         std::string                 file_;          // file name to store all unit text
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
         std::string                 fileId_;        // reference id inside file (for toc)
+#endif
         int                         level_;         // toc level
 
         Unit() : type_(UNIT_NONE), size_(0), parent_(0), level_(0) {}
