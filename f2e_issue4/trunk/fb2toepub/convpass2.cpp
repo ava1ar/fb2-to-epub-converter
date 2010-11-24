@@ -82,13 +82,11 @@ public:
                     const strvector &fonts,
                     XlitConv *xlitConv,
                     UnitArray *units,
-                    bool suppressEmptyTitles,
                     OutPackStm *pout)
                         :   s_                  (scanner),
                             css_                (css),
                             fonts_              (fonts),
                             units_              (*units),
-                            suppressEmptyTitles_(suppressEmptyTitles),
                             pout_               (pout),
                             tocLevels_          (0),
                             uniqueIdIdx_        (0),
@@ -109,12 +107,12 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 1
+#if 0
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)
-                printf ("%d-%d-%d %s size=%d, level = %d, %s.xhtml, noteRefId = \"%s\"\n", units_[i].bodyType_, units_[i].type_,
-                        units_[i].id_, units_[i].title_.c_str(), units_[i].size_, units_[i].level_, units_[i].file_.c_str(), units_[i].noteRefId_.c_str());
+                printf ("%d %d-%d-%d %s size=%d, parent=%d, level = %d, %s.xhtml, noteRefId = \"%s\"\n", i, units_[i].bodyType_, units_[i].type_,
+                        units_[i].id_, units_[i].title_.c_str(), units_[i].size_, units_[i].parent_, units_[i].level_, units_[i].file_.c_str(), units_[i].noteRefId_.c_str());
 
             for(ReferenceMap::const_iterator cit = refidToNew_.begin(), cit_end = refidToNew_.end(); cit != cit_end; ++cit)
                 printf("%s -> %s\n", cit->first.c_str(), cit->second.c_str());
@@ -146,7 +144,6 @@ private:
     Ptr<LexScanner>         s_;
     const strvector         &css_, &fonts_;
     UnitArray               &units_;
-    bool                    suppressEmptyTitles_;
     Ptr<OutPackStm>         pout_;
 
     struct Binary
@@ -296,14 +293,16 @@ void ConverterPass2::CalcTocLevels()
     UnitArray::iterator it = units_.begin(), it_end = units_.end();
     for(; it < it_end; ++it)
     {
-        if(!suppressEmptyTitles_ && it->title_.empty() && it->bodyType_ != Unit::BODY_NONE)
+#if !FB2TOEPUB_SUPPRESS_EMPTY_TITLES
+        if(it->title_.empty() && it->bodyType_ != Unit::BODY_NONE)
             it->title_ = "- - - - -";
+#endif
         if(it->parent_ < 0)
             it->level_ = 0;
         else
         {
             int parentLevel = units_[it->parent_].level_;
-            int level = it->title_.empty() ? parentLevel : parentLevel + 1;
+            int level = units_[it->parent_].title_.empty() ? parentLevel : parentLevel + 1;
             it->level_ = level;
             if(levels < level)
                 levels = level;
@@ -336,7 +335,7 @@ int ConverterPass2::CalcLevelToSplit()
     for(int i = maxLevelSize.size(); --i >= 0;)
         if(maxLevelSize[i] > THRESHOLD_SIZE)
             return i;
-    return -1;
+    return 0;
 }
 
 //-----------------------------------------------------------------------
@@ -379,15 +378,25 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
     Unit::Type prevType = Unit::UNIT_NONE;
     for(it = units_.begin(); it < it_end; ++it)
     {
+#if FB2TOEPUB_TOC_REFERS_FILES_ONLY
+        if ((it->type_ != prevType && (prevType != Unit::TITLE || it->type_ != Unit::SECTION)) || it->level_ <= levelToSplit)
+#else
         if ((it->type_ != prevType && (prevType != Unit::TITLE || it->type_ != Unit::SECTION)) ||
             (it->level_ <= levelToSplit && prevLevel >= levelToSplit) ||
             (it->level_ <= prevLevel && prevLevel <= levelToSplit))
+#endif
         {
             if(it == coverPgIt_)
                 file = "cover";
             else
                 file = MakeFileName("txt", fileIdx++);
         }
+
+#if FB2TOEPUB_TOC_REFERS_FILES_ONLY
+        // force exclusion from TOC for all units above split level
+        if(it->level_ > levelToSplit)
+            it->title_.clear();
+#endif
 
         // assing unit file name
         it->file_ = file;
@@ -473,10 +482,18 @@ void ConverterPass2::BuildAnchors(const std::set<std::string> &noteRefIds)
         for(; cit1 != cit1_end; ++cit1)
             if(noteRefIds.find(*cit1) != noteRefIds.end())
             {
+                // this is id to note/comment section
+                std::string id = refidToNew_[*cit1];
+
+                // make sure that this id appears first time
+                ReferenceMap::iterator it = noteidToAnchorId_.lower_bound(id);
+                if(it != noteidToAnchorId_.end() && it->first == id)
+                    continue;   // already has anchor
+
                 // create new unique anchor id
                 std::string anchorid = MakeUniqueId(true);
                 refidToUnit_[anchorid] = &*cit;
-                noteidToAnchorId_[refidToNew_[*cit1]] = anchorid;
+                noteidToAnchorId_.insert(it, ReferenceMap::value_type(id, anchorid));
             }
     }
 }
@@ -764,7 +781,14 @@ void ConverterPass2::AddTocNcx()
             }
             pout_->WriteFmt("<navPoint id=\"navPoint-%d\" playOrder=\"%d\">\n", navPoint, navPoint);
             pout_->WriteFmt("<navLabel><text>%s</text></navLabel>", (xlitConv_ ? xlitConv_->Convert(cit->title_) : cit->title_).c_str());
-            pout_->WriteFmt("<content src=\"%s.xhtml#%s\"/>\n", cit->file_.c_str(), cit->fileId_.c_str());
+
+#if FB2TOEPUB_TOC_REFERS_FILES_ONLY
+            std::string fullId = cit->file_ + ".xhtml";
+#else
+            std::string fullId = cit->file_ + ".xhtml#" + cit->fileId_;
+#endif
+            pout_->WriteFmt("<content src=\"%s\"/>\n", fullId.c_str());
+
             level = cit->level_;
             ++navPoint;
         }
@@ -773,6 +797,7 @@ void ConverterPass2::AddTocNcx()
         if(!first)
             pout_->WriteFmt("</navPoint>\n");
     }
+
     pout_->WriteStr("  </navMap>\n");
     pout_->WriteStr("</ncx>\n");
 }
@@ -1895,10 +1920,9 @@ void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,
                                         const strvector &fonts,
                                         XlitConv *xlitConv,
                                         UnitArray *units,
-                                        bool suppressEmptyTitles,
                                         OutPackStm *pout)
 {
-    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, xlitConv, units, suppressEmptyTitles, pout);
+    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, xlitConv, units, pout);
     conv->Scan();
 }
 

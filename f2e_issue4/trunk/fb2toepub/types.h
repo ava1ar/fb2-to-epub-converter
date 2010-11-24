@@ -115,6 +115,13 @@ inline std::string Concat(const std::string &s1, const std::string &divider, con
 
 
 //-----------------------------------------------------------------------
+inline void Error(const char *s)
+{
+    throw std::string(s);
+}
+
+
+//-----------------------------------------------------------------------
 typedef std::vector<std::string> strvector;
 
 #if 0
