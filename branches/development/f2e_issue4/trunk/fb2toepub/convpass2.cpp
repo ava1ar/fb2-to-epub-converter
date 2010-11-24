@@ -404,8 +404,10 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
         // make unique id
         std::string id = MakeUniqueId();
 
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
         // assing new unit id
         it->fileId_ = id;
+#endif
 
         prevLevel = it->level_;
         prevType = it->type_;
@@ -519,7 +521,9 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
     {
         if(unitHasId_)
             pout_->WriteFmt("</div>\n");        // <div id=...> - original id
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
         pout_->WriteFmt("</div>\n");            // <div id=...> - file id
+#endif
         if(units_[unitIdx_].type_ == Unit::SECTION)
             pout_->WriteFmt("</div>\n");    // <div class="section...>
         ++unitIdx_;
@@ -564,7 +568,9 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
     }
     if(unit.type_ == Unit::SECTION)
         pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
     pout_->WriteFmt("<div id=\"%s\">\n", unit.fileId_.c_str()); // file id
+#endif
 
     unitHasId_ = false;
     if(attrmap)
@@ -587,7 +593,9 @@ void ConverterPass2::EndUnit()
         // close last section and file
         if(unitHasId_)
             pout_->WriteFmt("</div>\n");    // <div id=...> - original id
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
         pout_->WriteFmt("</div>\n");        // <div id=...> - file id
+#endif
         if(units_[unitIdx_].type_ == Unit::SECTION)
             pout_->WriteFmt("</div>\n");    // <div class="section...">
         if(units_[unitIdx_].bodyType_ != Unit::BODY_NONE)

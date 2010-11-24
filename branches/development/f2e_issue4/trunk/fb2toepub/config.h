@@ -29,14 +29,18 @@
 // and their nested section are moved one level up.
 // Otherwise, every section without title is assigned a title "- - - - -"
 //-----------------------------------------------------------------------
-#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES     1
+#ifndef FB2TOEPUB_SUPPRESS_EMPTY_TITLES
+#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
+#endif
 
 //-----------------------------------------------------------------------
 // ENABLE IDS IN TABLE OF CONTENTS
 // If the value is nonzero, TOC contains references to file only
 // Otherwise, TOC contains "file#id" references.
 //-----------------------------------------------------------------------
-#define FB2TOEPUB_TOC_REFERS_FILES_ONLY     1
+#ifndef FB2TOEPUB_TOC_REFERS_FILES_ONLY
+#define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
+#endif
 
 
 #endif
