@@ -18,7 +18,7 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)\image"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
@@ -87,11 +87,12 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine=""
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)\image"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
@@ -164,11 +165,12 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine=""
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release Static|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)$(ConfigurationName)\image"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
@@ -213,7 +215,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="$(ProjectDir)win_zlib_rel\lib\zlibstat.lib"
-				OutputFile="$(OutDir)\image\$(ProjectName).exe"
+				OutputFile="$(OutDir)\$(ProjectName).exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)\$(TargetName).pdb"
@@ -244,6 +246,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="xcopy &quot;$(SolutionDir)README&quot; &quot;$(OutDir)&quot; /Y&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-emb&quot; &quot;$(OutDir)\custom-emb&quot; /Y /E /I&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-noemb&quot; &quot;$(OutDir)\custom-noemb&quot; /Y /E /I"
 			/>
 		</Configuration>
 	</Configurations>
