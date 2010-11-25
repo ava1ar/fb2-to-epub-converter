@@ -23,10 +23,43 @@
 
 #include "config.h"
 #include <string>
+#include <string.h>
 #include <vector>
 
 namespace Fb2ToEpub
 {
+
+#if FB2TOEPUB_NO_STD_STRING_COMPARE
+
+class String : public std::string
+{
+public:
+    String ()                           {}
+    String (const char *p)              : std::string (p) {}
+    String (const std::string &s)       : std::string (s) {}
+
+    int compare(const String &x) const
+    {
+        return strcmp(c_str(), x.c_str());
+    }
+    int compare(size_type offset, size_type no, const String &x) const
+    {
+        return strncmp(c_str()+offset, x.c_str(), no);
+    }
+};
+inline bool operator==(const String &x1, const String &x2)  {return x1.compare(x2) == 0;}
+inline bool operator!=(const String &x1, const String &x2)  {return x1.compare(x2) != 0;}
+inline bool operator< (const String &x1, const String &x2)  {return x1.compare(x2) < 0;}
+inline bool operator> (const String &x1, const String &x2)  {return x1.compare(x2) > 0;}
+inline bool operator<=(const String &x1, const String &x2)  {return x1.compare(x2) <= 0;}
+inline bool operator>=(const String &x1, const String &x2)  {return x1.compare(x2) >= 0;}
+
+#else
+
+typedef std::string String;
+
+#endif
+
 
 /*
 // unconst
@@ -106,16 +139,25 @@ public:
 
 
 //-----------------------------------------------------------------------
-inline std::string Concat(const std::string &s1, const std::string &divider, const std::string &s2)
+inline String Concat(const String &s1, const String &divider, const String &s2)
 {
     return  s2.empty() ? s1 :
             s1.empty() ? s2 :
-            s1 + divider + s2;
+            String(s1 + divider + s2);
 }
 
 
 //-----------------------------------------------------------------------
-typedef std::vector<std::string> strvector;
+inline void Error(const char *s)
+{
+    throw String(s);
+}
+
+
+//-----------------------------------------------------------------------
+typedef std::vector<String> strvector;
+
+//-----------------------------------------------------------------------
 
 #if 0
 //-----------------------------------------------------------------------
@@ -123,10 +165,10 @@ typedef std::vector<std::string> strvector;
 //-----------------------------------------------------------------------
 struct PathLoc
 {
-    std::string path_;
+    String      path_;
     bool        isFile_;
     PathLoc() {}
-    PathLoc(const std::string &path, bool isFile) : path_(path), isFile_(isFile) {}
+    PathLoc(const String &path, bool isFile) : path_(path), isFile_(isFile) {}
 };
 typedef std::vector<PathLoc> PathLocVector;
 #endif

@@ -97,7 +97,7 @@ void LexScanner::SkipElement()
 }
 
 //-----------------------------------------------------------------------
-void LexScanner::CheckAndSkipElement(const std::string &element)
+void LexScanner::CheckAndSkipElement(const String &element)
 {
     if(!IsNextElement(element))
         Error("expected element not found");
@@ -105,14 +105,14 @@ void LexScanner::CheckAndSkipElement(const std::string &element)
 }
 
 //-----------------------------------------------------------------------
-void LexScanner::SkipIfElement(const std::string &element)
+void LexScanner::SkipIfElement(const String &element)
 {
     if(LookAhead() == Token(START, element))
         SkipElement();
 }
 
 //-----------------------------------------------------------------------
-void LexScanner::SkipAll(const std::string &element)
+void LexScanner::SkipAll(const String &element)
 {
     Token t(START, element);
     while(LookAhead() == t)
@@ -161,7 +161,7 @@ void LexScanner::SkipXMLDeclaration ()
 }
 
 //-----------------------------------------------------------------------
-bool LexScanner::IsNextElement(const std::string &element)
+bool LexScanner::IsNextElement(const String &element)
 {
     return (LookAhead() == Token(START, element));
 }
@@ -194,7 +194,7 @@ void LexScanner::ParseAttributes(AttrMap *attrmap)
 }
 
 //-----------------------------------------------------------------------
-bool LexScanner::BeginElement(const std::string &element, AttrMap *attrmap)
+bool LexScanner::BeginElement(const String &element, AttrMap *attrmap)
 {
     if(GetToken() != Token(START, element))
     {
@@ -225,7 +225,7 @@ bool LexScanner::BeginElement(const std::string &element, AttrMap *attrmap)
 }
 
 //-----------------------------------------------------------------------
-void LexScanner::BeginNotEmptyElement(const std::string &element, AttrMap *attrmap)
+void LexScanner::BeginNotEmptyElement(const String &element, AttrMap *attrmap)
 {
     if(!BeginElement(element, attrmap))
     {
@@ -236,13 +236,13 @@ void LexScanner::BeginNotEmptyElement(const std::string &element, AttrMap *attrm
 }
 
 //-----------------------------------------------------------------------
-std::string LexScanner::SimpleTextElement(const std::string &element, AttrMap *attrmap)
+String LexScanner::SimpleTextElement(const String &element, AttrMap *attrmap)
 {
     if(!BeginElement(element, attrmap))
         return "";
 
     SetScannerDataMode setDataMode(this);
-    std::string text;
+    String text;
     LexScanner::Token t = GetToken();
     if(t.type_ == DATA)
     {

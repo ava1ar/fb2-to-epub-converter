@@ -33,7 +33,7 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 
 COBJ=$(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC)))))
 
-#CFLAGS=-Wall -W -O2 -I$(incdir)
+#CFLAGS= -O2 -I$(incdir) -D FB2TOEPUB_NO_STD_STRING_COMPARE=1
 CFLAGS= -O2 -I$(incdir)
 
 all : makedirs $(distdir)/fb2toepub
@@ -43,7 +43,7 @@ makedirs :
 	mkdir -p $(distdir)
 
 $(distdir)/fb2toepub : $(COBJ)
-	g++ -o $@ $(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC))))) -lz
+	g++ -o $@ $(COBJ) -lz
 	strip $@
 
 $(srcdir)/scanner.cpp : $(srcdir)/scanner.l
