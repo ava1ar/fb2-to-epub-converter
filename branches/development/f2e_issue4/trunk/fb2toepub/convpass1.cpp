@@ -44,16 +44,16 @@ private:
     int                     sectionCnt_;
     bool                    textMode_;
     Unit::BodyType          bodyType_;
-    std::set<std::string>   xlns_;      // xlink namespaces
-    std::set<std::string>   allRefIds_; // all ref ids
+    std::set<String>        xlns_;      // xlink namespaces
+    std::set<String>        allRefIds_; // all ref ids
 
-    const std::string* AddId    (const AttrMap &attrmap);
-    std::string Findhref        (const AttrMap &attrmap) const;
-    void ParseTextAndEndElement (const std::string &element, std::string *plainText);
+    const String* AddId         (const AttrMap &attrmap);
+    String Findhref             (const AttrMap &attrmap) const;
+    void ParseTextAndEndElement (const String &element, String *plainText);
 
     // FictionBook elements
     void FictionBook            ();
-    void a                      (std::string *plainText);
+    void a                      (String *plainText);
     void annotation             (bool startUnit = false);
     //void author                 ();
     //void binary                 ();
@@ -62,14 +62,14 @@ private:
     //void book_title             ();
     void cite                   ();
     //void city                   ();
-    void code                   (std::string *plainText);
+    void code                   (String *plainText);
     void coverpage              ();
     //void custom_info            ();
     //void date                   ();
     void description            ();
     //void document_info          ();
     //void email                  ();
-    void emphasis               (std::string *plainText);
+    void emphasis               (String *plainText);
     void empty_line             ();
     void epigraph               ();
     //void first_name             ();
@@ -86,7 +86,7 @@ private:
     //void nickname               ();
     //void output_document_class  ();
     //void output                 ();
-    void p                      (std::string *plainText = NULL);
+    void p                      (String *plainText = NULL);
     //void part                   ();
     void poem                   ();
     //void program_used           ();
@@ -99,22 +99,22 @@ private:
     //void src_title_info         ();
     //void src_url                ();
     void stanza                 ();
-    void strikethrough          (std::string *plainText);
-    void strong                 (std::string *plainText);
-    void style                  (std::string *plainText);
+    void strikethrough          (String *plainText);
+    void strong                 (String *plainText);
+    void style                  (String *plainText);
     //void stylesheet             ();
-    void sub                    (std::string *plainText);
-    void subtitle               (std::string *plainText = NULL);
-    void sup                    (std::string *plainText);
+    void sub                    (String *plainText);
+    void subtitle               (String *plainText = NULL);
+    void sup                    (String *plainText);
     void table                  ();
     void td                     ();
-    void text_author            (std::string *plainText = NULL);
+    void text_author            (String *plainText = NULL);
     void th                     ();
-    void title                  (std::string *plainText = NULL, bool startUnit = false);
+    void title                  (String *plainText = NULL, bool startUnit = false);
     void title_info             ();
     void tr                     ();
     //void translator             ();
-    void v                      (std::string *plainText = NULL);
+    void v                      (String *plainText = NULL);
     //void version                ();
     //void year                   ();
 };
@@ -127,7 +127,7 @@ void ConverterPass1::Scan()
 }
 
 //-----------------------------------------------------------------------
-const std::string* ConverterPass1::AddId(const AttrMap &attrmap)
+const String* ConverterPass1::AddId(const AttrMap &attrmap)
 {
     AttrMap::const_iterator cit = attrmap.find("id");
     if(cit == attrmap.end())
@@ -141,12 +141,12 @@ const std::string* ConverterPass1::AddId(const AttrMap &attrmap)
 }
 
 //-----------------------------------------------------------------------
-std::string ConverterPass1::Findhref(const AttrMap &attrmap) const
+String ConverterPass1::Findhref(const AttrMap &attrmap) const
 {
-    std::set<std::string>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
+    std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
     for(; cit != cit_end; ++cit)
     {
-        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? std::string("href") : (*cit)+":href");
+        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : (*cit)+":href");
         if(ait != attrmap.end())
             return ait->second;
     }
@@ -154,7 +154,7 @@ std::string ConverterPass1::Findhref(const AttrMap &attrmap) const
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::ParseTextAndEndElement(const std::string &element, std::string *plainText)
+void ConverterPass1::ParseTextAndEndElement(const String &element, String *plainText)
 {
     SetScannerDataMode setDataMode(s_);
     for(;;)
@@ -217,9 +217,9 @@ void ConverterPass1::FictionBook()
     bool has_fb = false, has_emptyfb = false;
     for(; cit != cit_end; ++cit)
     {
-        static const std::string xmlns = "xmlns";
+        static const String xmlns = "xmlns";
         static const std::size_t xmlns_len = xmlns.length();
-        static const std::string fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
+        static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
 
         if(!cit->second.compare(fbID))
         {
@@ -259,12 +259,12 @@ void ConverterPass1::FictionBook()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::a(std::string *plainText)
+void ConverterPass1::a(String *plainText)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("a", &attrmap);
 
-    std::string id = Findhref(attrmap);
+    String id = Findhref(attrmap);
     if(!id.empty() && id[0] == '#')
         units_->back().refs_.insert(id.substr(1));  // collect internal references
 
@@ -433,7 +433,7 @@ void ConverterPass1::cite()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::code(std::string *plainText)
+void ConverterPass1::code(String *plainText)
 {
     if(s_->BeginElement("code"))
         ParseTextAndEndElement("code", plainText);
@@ -468,7 +468,7 @@ void ConverterPass1::description()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::emphasis(std::string *plainText)
+void ConverterPass1::emphasis(String *plainText)
 {
     if(s_->BeginElement("emphasis"))
         ParseTextAndEndElement("emphasis", plainText);
@@ -538,7 +538,7 @@ void ConverterPass1::image(bool in_line, Unit::Type unitType)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::p(std::string *plainText)
+void ConverterPass1::p(String *plainText)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("p", &attrmap);
@@ -591,7 +591,7 @@ void ConverterPass1::section(int parent)
 
     int idx = units_->size();
     units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, parent));
-    const std::string *id = AddId(attrmap);
+    const String *id = AddId(attrmap);
     if(!notempty)
         return;
 
@@ -602,7 +602,7 @@ void ConverterPass1::section(int parent)
         if((bodyType_ == Unit::NOTES || bodyType_ == Unit::COMMENTS) && id && !id->empty())
             units_->back().noteRefId_ = *id;
 
-        std::string plainText;
+        String plainText;
         title(&plainText);
         units_->back().title_ = plainText;
     }
@@ -684,35 +684,35 @@ void ConverterPass1::stanza()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::strikethrough(std::string *plainText)
+void ConverterPass1::strikethrough(String *plainText)
 {
     if(s_->BeginElement("strikethrough"))
         ParseTextAndEndElement("strikethrough", plainText);
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::strong(std::string *plainText)
+void ConverterPass1::strong(String *plainText)
 {
     if(s_->BeginElement("strong"))
         ParseTextAndEndElement("strong", plainText);
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::style(std::string *plainText)
+void ConverterPass1::style(String *plainText)
 {
     if(s_->BeginElement("style"))
         ParseTextAndEndElement("style", plainText);
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::sub(std::string *plainText)
+void ConverterPass1::sub(String *plainText)
 {
     if(s_->BeginElement("sub"))
         ParseTextAndEndElement("sub", plainText);
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::subtitle(std::string *plainText)
+void ConverterPass1::subtitle(String *plainText)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("subtitle", &attrmap);
@@ -722,7 +722,7 @@ void ConverterPass1::subtitle(std::string *plainText)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::sup(std::string *plainText)
+void ConverterPass1::sup(String *plainText)
 {
     if(s_->BeginElement("sup"))
         ParseTextAndEndElement("sup", plainText);
@@ -755,7 +755,7 @@ void ConverterPass1::td()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::text_author(std::string *plainText)
+void ConverterPass1::text_author(String *plainText)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("text-author", &attrmap);
@@ -775,12 +775,12 @@ void ConverterPass1::th()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::title(std::string *plainText, bool startUnit)
+void ConverterPass1::title(String *plainText, bool startUnit)
 {
     if(!s_->BeginElement("title"))
         return;
 
-    std::string buf;
+    String buf;
     if(startUnit)
     {
         units_->push_back(Unit(bodyType_, Unit::TITLE, 0, -1));
@@ -797,7 +797,7 @@ void ConverterPass1::title(std::string *plainText, bool startUnit)
                 p();
             else
             {
-                std::string text;
+                String text;
                 p(&text);
                 *plainText = Concat(*plainText, " ", text);
             }
@@ -891,7 +891,7 @@ void ConverterPass1::tr()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::v(std::string *plainText)
+void ConverterPass1::v(String *plainText)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("v", &attrmap);

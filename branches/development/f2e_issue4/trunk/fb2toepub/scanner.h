@@ -29,7 +29,7 @@
 namespace Fb2ToEpub
 {
     //-----------------------------------------------------------------------
-    typedef std::map<std::string, std::string> AttrMap;
+    typedef std::map<String, String> AttrMap;
 
     //-----------------------------------------------------------------------
     class LexScanner : public Object
@@ -63,13 +63,13 @@ namespace Fb2ToEpub
         {
             TokenType   type_;
             char        c_;
-            std::string s_;
+            String      s_;
             std::size_t size_;  // approximate size of DATA section (valid in skip mode)
 
             Token(TokenType type, std::size_t size = 0)                         : type_(type), size_(size) {}
             Token(char c)                                                       : type_(CHAR), c_(c) {}
             Token(TokenType type, const char *s, std::size_t size = 0)          : type_(type), s_(s), size_(size) {}
-            Token(TokenType type, const std::string &s, std::size_t size = 0)   : type_(type), s_(s), size_(size) {}
+            Token(TokenType type, const String &s, std::size_t size = 0)        : type_(type), s_(s), size_(size) {}
 
             static int compare(const Token &t1, const Token &t2)
             {
@@ -107,15 +107,15 @@ namespace Fb2ToEpub
         void SkipAttributes                         ();
         void SkipRestOfElementContent               ();
         void SkipElement                            ();
-        void CheckAndSkipElement                    (const std::string &element);
-        void SkipIfElement                          (const std::string &element);
-        void SkipAll                                (const std::string &element);
+        void CheckAndSkipElement                    (const String &element);
+        void SkipIfElement                          (const String &element);
+        void SkipAll                                (const String &element);
         void SkipXMLDeclaration                     ();
-        bool IsNextElement                          (const std::string &element);
+        bool IsNextElement                          (const String &element);
         void ParseAttributes                        (AttrMap *attrmap);
-        bool BeginElement                           (const std::string &element, AttrMap *attrmap = NULL);  // returns true if nonempty, false otherwise
-        void BeginNotEmptyElement                   (const std::string &element, AttrMap *attrmap = NULL);
-        std::string SimpleTextElement               (const std::string &element, AttrMap *attrmap = NULL);
+        bool BeginElement                           (const String &element, AttrMap *attrmap = NULL);  // returns true if nonempty, false otherwise
+        void BeginNotEmptyElement                   (const String &element, AttrMap *attrmap = NULL);
+        String SimpleTextElement                    (const String &element, AttrMap *attrmap = NULL);
         void EndElement                             ();
 
         // text processing helpers

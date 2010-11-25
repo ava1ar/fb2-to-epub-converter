@@ -107,7 +107,7 @@ void InStmUtf8::Rewind()
     }
 }
 
-static std::string ParseEncoding(InStm *stm)
+static String ParseEncoding(InStm *stm)
 {
     Ptr<LexScanner> scanner = CreateScanner(stm);
 

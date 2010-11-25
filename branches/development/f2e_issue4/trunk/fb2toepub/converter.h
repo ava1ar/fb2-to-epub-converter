@@ -127,19 +127,19 @@ namespace Fb2ToEpub
         BodyType                    bodyType_;      // body type
         Type                        type_;          // unit type
         int                         id_;            // inique id (among same type units)
-        std::string                 title_;         // unit title from fb2 book, if any (e.g. section title)
+        String                      title_;         // unit title from fb2 book, if any (e.g. section title)
 
         // pass 1 data
         std::size_t                 size_;          // approx. size of unit
         int                         parent_;        // paremt unit index, of -1 in no parent
         strvector                   refIds_;        // refernce ids collected in this unit
-        std::set<std::string>       refs_;          // refernces from this unit to another place
-        std::string                 noteRefId_;     // if it is note or comment section and is has an id, it should have anchor
+        std::set<String>            refs_;          // refernces from this unit to another place
+        String                      noteRefId_;     // if it is note or comment section and is has an id, it should have anchor
 
         // pass 2 data
-        std::string                 file_;          // file name to store all unit text
+        String                      file_;          // file name to store all unit text
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
-        std::string                 fileId_;        // reference id inside file (for toc)
+        String                      fileId_;        // reference id inside file (for toc)
 #endif
         int                         level_;         // toc level
 
@@ -150,7 +150,7 @@ namespace Fb2ToEpub
 
 
     //-----------------------------------------------------------------------
-    typedef std::map<std::string, std::string>  ReferenceMap;   // (refid -> file) or (refid -> refid)
+    typedef std::map<String, String>  ReferenceMap;   // (refid -> file) or (refid -> refid)
 
 
     //-----------------------------------------------------------------------

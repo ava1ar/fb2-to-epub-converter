@@ -60,7 +60,7 @@ private:
 
 
 //-----------------------------------------------------------------------
-static std::string EncodeStr(const std::string &str)
+static String EncodeStr(const String &str)
 {
     std::vector<char> buf;
     LexScanner::Encode(str.c_str(), &buf);
@@ -68,7 +68,7 @@ static std::string EncodeStr(const std::string &str)
 }
 
 //-----------------------------------------------------------------------
-static void AddContentManifestFile(OutPackStm *pout, const std::string &id, const std::string &ref, const std::string &media_type)
+static void AddContentManifestFile(OutPackStm *pout, const String &id, const String &ref, const String &media_type)
 {
     pout->WriteFmt("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>\n", EncodeStr(id).c_str(), EncodeStr(ref).c_str(), EncodeStr(media_type).c_str());
 }
@@ -102,7 +102,7 @@ public:
     {
         BuildOutputLayout();
         {
-            std::set<std::string> noteRefIds;
+            std::set<String> noteRefIds;
             BuildReferenceMaps(&noteRefIds);
             BuildAnchors(noteRefIds);
         }
@@ -148,13 +148,13 @@ private:
 
     struct Binary
     {
-        std::string file_, type_;
+        String file_, type_;
         Binary() {}
-        Binary(const std::string &file, const std::string type) : file_(file), type_(type) {}
+        Binary(const String &file, const String type) : file_(file), type_(type) {}
     };
     typedef std::vector<Binary> binvector;
 
-    typedef std::map<std::string, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
+    typedef std::map<String, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
 
     int                     tocLevels_;
     UnitArray::iterator     coverPgIt_;
@@ -162,14 +162,14 @@ private:
     ReferenceMap            refidToNew_;        // (re)mapping of original reference id to unique reference id
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
     ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
-    std::set<std::string>   usedAnchorsids_;    // anchor ids already set
+    std::set<String>        usedAnchorsids_;    // anchor ids already set
     strvector               cssfiles_, ttffiles_, otffiles_;
     binvector               binaries_;
-    std::set<std::string>   xlns_;              // xlink namespaces
-    std::set<std::string>   allRefIds_;         // all ref ids
-    std::string             authors_, title_, lang_, id_;
+    std::set<String>        xlns_;              // xlink namespaces
+    std::set<String>        allRefIds_;         // all ref ids
+    String                  authors_, title_, lang_, id_;
 
-    std::string             prevUnitFile_;
+    String                  prevUnitFile_;
     int                     unitIdx_;
     bool                    unitActive_;
     bool                    unitHasId_;
@@ -179,13 +179,13 @@ private:
     void AdjustUnitSizes        ();
     void CalcTocLevels          ();
     int CalcLevelToSplit        ();
-    std::string MakeUniqueId    (bool anchor = false);
+    String MakeUniqueId         (bool anchor = false);
     void BuiltFileLayout        (int levelToSplit);
     void BuildOutputLayout      ();
-    void BuildReferenceMaps     (std::set<std::string> *noteRefIds);
-    void BuildAnchors           (const std::set<std::string> &noteRefIds);
+    void BuildReferenceMaps     (std::set<String> *noteRefIds);
+    void BuildAnchors           (const std::set<String> &noteRefIds);
 
-    std::string Findhref        (const AttrMap &attrmap) const;
+    String Findhref             (const AttrMap &attrmap) const;
 
     void StartUnit              (Unit::Type unitType, AttrMap *attrmap = NULL);
     void EndUnit                ();
@@ -197,10 +197,10 @@ private:
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
     void AddTocNcx              ();
-    const std::string* AddId    (const AttrMap &attrmap);
-    void ParseTextAndEndElement (const std::string &element);
-    void CopyAttribute          (const std::string &attr, const AttrMap &attrmap);
-    bool AddAnchorid            (const std::string &anchorid);
+    const String* AddId         (const AttrMap &attrmap);
+    void ParseTextAndEndElement (const String &element);
+    void CopyAttribute          (const String &attr, const AttrMap &attrmap);
+    bool AddAnchorid            (const String &anchorid);
 
     // FictionBook elements
     void FictionBook            ();
@@ -261,7 +261,7 @@ private:
     void td                     ();
     void text_author            ();
     void th                     ();
-    void title                  (bool startUnit, const std::string &anchorid = "");
+    void title                  (bool startUnit, const String &anchorid = "");
     void title_info             ();
     void tr                     ();
     //void translator             ();
@@ -339,7 +339,7 @@ int ConverterPass2::CalcLevelToSplit()
 }
 
 //-----------------------------------------------------------------------
-static std::string MakeFileName(const std::string &prefix, int idx)
+static String MakeFileName(const String &prefix, int idx)
 {
     std::ostringstream fileName;
     fileName << prefix;
@@ -350,7 +350,7 @@ static std::string MakeFileName(const std::string &prefix, int idx)
 }
 
 //-----------------------------------------------------------------------
-std::string ConverterPass2::MakeUniqueId(bool anchor)
+String ConverterPass2::MakeUniqueId(bool anchor)
 {
     std::ostringstream fileId;
     fileId << (anchor ? "anchor" : "id") << uniqueIdIdx_++;
@@ -373,7 +373,7 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
 
     // build layout
     int fileIdx = 0;
-    std::string file;
+    String file;
     int prevLevel = -1;
     Unit::Type prevType = Unit::UNIT_NONE;
     for(it = units_.begin(); it < it_end; ++it)
@@ -402,7 +402,7 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
         it->file_ = file;
 
         // make unique id
-        std::string id = MakeUniqueId();
+        String id = MakeUniqueId();
 
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
         // assing new unit id
@@ -428,7 +428,7 @@ void ConverterPass2::BuildOutputLayout()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::BuildReferenceMaps(std::set<std::string> *noteRefIds)
+void ConverterPass2::BuildReferenceMaps(std::set<String> *noteRefIds)
 {
     ReferenceMap::iterator refidToNew_end = refidToNew_.end();
     RefidInfoMap::iterator refidToUnit_end = refidToUnit_.end();
@@ -439,10 +439,10 @@ void ConverterPass2::BuildReferenceMaps(std::set<std::string> *noteRefIds)
         strvector::const_iterator cit1 = cit->refIds_.begin(), cit1_end = cit->refIds_.end();
         for(; cit1 < cit1_end; ++cit1)
         {
-            const std::string &id = *cit1;
+            const String &id = *cit1;
 
             // map original id to new id
-            std::string newId;
+            String newId;
             {
                 ReferenceMap::iterator it = refidToNew_.lower_bound(id);
                 if(it != refidToNew_end && it->first == id)
@@ -475,17 +475,17 @@ void ConverterPass2::BuildReferenceMaps(std::set<std::string> *noteRefIds)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::BuildAnchors(const std::set<std::string> &noteRefIds)
+void ConverterPass2::BuildAnchors(const std::set<String> &noteRefIds)
 {
     UnitArray::const_iterator cit = units_.begin(), cit_end = units_.end();
     for(; cit < cit_end; ++cit)
     {
-        std::set<std::string>::const_iterator cit1 = cit->refs_.begin(), cit1_end = cit->refs_.end();
+        std::set<String>::const_iterator cit1 = cit->refs_.begin(), cit1_end = cit->refs_.end();
         for(; cit1 != cit1_end; ++cit1)
             if(noteRefIds.find(*cit1) != noteRefIds.end())
             {
                 // this is id to note/comment section
-                std::string id = refidToNew_[*cit1];
+                String id = refidToNew_[*cit1];
 
                 // make sure that this id appears first time
                 ReferenceMap::iterator it = noteidToAnchorId_.lower_bound(id);
@@ -493,7 +493,7 @@ void ConverterPass2::BuildAnchors(const std::set<std::string> &noteRefIds)
                     continue;   // already has anchor
 
                 // create new unique anchor id
-                std::string anchorid = MakeUniqueId(true);
+                String anchorid = MakeUniqueId(true);
                 refidToUnit_[anchorid] = &*cit;
                 noteidToAnchorId_.insert(it, ReferenceMap::value_type(id, anchorid));
             }
@@ -501,12 +501,12 @@ void ConverterPass2::BuildAnchors(const std::set<std::string> &noteRefIds)
 }
 
 //-----------------------------------------------------------------------
-std::string ConverterPass2::Findhref(const AttrMap &attrmap) const
+String ConverterPass2::Findhref(const AttrMap &attrmap) const
 {
-    std::set<std::string>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
+    std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
     for(; cit != cit_end; ++cit)
     {
-        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? std::string("href") : (*cit)+":href");
+        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : (*cit)+":href");
         if(ait != attrmap.end())
             return ait->second;
     }
@@ -544,7 +544,7 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
         }
 
         // begin new file
-        pout_->BeginFile((std::string("OPS/") + unit.file_ + ".xhtml").c_str(), true);
+        pout_->BeginFile((String("OPS/") + unit.file_ + ".xhtml").c_str(), true);
         pout_->WriteFmt("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         pout_->WriteFmt("<html xmlns=\"http://www.w3.org/1999/xhtml\">\n");
         pout_->WriteFmt("<head>\n");
@@ -575,7 +575,7 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
     unitHasId_ = false;
     if(attrmap)
     {
-        std::string id = (*attrmap)["id"];
+        String id = (*attrmap)["id"];
         if(!id.empty())
         {
             unitHasId_ = true;
@@ -637,11 +637,11 @@ void ConverterPass2::AddStyles()
     for(; cit < cit_end; ++cit)
     {
         Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), "css");
-        std::string fname;
-        for(std::string ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
+        String fname;
+        for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
         {
-            fname = std::string("css/") + fname;
-            pout_->AddFile(CreateInFileStm(ospath.c_str()), (std::string("OPS/") + fname).c_str(), true);
+            fname = String("css/") + fname;
+            pout_->AddFile(CreateInFileStm(ospath.c_str()), (String("OPS/") + fname).c_str(), true);
             cssfiles_.push_back(fname);
         }
     }
@@ -654,11 +654,11 @@ void ConverterPass2::AddFonts(const char *ext, strvector *fontfiles)
     for(; cit < cit_end; ++cit)
     {
         Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), ext);
-        std::string fname;
-        for(std::string ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
+        String fname;
+        for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
         {
-            fname = std::string("fonts/") + fname;
-            pout_->AddFile(CreateInFileStm(ospath.c_str()), (std::string("OPS/") + fname).c_str(), true);
+            fname = String("fonts/") + fname;
+            pout_->AddFile(CreateInFileStm(ospath.c_str()), (String("OPS/") + fname).c_str(), true);
             fontfiles->push_back(fname);
         }
     }
@@ -683,7 +683,7 @@ void ConverterPass2::AddContentOpf()
     strvector files;
     {
         // build file array
-        std::string prevFile;
+        String prevFile;
         UnitArray::const_iterator cit = units_.begin(), cit_end = units_.end();
         for(; cit < cit_end; ++cit)
             if(prevFile != cit->file_)
@@ -791,9 +791,9 @@ void ConverterPass2::AddTocNcx()
             pout_->WriteFmt("<navLabel><text>%s</text></navLabel>", (xlitConv_ ? xlitConv_->Convert(cit->title_) : cit->title_).c_str());
 
 #if FB2TOEPUB_TOC_REFERS_FILES_ONLY
-            std::string fullId = cit->file_ + ".xhtml";
+            String fullId = cit->file_ + ".xhtml";
 #else
-            std::string fullId = cit->file_ + ".xhtml#" + cit->fileId_;
+            String fullId = cit->file_ + ".xhtml#" + cit->fileId_;
 #endif
             pout_->WriteFmt("<content src=\"%s\"/>\n", fullId.c_str());
 
@@ -811,7 +811,7 @@ void ConverterPass2::AddTocNcx()
 }
 
 //-----------------------------------------------------------------------
-const std::string* ConverterPass2::AddId(const AttrMap &attrmap)
+const String* ConverterPass2::AddId(const AttrMap &attrmap)
 {
     AttrMap::const_iterator cit = attrmap.find("id");
     if(cit == attrmap.end())
@@ -820,7 +820,7 @@ const std::string* ConverterPass2::AddId(const AttrMap &attrmap)
     if(allRefIds_.find(cit->second) != allRefIds_.end())
         return NULL;    // ignore second instance
 
-    std::string id = cit->second;
+    String id = cit->second;
 
     // remap it to our new id
     id = refidToNew_[id];
@@ -832,7 +832,7 @@ const std::string* ConverterPass2::AddId(const AttrMap &attrmap)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::ParseTextAndEndElement (const std::string &element)
+void ConverterPass2::ParseTextAndEndElement (const String &element)
 {
     SetScannerDataMode setDataMode(s_);
     for(;;)
@@ -881,7 +881,7 @@ void ConverterPass2::ParseTextAndEndElement (const std::string &element)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::CopyAttribute(const std::string &attr, const AttrMap &attrmap)
+void ConverterPass2::CopyAttribute(const String &attr, const AttrMap &attrmap)
 {
     AttrMap::const_iterator cit = attrmap.find(attr);
     if(cit != attrmap.end())
@@ -899,9 +899,9 @@ void ConverterPass2::FictionBook()
     bool has_fb = false, has_emptyfb = false;
     for(; cit != cit_end; ++cit)
     {
-        static const std::string xmlns = "xmlns";
+        static const String xmlns = "xmlns";
         static const std::size_t xmlns_len = xmlns.length();
-        static const std::string fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
+        static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
 
         if(!cit->second.compare(fbID))
         {
@@ -948,9 +948,9 @@ void ConverterPass2::FictionBook()
 }
 
 //-----------------------------------------------------------------------
-bool ConverterPass2::AddAnchorid(const std::string &anchorid)
+bool ConverterPass2::AddAnchorid(const String &anchorid)
 {
-    std::set<std::string>::iterator it = usedAnchorsids_.lower_bound(anchorid);
+    std::set<String>::iterator it = usedAnchorsids_.lower_bound(anchorid);
     if(it != usedAnchorsids_.end() && *it == anchorid)
         return false;   // already processed
 
@@ -964,7 +964,7 @@ void ConverterPass2::a()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("a", &attrmap);
 
-    std::string id = Findhref(attrmap);
+    String id = Findhref(attrmap);
     if(id.empty())
         Error("<a> should have href attribute");
 
@@ -983,14 +983,14 @@ void ConverterPass2::a()
     {
         // internal reference
         id = id.substr(1);
-        std::string file = refidToUnit_[refidToNew_[id]]->file_;
+        String file = refidToUnit_[refidToNew_[id]]->file_;
 
         // remap it to our new id
         id = refidToNew_[id];
         if(id.empty())
             Error("a() internal error");
 
-        std::string anchorid = noteidToAnchorId_[id];
+        String anchorid = noteidToAnchorId_[id];
         if(!anchorid.empty() && AddAnchorid(anchorid))
         {
             anchorSet = true;
@@ -1105,7 +1105,7 @@ void ConverterPass2::author()
 {
     s_->BeginNotEmptyElement("author");
 
-    std::string author;
+    String author;
     if(s_->IsNextElement("first-name"))
     {
         author = s_->SimpleTextElement("first-name");
@@ -1135,7 +1135,7 @@ void ConverterPass2::binary()
     //if(b.file_.empty() || (b.type_ != "image/jpeg" && b.type_ != "image/png"))
     if(b.file_.empty() || b.type_.empty())
         Error("invalid <binary> attributes");
-    b.file_ = std::string("bin/") + b.file_;
+    b.file_ = String("bin/") + b.file_;
     binaries_.push_back(b);
 
     // store binary file
@@ -1145,7 +1145,7 @@ void ConverterPass2::binary()
         if(t.type_ != LexScanner::DATA)
             Error("<binary> data expected");
 
-        pout_->BeginFile((std::string("OPS/") + b.file_).c_str(), true);
+        pout_->BeginFile((String("OPS/") + b.file_).c_str(), true);
         DecodeBase64(t.s_.c_str(), pout_);
     }
 
@@ -1421,10 +1421,10 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
     }
 
     // get file href
-    std::string href = Findhref(attrmap), alt = attrmap["alt"];
+    String href = Findhref(attrmap), alt = attrmap["alt"];
     if(!href.empty())
     {
-        std::string group = html_inline ? "span" : "div";
+        String group = html_inline ? "span" : "div";
 
         pout_->WriteFmt("<%s class=\"image\">", group.c_str());
         if(scale)
@@ -1529,7 +1529,7 @@ void ConverterPass2::section()
     if(s_->IsNextElement("title"))
     {
         // add anchor ref
-        std::string id = units_[unitIdx_].noteRefId_;
+        String id = units_[unitIdx_].noteRefId_;
         if(!id.empty())
         {
             id = noteidToAnchorId_[refidToNew_[id]];
@@ -1787,7 +1787,7 @@ void ConverterPass2::th()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::title(bool startUnit, const std::string &anchorid)
+void ConverterPass2::title(bool startUnit, const String &anchorid)
 {
     if(!s_->BeginElement("title"))
         return;

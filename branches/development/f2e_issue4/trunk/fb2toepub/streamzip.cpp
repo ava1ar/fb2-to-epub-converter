@@ -47,7 +47,7 @@ class UnzipStm : public InStm, Noncopyable
 {
     ::unzFile   uf_;
     mutable int c_; // last buffered character
-    std::string name_;
+    String name_;
 
 public:
     explicit UnzipStm(const char *name);
