@@ -1346,11 +1346,10 @@ void ConverterPass2::emphasis()
 //-----------------------------------------------------------------------
 void ConverterPass2::empty_line()
 {
-    if(s_->BeginElement("empty-line"))
-    {
-        pout_->WriteStr("<p class=\"empty-line\"> </p>\n");
+    bool notempty = s_->BeginElement("empty-line");
+    pout_->WriteStr("<p class=\"empty-line\"> </p>\n");
+    if(notempty)
         s_->EndElement();
-    }
 }
 
 //-----------------------------------------------------------------------
