@@ -656,6 +656,9 @@ void ConverterPass1::section(int parent)
                 Error(ss.str().c_str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
+
+            if(units_->back().size_ > MAX_UNIT_SIZE)
+                units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, parent));
         }
 
     s_->EndElement();

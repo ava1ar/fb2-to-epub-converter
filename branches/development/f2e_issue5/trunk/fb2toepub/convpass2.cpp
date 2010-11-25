@@ -93,6 +93,7 @@ public:
                             unitIdx_            (0),
                             unitActive_         (false),
                             unitHasId_          (false),
+                            sectionSize_        (0),
                             xlitConv_           (xlitConv)
     {
         coverPgIt_ = units_.end();
@@ -173,6 +174,7 @@ private:
     int                     unitIdx_;
     bool                    unitActive_;
     bool                    unitHasId_;
+    std::size_t             sectionSize_;
     Ptr<XlitConv>           xlitConv_;
 
 
@@ -845,6 +847,7 @@ void ConverterPass2::ParseTextAndEndElement (const String &element)
             return;
 
         case LexScanner::DATA:
+            sectionSize_ += t.size_;
             pout_->WriteStr(s_->GetToken().s_.c_str());
             continue;
 
@@ -1022,6 +1025,7 @@ void ConverterPass2::a()
             return;
 
         case LexScanner::DATA:
+            sectionSize_ += t.size_;
             pout_->WriteStr(s_->GetToken().s_.c_str());
             continue;
 
@@ -1521,6 +1525,7 @@ void ConverterPass2::section()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("section", &attrmap);
 
+    sectionSize_ = 0;
     StartUnit(Unit::SECTION, &attrmap);
 
     if(!notempty)
@@ -1591,6 +1596,12 @@ void ConverterPass2::section()
                 Error(ss.str().c_str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
+
+            if(sectionSize_ > MAX_UNIT_SIZE)
+            {
+                sectionSize_ = 0;
+                StartUnit(Unit::SECTION);
+            }
         }
     }
 
