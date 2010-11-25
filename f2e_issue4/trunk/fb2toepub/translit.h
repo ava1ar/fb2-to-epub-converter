@@ -34,7 +34,7 @@ namespace Fb2ToEpub
 class XlitConv : public Object
 {
 public:
-    virtual std::string Convert(const std::string &s) const = 0;
+    virtual String Convert(const String &s) const = 0;
 };
 
 //-----------------------------------------------------------------------

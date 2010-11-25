@@ -124,7 +124,7 @@ public:
     int Lex(yy::parser::semantic_type* yylval, yy::parser::location_type* yylloc)
         {return LexFromScanner(scanner_, yylval, yylloc);}
 
-    bool SetEncoding(const std::string&)  {return true;}
+    bool SetEncoding(const String&)  {return true;}
 };
 
 static int test4(int argc, char **argv)
@@ -223,7 +223,7 @@ static int ErrorExit(const char *err)
     return 1;
 }
 
-static void DeleteFile(const std::string &name)
+static void DeleteFile(const String &name)
 {
 #if defined(WIN32)
             _unlink(name.c_str());
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     }
 
     strvector css, fonts;
-    std::string xlit, in, out;
+    String xlit, in, out;
 
     int i = 1;
     while(i < argc)
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 
         return Convert(pin, css, fonts, xlitConv, pout);
     }
-    catch(const std::string &s)
+    catch(const String &s)
     {
         fprintf(stderr, "%s\n", s.c_str());
         fprintf(stderr, "[%d]%s\n", errno, strerror(errno));

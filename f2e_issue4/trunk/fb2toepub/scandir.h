@@ -33,7 +33,7 @@ namespace Fb2ToEpub
 class ScanDir : public Object
 {
 public:
-    virtual std::string GetNextFile(std::string *fname) = 0;
+    virtual String GetNextFile(String *fname) = 0;
 };
 
 Ptr<ScanDir> FB2TOEPUB_DECL CreateScanDir(const char *dir, const char *ext);

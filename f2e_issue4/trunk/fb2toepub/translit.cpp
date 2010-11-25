@@ -28,7 +28,7 @@
 namespace Fb2ToEpub
 {
 
-typedef std::map<std::string, std::string> XlitMap;
+typedef std::map<String, String> XlitMap;
 
 //-----------------------------------------------------------------------
 // XlitConv implementation
@@ -41,7 +41,7 @@ public:
     XlitConvImpl(InStm *stm);
 
     //virtual
-    std::string Convert(const std::string &s) const;
+    String Convert(const String &s) const;
 
 private:
     XlitMap xlit_;
@@ -64,7 +64,7 @@ XlitConvImpl::XlitConvImpl(InStm *stm)
 
 
 //-----------------------------------------------------------------------
-std::string XlitConvImpl::Convert(const std::string &s) const
+String XlitConvImpl::Convert(const String &s) const
 {
     if(xlit_.empty())
         return s;
@@ -129,7 +129,7 @@ void XlitConvImpl::map(LexScanner *s)
     AttrMap attrmap;
     bool notempty = s->BeginElement("map", &attrmap);
 
-    std::string in = attrmap["in"], out = attrmap["out"];
+    String in = attrmap["in"], out = attrmap["out"];
     if(!in.empty() && !out.empty())
         xlit_[in] = out;
 

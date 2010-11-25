@@ -42,5 +42,13 @@
 #define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
 #endif
 
+//-----------------------------------------------------------------------
+// Remove references to std::string::compare
+// (Custom option for ARM Linux)
+//-----------------------------------------------------------------------
+#ifndef FB2TOEPUB_NO_STD_STRING_COMPARE
+#define FB2TOEPUB_NO_STD_STRING_COMPARE 0
+#endif
+
 
 #endif
