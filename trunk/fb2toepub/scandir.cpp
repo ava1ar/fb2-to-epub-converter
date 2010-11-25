@@ -31,7 +31,7 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
     // OS-dependent GetFileFromPath implementation
     //-----------------------------------------------------------------------
-    std::string GetFileFromPath(const char *path)
+    String GetFileFromPath(const char *path)
     {
         char fname[_MAX_PATH], ext[_MAX_PATH], filename[_MAX_PATH];
         _splitpath(path, NULL, NULL, fname, ext);
@@ -46,7 +46,7 @@ namespace Fb2ToEpub
     class WinScanDir : public ScanDir, Noncopyable
     {
         intptr_t    h_;
-        std::string dir_, spec_;
+        String      dir_, spec_;
     public:
         WinScanDir(const char *dir, const char *ext) : h_(-1L), dir_(dir)
         {
@@ -62,7 +62,7 @@ namespace Fb2ToEpub
         }
 
         //virtual
-        std::string GetNextFile(std::string *fname)
+        String GetNextFile(String *fname)
         {
             if(fname)
                 *fname = "";
@@ -100,7 +100,7 @@ namespace Fb2ToEpub
     class UnixScanDir : public ScanDir, Noncopyable
     {
         DIR         *d_;
-        std::string dir_, ext_;
+        String      dir_, ext_;
     public:
         UnixScanDir(const char *dir, const char *ext) : d_(opendir(dir)), dir_(dir), ext_(ext)
         {
@@ -115,7 +115,7 @@ namespace Fb2ToEpub
         }
 
         //virtual
-        std::string GetNextFile(std::string *fname)
+        String GetNextFile(String *fname)
         {
             if(fname)
                 *fname = "";

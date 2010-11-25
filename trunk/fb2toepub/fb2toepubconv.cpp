@@ -39,7 +39,7 @@ int Convert(InStm *pin, const strvector &css, const strvector &fonts, XlitConv *
         Error("internal error: I don't know why but it happened that there is no content in input file!");
 
     // perform pass 2 to create epub document
-    DoConvertionPass2(CreateScanner(pin), css, fonts, xlitConv, &units, true, pout);
+    DoConvertionPass2(CreateScanner(pin), css, fonts, xlitConv, &units, pout);
     return 0;
 }
 

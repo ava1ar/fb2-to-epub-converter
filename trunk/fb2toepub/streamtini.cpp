@@ -38,8 +38,8 @@ class FB2TOEPUB_DECL ConvTini : Noncopyable
 {
     ::tiniconv_ctx_s ctx_;
 
-    typedef std::pair<std::string, int> TblEntry;
-    static int EncToCharset(std::string code);
+    typedef std::pair<String, int> TblEntry;
+    static int EncToCharset(String code);
 
 public:
     ConvTini(const char* tocode, const char* fromcode, bool translit = true, bool ignore = true);
@@ -96,7 +96,7 @@ void ConvTini::Reset()
 //-----------------------------------------------------------------------
 // It is not optimized, for we call this function just a few times.
 inline bool nonalnum(int c) {return !isalnum(c);}
-int ConvTini::EncToCharset(std::string code)
+int ConvTini::EncToCharset(String code)
 {
     static const TblEntry table[] =
     {
@@ -160,7 +160,7 @@ int ConvTini::EncToCharset(std::string code)
     };
 
     // remove all non digits and letters, convert to uppercase
-    std::string::iterator it = code.begin(), it_end = code.end();
+    String::iterator it = code.begin(), it_end = code.end();
     it_end = std::remove_if(it, it_end, nonalnum);
     std::transform(it, it_end, it, toupper);
     code = code.substr(0, it_end - it);
