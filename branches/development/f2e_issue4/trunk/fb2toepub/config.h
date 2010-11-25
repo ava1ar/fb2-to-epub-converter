@@ -29,23 +29,34 @@
 // and their nested section are moved one level up.
 // Otherwise, every section without title is assigned a title "- - - - -"
 //-----------------------------------------------------------------------
-#ifndef FB2TOEPUB_SUPPRESS_EMPTY_TITLES
-#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
-#endif
+//#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
+
 
 //-----------------------------------------------------------------------
 // ENABLE IDS IN TABLE OF CONTENTS
 // If the value is nonzero, TOC contains references to file only
 // Otherwise, TOC contains "file#id" references.
 //-----------------------------------------------------------------------
-#ifndef FB2TOEPUB_TOC_REFERS_FILES_ONLY
-#define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
-#endif
+//#define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
+
 
 //-----------------------------------------------------------------------
 // Remove references to std::string::compare
 // (Custom option for ARM Linux)
 //-----------------------------------------------------------------------
+//#define FB2TOEPUB_NO_STD_STRING_COMPARE 0
+
+
+
+//-----------------------------------------------------------------------
+//-----------------------------------------------------------------------
+// Default
+#ifndef FB2TOEPUB_SUPPRESS_EMPTY_TITLES
+#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
+#endif
+#ifndef FB2TOEPUB_TOC_REFERS_FILES_ONLY
+#define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
+#endif
 #ifndef FB2TOEPUB_NO_STD_STRING_COMPARE
 #define FB2TOEPUB_NO_STD_STRING_COMPARE 0
 #endif
