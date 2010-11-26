@@ -30,7 +30,13 @@
 namespace Fb2ToEpub
 {
 
-    const std::size_t MAX_UNIT_SIZE = 0x10000UL;
+    // Different threshold file sizes for splitting, depending on next element
+    // (see implementation of pass1 and pass2 section())
+    const std::size_t MAX_UNIT_SIZE     = 0x18000UL;
+    //const std::size_t MAX_UNIT_SIZE     = 25000UL;
+    const std::size_t UNIT_SIZE0        = MAX_UNIT_SIZE*1/2;
+    const std::size_t UNIT_SIZE1        = MAX_UNIT_SIZE*3/4;
+    const std::size_t UNIT_SIZE2        = MAX_UNIT_SIZE*5/6;
 
     //-----------------------------------------------------------------------
     // All elements
