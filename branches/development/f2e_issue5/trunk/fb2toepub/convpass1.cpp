@@ -47,6 +47,7 @@ private:
     std::set<String>        xlns_;      // xlink namespaces
     std::set<String>        allRefIds_; // all ref ids
 
+    void SwitchUnitIfSizeAbove  (std::size_t size, int parent);
     const String* AddId         (const AttrMap &attrmap);
     String Findhref             (const AttrMap &attrmap) const;
     void ParseTextAndEndElement (const String &element, String *plainText);
@@ -124,6 +125,13 @@ void ConverterPass1::Scan()
 {
     s_->SkipXMLDeclaration();
     FictionBook();
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass1::SwitchUnitIfSizeAbove(std::size_t size, int parent)
+{
+    if(units_->back().size_ > size)
+        units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, parent));
 }
 
 //-----------------------------------------------------------------------
@@ -638,17 +646,35 @@ void ConverterPass1::section(int parent)
             if(!t.s_.compare("p"))
                 p();
             else if(!t.s_.compare("image"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1, parent);
                 image(false);
+            }
             else if(!t.s_.compare("poem"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1, parent);
                 poem();
+            }
             else if(!t.s_.compare("subtitle"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE0, parent);
                 subtitle();
+            }
             else if(!t.s_.compare("cite"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2, parent);
                 cite();
+            }
             else if(!t.s_.compare("empty-line"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2, parent);
                 empty_line();
+            }
             else if(!t.s_.compare("table"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1, parent);
                 table();
+            }
             else
             {
                 std::ostringstream ss;
@@ -657,8 +683,7 @@ void ConverterPass1::section(int parent)
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
 
-            if(units_->back().size_ > MAX_UNIT_SIZE)
-                units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, parent));
+            SwitchUnitIfSizeAbove(MAX_UNIT_SIZE, parent);
         }
 
     s_->EndElement();

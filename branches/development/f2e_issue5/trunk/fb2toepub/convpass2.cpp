@@ -191,6 +191,7 @@ private:
 
     void StartUnit              (Unit::Type unitType, AttrMap *attrmap = NULL);
     void EndUnit                ();
+    void SwitchUnitIfSizeAbove  (std::size_t size);
 
     void AddMimetype            ();
     void AddContainer           ();
@@ -607,6 +608,16 @@ void ConverterPass2::EndUnit()
 
         unitActive_ = false;
         ++unitIdx_;
+    }
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::SwitchUnitIfSizeAbove(std::size_t size)
+{
+    if(sectionSize_ > size)
+    {
+        sectionSize_ = 0;
+        StartUnit(Unit::SECTION);
     }
 }
 
@@ -1578,17 +1589,35 @@ void ConverterPass2::section()
             if(!t.s_.compare("p"))
                 p();
             else if(!t.s_.compare("image"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 image(false, false, false);
+            }
             else if(!t.s_.compare("poem"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 poem();
+            }
             else if(!t.s_.compare("subtitle"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE0);
                 subtitle();
+            }
             else if(!t.s_.compare("cite"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 cite();
+            }
             else if(!t.s_.compare("empty-line"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 empty_line();
+            }
             else if(!t.s_.compare("table"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 table();
+            }
             else
             {
                 std::ostringstream ss;
@@ -1597,11 +1626,7 @@ void ConverterPass2::section()
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
 
-            if(sectionSize_ > MAX_UNIT_SIZE)
-            {
-                sectionSize_ = 0;
-                StartUnit(Unit::SECTION);
-            }
+            SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
         }
     }
 
