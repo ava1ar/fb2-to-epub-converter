@@ -246,7 +246,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(SolutionDir)README&quot; &quot;$(OutDir)&quot; /Y&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-emb&quot; &quot;$(OutDir)\custom-emb&quot; /Y /E /I&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-noemb&quot; &quot;$(OutDir)\custom-noemb&quot; /Y /E /I"
+				CommandLine="xcopy &quot;$(SolutionDir)README&quot; &quot;$(OutDir)&quot; /Y&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-emb&quot; &quot;$(OutDir)\custom-emb&quot; /Y /E /I&#x0D;&#x0A;xcopy &quot;$(SolutionDir)custom-noemb&quot; &quot;$(OutDir)\custom-noemb&quot; /Y /E /I&#x0D;&#x0A;xcopy &quot;$(SolutionDir)Translit&quot; &quot;$(OutDir)\Translit&quot; /Y /E /I&#x0D;&#x0A;"
 			/>
 		</Configuration>
 	</Configurations>

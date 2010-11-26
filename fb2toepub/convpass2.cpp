@@ -93,6 +93,7 @@ public:
                             unitIdx_            (0),
                             unitActive_         (false),
                             unitHasId_          (false),
+                            sectionSize_        (0),
                             xlitConv_           (xlitConv)
     {
         coverPgIt_ = units_.end();
@@ -173,6 +174,7 @@ private:
     int                     unitIdx_;
     bool                    unitActive_;
     bool                    unitHasId_;
+    std::size_t             sectionSize_;
     Ptr<XlitConv>           xlitConv_;
 
 
@@ -189,6 +191,7 @@ private:
 
     void StartUnit              (Unit::Type unitType, AttrMap *attrmap = NULL);
     void EndUnit                ();
+    void SwitchUnitIfSizeAbove  (std::size_t size);
 
     void AddMimetype            ();
     void AddContainer           ();
@@ -237,7 +240,7 @@ private:
     //void nickname               ();
     //void output_document_class  ();
     //void output                 ();
-    void p                      (const char *pelement = "p");
+    void p                      (const char *pelement = "p", const char *cls = NULL);
     //void part                   ();
     void poem                   ();
     //void program_used           ();
@@ -609,6 +612,16 @@ void ConverterPass2::EndUnit()
 }
 
 //-----------------------------------------------------------------------
+void ConverterPass2::SwitchUnitIfSizeAbove(std::size_t size)
+{
+    if(sectionSize_ > size)
+    {
+        sectionSize_ = 0;
+        StartUnit(Unit::SECTION);
+    }
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::AddMimetype()
 {
     static const char contents[] = "application/epub+zip";
@@ -845,6 +858,7 @@ void ConverterPass2::ParseTextAndEndElement (const String &element)
             return;
 
         case LexScanner::DATA:
+            sectionSize_ += t.size_;
             pout_->WriteStr(s_->GetToken().s_.c_str());
             continue;
 
@@ -972,7 +986,7 @@ void ConverterPass2::a()
     if(id[0] != '#')
     {
         // external reference
-        pout_->WriteFmt("<a href=\"%s\"", EncodeStr(id).c_str());
+        pout_->WriteFmt("<a class=\"e_a\" href=\"%s\"", EncodeStr(id).c_str());
         if(!notempty)
         {
             pout_->WriteStr("/>");
@@ -1022,6 +1036,7 @@ void ConverterPass2::a()
             return;
 
         case LexScanner::DATA:
+            sectionSize_ += t.size_;
             pout_->WriteStr(s_->GetToken().s_.c_str());
             continue;
 
@@ -1243,7 +1258,7 @@ void ConverterPass2::code()
 {
     if(s_->BeginElement("code"))
     {
-        pout_->WriteStr("<code>");
+        pout_->WriteStr("<code class=\"e_code\">");
         ParseTextAndEndElement("code");
         pout_->WriteStr("</code>");
     }
@@ -1337,7 +1352,7 @@ void ConverterPass2::emphasis()
 {
     if(s_->BeginElement("emphasis"))
     {
-        pout_->WriteStr("<em>");
+        pout_->WriteStr("<em class=\"emphasis\">");
         ParseTextAndEndElement("emphasis");
         pout_->WriteStr("</em>");
     }
@@ -1346,11 +1361,10 @@ void ConverterPass2::emphasis()
 //-----------------------------------------------------------------------
 void ConverterPass2::empty_line()
 {
-    if(s_->BeginElement("empty-line"))
-    {
-        pout_->WriteStr("<p class=\"empty-line\"> </p>\n");
+    bool notempty = s_->BeginElement("empty-line");
+    pout_->WriteStr("<p class=\"empty-line\"> </p>\n");
+    if(notempty)
         s_->EndElement();
-    }
 }
 
 //-----------------------------------------------------------------------
@@ -1457,12 +1471,14 @@ void ConverterPass2::lang()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::p(const char *pelement)
+void ConverterPass2::p(const char *pelement, const char *cls)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("p", &attrmap);
 
     pout_->WriteFmt("<%s", pelement);
+    if(cls)
+        pout_->WriteFmt(" class=\"%s\"", cls);
     AddId(attrmap);
     if(!notempty)
     {
@@ -1472,7 +1488,7 @@ void ConverterPass2::p(const char *pelement)
     pout_->WriteStr(">");
 
     ParseTextAndEndElement("p");
-    pout_->WriteFmt("</%s>", pelement);
+    pout_->WriteFmt("</%s>\n", pelement);
 }
 
 //-----------------------------------------------------------------------
@@ -1520,6 +1536,7 @@ void ConverterPass2::section()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("section", &attrmap);
 
+    sectionSize_ = 0;
     StartUnit(Unit::SECTION, &attrmap);
 
     if(!notempty)
@@ -1572,17 +1589,35 @@ void ConverterPass2::section()
             if(!t.s_.compare("p"))
                 p();
             else if(!t.s_.compare("image"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 image(false, false, false);
+            }
             else if(!t.s_.compare("poem"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 poem();
+            }
             else if(!t.s_.compare("subtitle"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE0);
                 subtitle();
+            }
             else if(!t.s_.compare("cite"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 cite();
+            }
             else if(!t.s_.compare("empty-line"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 empty_line();
+            }
             else if(!t.s_.compare("table"))
+            {
+                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 table();
+            }
             else
             {
                 std::ostringstream ss;
@@ -1590,6 +1625,8 @@ void ConverterPass2::section()
                 Error(ss.str().c_str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
+
+            SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
         }
     }
 
@@ -1625,7 +1662,7 @@ void ConverterPass2::strikethrough()
 {
     if(s_->BeginElement("strikethrough"))
     {
-        pout_->WriteStr("<del>");
+        pout_->WriteStr("<del class=\"strikethrough\">");
         ParseTextAndEndElement("strikethrough");
         pout_->WriteStr("</del>");
     }
@@ -1636,7 +1673,7 @@ void ConverterPass2::strong()
 {
     if(s_->BeginElement("strong"))
     {
-        pout_->WriteStr("<strong>");
+        pout_->WriteStr("<strong class=\"e_strong\">");
         ParseTextAndEndElement("strong");
         pout_->WriteStr("</strong>");
     }
@@ -1655,7 +1692,7 @@ void ConverterPass2::sub()
 {
     if(s_->BeginElement("sub"))
     {
-        pout_->WriteStr("<sub>");
+        pout_->WriteStr("<sub class=\"e_sub\">");
         ParseTextAndEndElement("sub");
         pout_->WriteStr("</sub>");
     }
@@ -1667,7 +1704,7 @@ void ConverterPass2::subtitle()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("subtitle", &attrmap);
 
-    pout_->WriteStr("<h2");
+    pout_->WriteStr("<h2 class=\"e_h2\"");
     AddId(attrmap);
     if(!notempty)
     {
@@ -1685,7 +1722,7 @@ void ConverterPass2::sup()
 {
     if(s_->BeginElement("sup"))
     {
-        pout_->WriteStr("<sup>");
+        pout_->WriteStr("<sup class=\"e_sup\">");
         ParseTextAndEndElement("sup");
         pout_->WriteStr("</sup>");
     }
@@ -1801,7 +1838,7 @@ void ConverterPass2::title(bool startUnit, const String &anchorid)
         if(!t.s_.compare("p"))
         {
             //<p>
-            p("h1");
+            p("h1", "e_h1");
             //</p>
         }
         else if(!t.s_.compare("empty-line"))
