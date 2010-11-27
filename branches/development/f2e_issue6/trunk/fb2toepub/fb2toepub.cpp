@@ -30,6 +30,10 @@
 #include <stdio.h>
 #include <errno.h>
 
+#if (defined unix)
+#include <unistd.h>
+#endif
+
 using namespace Fb2ToEpub;
 
 //-----------------------------------------------------------------------

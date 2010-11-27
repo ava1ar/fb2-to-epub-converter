@@ -185,7 +185,8 @@ private:
     binvector               binaries_;
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
-    String                  authors_, title_, lang_, id_;
+    String                  title_, lang_, id_, title_info_date_, isbn_;
+    strvector               authors_;
 
     String                  prevUnitFile_;
     int                     unitIdx_;
@@ -238,6 +239,7 @@ private:
     void coverpage              ();
     //void custom_info            ();
     void date                   ();
+    String date__textonly       ();
     void description            ();
     void document_info          ();
     //void email                  ();
@@ -249,8 +251,8 @@ private:
     //void history                ();
     //void home_page              ();
     void id                     ();
-    //void isbn                   ();
     void image                  (bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType = Unit::UNIT_NONE);
+    String isbn                 ();
     //void keywords               ();
     void lang                   ();
     //void last_name              ();
@@ -262,7 +264,7 @@ private:
     //void part                   ();
     void poem                   ();
     //void program_used           ();
-    //void publish_info           ();
+    void publish_info           ();
     //void publisher              ();
     void section                ();
     //void sequence               ();
@@ -422,12 +424,9 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
         // assing unit file name
         it->file_ = file;
 
-        // make unique id
-        String id = MakeUniqueId();
-
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
-        // assing new unit id
-        it->fileId_ = id;
+        // make and assing new unit id
+        it->fileId_ = MakeUniqueId();
 #endif
 
         prevLevel = it->level_;
@@ -527,7 +526,7 @@ String ConverterPass2::Findhref(const AttrMap &attrmap) const
     std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
     for(; cit != cit_end; ++cit)
     {
-        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : (*cit)+":href");
+        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : String((*cit)+":href"));
         if(ait != attrmap.end())
             return ait->second;
     }
@@ -744,7 +743,15 @@ void ConverterPass2::AddContentOpf()
     pout_->WriteFmt("    <dc:title>%s</dc:title>\n", (xlitConv_ ? xlitConv_->Convert(title_) : title_).c_str());
     pout_->WriteFmt("    <dc:language>%s</dc:language>\n", lang_.c_str());
     pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"ID\">%s</dc:identifier>\n", id_.c_str());
-    pout_->WriteFmt("    <dc:creator opf:role=\"aut\">%s</dc:creator>\n", (xlitConv_ ? xlitConv_->Convert(authors_) : authors_).c_str());
+    {
+        strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
+        for(; cit < cit_end; ++cit)
+            pout_->WriteFmt("    <dc:creator opf:role=\"aut\">%s</dc:creator>\n", (xlitConv_ ? xlitConv_->Convert(*cit) : *cit).c_str());
+    }
+    if(!title_info_date_.empty())
+        pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
+    if(!isbn_.empty())
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
     pout_->WriteStr("  </metadata>\n\n");
 
     pout_->WriteStr("  <manifest>\n");
@@ -1168,7 +1175,7 @@ void ConverterPass2::author()
     else
         Error("<first-name> or <nickname> expected");
 
-    authors_ = Concat(authors_, ", ", author);
+    authors_.push_back(author);
     s_->SkipRestOfElementContent();
 }
 
@@ -1335,6 +1342,19 @@ void ConverterPass2::date()
 }
 
 //-----------------------------------------------------------------------
+String ConverterPass2::date__textonly()
+{
+    String text;
+
+    s_->BeginNotEmptyElement("date");
+    SetScannerDataMode setDataMode(s_);
+    if(s_->LookAhead().type_ == LexScanner::DATA)
+        text = s_->GetToken().s_;
+    s_->EndElement();
+    return text;
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::description()
 {
     s_->BeginNotEmptyElement("description");
@@ -1351,6 +1371,11 @@ void ConverterPass2::description()
     //<document-info>
     document_info();
     //</document-info>
+
+    //<publish-info>
+    if(s_->IsNextElement("publish-info"))
+        publish_info();
+    //</publish-info>
 
     s_->SkipRestOfElementContent(); // skip rest of <description>
 }
@@ -1508,6 +1533,19 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
 }
 
 //-----------------------------------------------------------------------
+String ConverterPass2::isbn()
+{
+    String text;
+
+    s_->BeginNotEmptyElement("isbn");
+    SetScannerDataMode setDataMode(s_);
+    if(s_->LookAhead().type_ == LexScanner::DATA)
+        text = s_->GetToken().s_;
+    s_->EndElement();
+    return text;
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::lang()
 {
     lang_ = s_->SimpleTextElement("lang");
@@ -1569,6 +1607,40 @@ void ConverterPass2::poem()
 
     pout_->WriteStr("</div>\n");
     s_->EndElement();
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::publish_info()
+{
+    if(!s_->BeginElement("publish-info"))
+        return;
+
+    //<book-name>
+    if(s_->IsNextElement("book-name"))
+        s_->SkipElement();
+    //</book-name>
+
+    //<publisher>
+    if(s_->IsNextElement("publisher"))
+        s_->SkipElement();
+    //</publisher>
+
+    //<city>
+    if(s_->IsNextElement("city"))
+        s_->SkipElement();
+    //</city>
+
+    //<year>
+    if(s_->IsNextElement("year"))
+        s_->SkipElement();
+    //</year>
+
+    //<isbn>
+    if(s_->IsNextElement("isbn"))
+        isbn_ = isbn();
+    //</isbn>
+
+    s_->SkipRestOfElementContent(); // skip rest of <publish-info>
 }
 
 //-----------------------------------------------------------------------
@@ -1726,9 +1798,9 @@ void ConverterPass2::strong()
 //-----------------------------------------------------------------------
 void ConverterPass2::style()
 {
-    s_->SkipElement();
-    //if(s_->BeginElement("style"))
-    //    ParseTextAndEndElement("style");
+    // ignore style
+    if(s_->BeginElement("style"))
+        ParseTextAndEndElement("strong");
 }
 
 //-----------------------------------------------------------------------
@@ -1934,7 +2006,7 @@ void ConverterPass2::title_info()
 
     //<date>
     if(s_->IsNextElement("date"))
-        s_->SkipElement();
+        title_info_date_ = date__textonly();
     //<date>
 
     //<coverpage>

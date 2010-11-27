@@ -38,6 +38,7 @@ namespace Fb2ToEpub
     const std::size_t UNIT_SIZE1        = MAX_UNIT_SIZE*3/4;
     const std::size_t UNIT_SIZE2        = MAX_UNIT_SIZE*5/6;
 
+    /*
     //-----------------------------------------------------------------------
     // All elements
     //-----------------------------------------------------------------------
@@ -110,6 +111,7 @@ namespace Fb2ToEpub
         E_VERSION,
         E_YEAR
     };
+    */
 
     //-----------------------------------------------------------------------
     struct Unit
