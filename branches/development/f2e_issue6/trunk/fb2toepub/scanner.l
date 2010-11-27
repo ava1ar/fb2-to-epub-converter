@@ -178,11 +178,11 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
                                     if(dataMode_)
                                     {
                                         if(skipMode_)
-                                            return Token(DATA, strlen(yytext));
+                                            return Token(DATA, yyleng);
                                         //std::vector<char> buf;
                                         //Decode(yytext, &buf, false, false);
                                         //return Token(DATA, &buf[0]);
-                                        return Token(DATA, yytext, strlen(yytext));
+                                        return Token(DATA, yytext, yyleng);
                                     }
                                 }
 <CONTENT,OUTSIDE>{stagstart}    {
@@ -213,7 +213,7 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 <INITIAL>{attrvalue}            {
                                     if(skipMode_)
                                         return Token(VALUE);
-                                    yytext[strlen(yytext)-1] = '\0';
+                                    yytext[yyleng-1] = '\0';
                                     std::vector<char> buf;
                                     Decode(yytext+1, &buf, true, true);
                                     return Token(VALUE, &buf[0]);

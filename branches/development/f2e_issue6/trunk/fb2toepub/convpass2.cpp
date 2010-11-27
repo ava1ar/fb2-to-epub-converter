@@ -58,6 +58,22 @@ private:
 };
 */
 
+class SetLanguage
+{
+    String *pstr_, old_;
+public:
+    SetLanguage(String *pstr, const AttrMap &attrmap) : pstr_(pstr), old_(*pstr)
+    {
+        AttrMap::const_iterator cit = attrmap.find("xml:lang");
+        if(cit != attrmap.end())
+            *pstr_ = cit->second;
+    }
+    ~SetLanguage()
+    {
+        *pstr_ = old_;
+    }
+};
+
 
 //-----------------------------------------------------------------------
 static String EncodeStr(const String &str)
@@ -86,6 +102,7 @@ public:
                         :   s_                  (scanner),
                             css_                (css),
                             fonts_              (fonts),
+                            xlitConv_           (xlitConv),
                             units_              (*units),
                             pout_               (pout),
                             tocLevels_          (0),
@@ -93,8 +110,7 @@ public:
                             unitIdx_            (0),
                             unitActive_         (false),
                             unitHasId_          (false),
-                            sectionSize_        (0),
-                            xlitConv_           (xlitConv)
+                            sectionSize_        (0)
     {
         coverPgIt_ = units_.end();
     }
@@ -144,6 +160,7 @@ public:
 private:
     Ptr<LexScanner>         s_;
     const strvector         &css_, &fonts_;
+    Ptr<XlitConv>           xlitConv_;
     UnitArray               &units_;
     Ptr<OutPackStm>         pout_;
 
@@ -175,7 +192,7 @@ private:
     bool                    unitActive_;
     bool                    unitHasId_;
     std::size_t             sectionSize_;
-    Ptr<XlitConv>           xlitConv_;
+    String                  bodyXmlLang_, sectXmlLang_;
 
 
     void AdjustUnitSizes        ();
@@ -203,6 +220,7 @@ private:
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
+    void CopyXmlLang            (const AttrMap &attrmap);
     bool AddAnchorid            (const String &anchorid);
 
     // FictionBook elements
@@ -558,7 +576,10 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
             pout_->WriteFmt("<link rel=\"stylesheet\" type=\"text/css\" href=\"%s\"/>\n", EncodeStr(*cit).c_str());
 
         pout_->WriteFmt("</head>\n");
-        pout_->WriteFmt("<body>\n");
+        if(!bodyXmlLang_.empty())
+            pout_->WriteFmt("<body xml:lang=\"%s\">\n", EncodeStr(bodyXmlLang_).c_str());
+        else
+            pout_->WriteFmt("<body>\n");
 
         switch(unit.bodyType_)
         {
@@ -570,7 +591,12 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
         }
     }
     if(unit.type_ == Unit::SECTION)
-        pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
+    {
+        if(!sectXmlLang_.empty())
+            pout_->WriteFmt("<div class=\"section%d\" xml:lang=\"%s\">\n", unit.level_+1, EncodeStr(sectXmlLang_).c_str());
+        else
+            pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
+    }
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
     pout_->WriteFmt("<div id=\"%s\">\n", unit.fileId_.c_str()); // file id
 #endif
@@ -903,6 +929,12 @@ void ConverterPass2::CopyAttribute(const String &attr, const AttrMap &attrmap)
 }
 
 //-----------------------------------------------------------------------
+void ConverterPass2::CopyXmlLang(const AttrMap &attrmap)
+{
+    CopyAttribute("xml:lang", attrmap);
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::FictionBook()
 {
     AttrMap attrmap;
@@ -1080,6 +1112,7 @@ void ConverterPass2::annotation(bool startUnit)
 
     pout_->WriteStr("<div class=\"annotation\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     if(!notempty)
     {
         pout_->WriteStr("/>");
@@ -1170,7 +1203,11 @@ void ConverterPass2::binary()
 //-----------------------------------------------------------------------
 void ConverterPass2::body()
 {
-    s_->BeginNotEmptyElement("body");
+    AttrMap attrmap;
+    s_->BeginNotEmptyElement("body", &attrmap);
+
+    // set body language
+    SetLanguage l(&bodyXmlLang_, attrmap);
 
     //<image>
     if(s_->IsNextElement("image"))
@@ -1213,6 +1250,7 @@ void ConverterPass2::cite()
     bool notempty = s_->BeginElement("cite", &attrmap);
     pout_->WriteStr("<div class=\"citation\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     if(!notempty)
     {
         pout_->WriteStr("/>");
@@ -1282,11 +1320,16 @@ void ConverterPass2::coverpage()
 //-----------------------------------------------------------------------
 void ConverterPass2::date()
 {
-    if(s_->BeginElement("date"))
+    AttrMap attrmap;
+    if(s_->BeginElement("date"), &attrmap)
     {
         SetScannerDataMode setDataMode(s_);
         if(s_->LookAhead().type_ == LexScanner::DATA)
-            pout_->WriteFmt("<p class=\"date\">%s</p>\n", s_->GetToken().s_.c_str());
+        {
+            pout_->WriteFmt("<p class=\"date\"");
+            CopyXmlLang(attrmap);
+            pout_->WriteFmt(">%s</p>\n", s_->GetToken().s_.c_str());
+        }
         s_->EndElement();
     }
 }
@@ -1474,21 +1517,18 @@ void ConverterPass2::lang()
 void ConverterPass2::p(const char *pelement, const char *cls)
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("p", &attrmap);
-
-    pout_->WriteFmt("<%s", pelement);
-    if(cls)
-        pout_->WriteFmt(" class=\"%s\"", cls);
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("p", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteFmt("<%s", pelement);
+        if(cls)
+            pout_->WriteFmt(" class=\"%s\"", cls);
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("p");
-    pout_->WriteFmt("</%s>\n", pelement);
+        ParseTextAndEndElement("p");
+        pout_->WriteFmt("</%s>\n", pelement);
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1498,6 +1538,7 @@ void ConverterPass2::poem()
     s_->BeginNotEmptyElement("poem", &attrmap);
     pout_->WriteStr("<div class=\"poem\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     pout_->WriteStr(">");
 
     //<title>
@@ -1535,6 +1576,9 @@ void ConverterPass2::section()
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("section", &attrmap);
+
+    // set section language
+    SetLanguage l(&sectXmlLang_, attrmap);
 
     sectionSize_ = 0;
     StartUnit(Unit::SECTION, &attrmap);
@@ -1702,19 +1746,16 @@ void ConverterPass2::sub()
 void ConverterPass2::subtitle()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("subtitle", &attrmap);
-
-    pout_->WriteStr("<h2 class=\"e_h2\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("subtitle", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteStr("<h2 class=\"e_h2\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("subtitle");
-    pout_->WriteStr("</h2>\n");
+        ParseTextAndEndElement("subtitle");
+        pout_->WriteStr("</h2>\n");
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1764,7 +1805,7 @@ void ConverterPass2::td()
     CopyAttribute("rowspan", attrmap);
     CopyAttribute("align", attrmap);
     CopyAttribute("valign", attrmap);
-    CopyAttribute("xml::lang", attrmap);
+    CopyXmlLang(attrmap);
 
     if(!notempty)
     {
@@ -1781,19 +1822,16 @@ void ConverterPass2::td()
 void ConverterPass2::text_author()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("text-author", &attrmap);
-
-    pout_->WriteFmt("<div class=\"text_author\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("text-author", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteFmt("<div class=\"text_author\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("text-author");
-    pout_->WriteStr("</div>\n");
+        ParseTextAndEndElement("text-author");
+        pout_->WriteStr("</div>\n");
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1810,7 +1848,7 @@ void ConverterPass2::th()
     CopyAttribute("rowspan", attrmap);
     CopyAttribute("align", attrmap);
     CopyAttribute("valign", attrmap);
-    CopyAttribute("xml::lang", attrmap);
+    CopyXmlLang(attrmap);
 
     if(!notempty)
     {
@@ -1826,13 +1864,16 @@ void ConverterPass2::th()
 //-----------------------------------------------------------------------
 void ConverterPass2::title(bool startUnit, const String &anchorid)
 {
-    if(!s_->BeginElement("title"))
+    AttrMap attrmap;
+    if(!s_->BeginElement("title", &attrmap))
         return;
 
     if(startUnit)
         StartUnit(Unit::TITLE);
 
-    pout_->WriteFmt("<div class=\"title\">\n");
+    pout_->WriteFmt("<div class=\"title\"");
+    CopyXmlLang(attrmap);
+    pout_->WriteFmt(">\n");
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
         if(!t.s_.compare("p"))
@@ -1944,19 +1985,16 @@ void ConverterPass2::tr()
 void ConverterPass2::v()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("v", &attrmap);
-
-    pout_->WriteStr("<p class=\"v\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("v", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteStr("<p class=\"v\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("v");
-    pout_->WriteStr("</p>\n");
+        ParseTextAndEndElement("v");
+        pout_->WriteStr("</p>\n");
+    }
 }
 
 
