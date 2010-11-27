@@ -41,5 +41,3 @@ Ptr<ScanDir> FB2TOEPUB_DECL CreateScanDir(const char *dir, const char *ext);
 };  //namespace Fb2ToEpub
 
 #endif
-
-
