@@ -27,6 +27,7 @@
 namespace Fb2ToEpub
 {
 
+    int FB2TOEPUB_DECL PrintInfo(InStm *pin);
     int FB2TOEPUB_DECL Convert(InStm *pin, const strvector &css, const strvector &fonts, XlitConv *xlitConv, OutPackStm *pout);
 
 };  //namespace Fb2ToEpub

@@ -27,6 +27,13 @@ namespace Fb2ToEpub
 {
 
 //-----------------------------------------------------------------------
+int PrintInfo(InStm *pin)
+{
+    DoPrintInfo(CreateScanner(pin));
+    return 0;
+}
+
+//-----------------------------------------------------------------------
 int Convert(InStm *pin, const strvector &css, const strvector &fonts, XlitConv *xlitConv, OutPackStm *pout)
 {
     // perform pass 1 to determine fb2 document structure and to collect all cross-references inside the fb2 file

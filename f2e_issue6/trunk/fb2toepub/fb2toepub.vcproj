@@ -263,6 +263,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\convinfo.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\convpass1.cpp"
 				>
 			</File>
