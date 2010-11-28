@@ -40,14 +40,21 @@ using namespace Fb2ToEpub;
 const char name[]       = "FB2 to EPUB format converter";
 const char version[]    = "0.10";
 
+//-----------------------------------------------------------------------
 static void Logo()
 {
     printf("%s version %s\n", name, version);
 }
 
+//-----------------------------------------------------------------------
 static void Usage()
 {
-    printf("Usage: fb2toepub <options> <input file> <output file>\n");
+    printf("Usage:\n\n");
+    printf("Print input fb2 file info to console and exit:\n");
+    printf("    fb2toepub -i <input file>\n\n");
+    printf("or\n\n");
+    printf("Convert input fb2 file to output epub file:\n");
+    printf("    fb2toepub <options> <input file> <output file>\n\n");
     printf("Options:\n");
     printf("    -s <path>               Path to .css style directory\n");
     printf("                              (optional, any number)\n");
@@ -61,12 +68,39 @@ static void Usage()
     printf("Options are case-sensitive.\nSpace between -s/-f/-sf/-t and path is mandatory.\n");
 }
 
+//-----------------------------------------------------------------------
 static int ErrorExit(const char *err)
 {
     fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err);
     return 1;
 }
 
+//-----------------------------------------------------------------------
+static int Info(const String &in)
+{
+    // check
+    if(in.empty())
+        return ErrorExit("input file is not defined");
+
+    try
+    {
+        // create input stream
+        Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
+        return PrintInfo(pin);
+    }
+    catch(const String &s)
+    {
+        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        return 1;
+    }
+    catch(...)
+    {
+        fprintf(stderr, "Unknown error\n[%d]%s\n", errno, strerror(errno));
+        return 1;
+    }
+}
+
+//-----------------------------------------------------------------------
 static void DeleteFile(const String &name)
 {
 #if defined(WIN32)
@@ -76,6 +110,7 @@ static void DeleteFile(const String &name)
 #endif
 }
 
+//-----------------------------------------------------------------------
 int main(int argc, char **argv)
 {
     // parse command line
@@ -88,6 +123,7 @@ int main(int argc, char **argv)
 
     strvector css, fonts;
     String xlit, in, out;
+    bool infoOnly = false;
 
     int i = 1;
     while(i < argc)
@@ -123,12 +159,20 @@ int main(int argc, char **argv)
         }
         else if(!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help"))
             ++i;
-        else if(in.empty())
+        else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info"))
+        {
+            infoOnly = true;
+            ++i;
+        }
+        else if(argv[i][0] != '-' && in.empty())
             in = argv[i++];
-        else if(out.empty())
+        else if(argv[i][0] != '-' && out.empty())
             out = argv[i++];
         else
             return ErrorExit("unrecognized command line switch");
+
+    if(infoOnly)
+        return Info(in);
 
     // check
     if(in.empty() || out.empty())

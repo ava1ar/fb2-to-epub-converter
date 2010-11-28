@@ -122,6 +122,8 @@ namespace Fb2ToEpub
 
             for(;;)
             {
+                if(d_ == NULL)
+                    return "";
                 struct dirent *entry = readdir(d_);
                 if(!entry)
                     return "";
