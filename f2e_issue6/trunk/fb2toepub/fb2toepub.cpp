@@ -63,9 +63,7 @@ static void Usage()
 
 static int ErrorExit(const char *err)
 {
-    Logo();
-    printf("Command line error: %s\n", err);
-    Usage();
+    fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err);
     return 1;
 }
 
@@ -155,16 +153,14 @@ int main(int argc, char **argv)
     }
     catch(const String &s)
     {
-        fprintf(stderr, "%s\n", s.c_str());
-        fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;
     }
     catch(...)
     {
-        fprintf(stderr, "Unknown error\n");
-        fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
+        fprintf(stderr, "Unknown error\n[%d]%s\n", errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;
