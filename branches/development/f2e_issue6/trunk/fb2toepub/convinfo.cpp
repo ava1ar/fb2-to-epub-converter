@@ -23,19 +23,44 @@
 #include "fb2toepubconv.h"
 #include "scanner.h"
 #include "converter.h"
+#include "streamconv.h"
+#include "streamzip.h"
+#include <sstream>
 #include <vector>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 namespace Fb2ToEpub
 {
 
 //-----------------------------------------------------------------------
+static void PrintInfo(const String &name, const String &value)
+{
+    if(!value.empty())
+    {
+        std::vector<char> buf;
+        LexScanner::Decode(value.c_str(), &buf, true, true);
+        printf("%s=%s\n", name.c_str(), &buf[0]);
+    }
+}
+
+//-----------------------------------------------------------------------
 class ConverterInfo : public Object, Noncopyable
 {
 public:
-    ConverterInfo (LexScanner *scanner) : s_(scanner) {}
+    ConverterInfo (const String &in) : in_(in) {}
 
     void Scan()
     {
+        std::size_t size;
+        {
+            struct stat st;
+            ::stat(in_.c_str(), &st);
+            size = st.st_size;
+        }
+
+        Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in_.c_str()));
+        s_ = CreateScanner(pin);
         s_->SkipXMLDeclaration();
         FictionBook();
 
@@ -47,16 +72,45 @@ public:
                 authors = Concat(authors, ", ", *cit);
         }
 
-        printf("author=%s\n", authors.c_str());
-        printf("title=%s\n", title_.c_str());
-        if(!title_info_date_.empty())
-            printf("date=%s\n", title_info_date_.c_str());
+        PrintInfo("author", authors);
+        PrintInfo("title", title_);
+        PrintInfo("date", title_info_date_);
+
+        {
+            std::ostringstream sizeStr;
+            sizeStr << size;
+            PrintInfo("size", sizeStr.str());
+        }
+
+        // sequence, number
+        if(!sequences_.empty())
+        {
+            PrintInfo("sequence", sequences_[0].first);
+            PrintInfo("number", sequences_[0].second);
+
+            // if more than one sequence?
+            /*
+            for(int i = 1; i < sequences_.size(); ++i)
+            {
+                std::ostringstream index;
+                index.width(4);
+                index.fill('0');
+                index << i;
+                PrintInfo(String("sequence") + index.str(), sequences_[i].first);
+                PrintInfo(String("number") + index.str(), sequences_[i].second);
+            }
+            */
+        }
     }
 
 private:
+    String                  in_;
     Ptr<LexScanner>         s_;
     String                  title_, lang_, title_info_date_, isbn_;
     strvector               authors_;
+
+    typedef std::vector<std::pair<String, String> > seqvector;
+    seqvector               sequences_;
 
     // FictionBook elements
     void FictionBook            ();
@@ -101,7 +155,7 @@ private:
     void publish_info           ();
     //void publisher              ();
     //void section                ();
-    //void sequence               ();
+    void sequence               ();
     //void src_lang               ();
     //void src_ocr                ();
     //void src_title_info         ();
@@ -174,9 +228,10 @@ void ConverterInfo::book_title()
 //-----------------------------------------------------------------------
 String ConverterInfo::date__textonly()
 {
-    String text;
+    if(!s_->BeginElement("date"))
+        return "";
 
-    s_->BeginNotEmptyElement("date");
+    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
@@ -213,9 +268,10 @@ void ConverterInfo::description()
 //-----------------------------------------------------------------------
 String ConverterInfo::isbn()
 {
-    String text;
+    if(!s_->BeginElement("isbn"))
+        return "";
 
-    s_->BeginNotEmptyElement("isbn");
+    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
@@ -264,6 +320,20 @@ void ConverterInfo::publish_info()
 }
 
 //-----------------------------------------------------------------------
+void ConverterInfo::sequence()
+{
+    AttrMap attrmap;
+    bool notempty = s_->BeginElement("sequence", &attrmap);
+
+    String name = attrmap["name"];
+    if(!name.empty())
+        sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
+
+    if(notempty)
+        s_->EndElement();
+}
+
+//-----------------------------------------------------------------------
 void ConverterInfo::title_info()
 {
     s_->BeginNotEmptyElement("title-info");
@@ -307,12 +377,27 @@ void ConverterInfo::title_info()
     lang();
     //</lang>
 
-    s_->SkipRestOfElementContent(); // skip rest of <title-info>
+    //<src-lang>
+    if(s_->IsNextElement("src-lang"))
+        s_->SkipElement();
+    //</src-lang>
+
+    //<translator>
+    if(s_->IsNextElement("translator"))
+        s_->SkipElement();
+    //</translator>
+
+    //<sequence>
+    while(s_->IsNextElement("sequence"))
+        sequence();
+    //</sequence>
+
+    s_->EndElement();
 }
 
-void FB2TOEPUB_DECL DoPrintInfo (LexScanner *scanner)
+void FB2TOEPUB_DECL DoPrintInfo (const String &in)
 {
-    Ptr<ConverterInfo> conv = new ConverterInfo(scanner);
+    Ptr<ConverterInfo> conv = new ConverterInfo(in);
     conv->Scan();
 }
 

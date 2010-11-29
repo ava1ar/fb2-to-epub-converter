@@ -27,9 +27,9 @@ namespace Fb2ToEpub
 {
 
 //-----------------------------------------------------------------------
-int PrintInfo(InStm *pin)
+int PrintInfo(const String &in)
 {
-    DoPrintInfo(CreateScanner(pin));
+    DoPrintInfo(in);
     return 0;
 }
 
