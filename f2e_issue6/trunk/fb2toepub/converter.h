@@ -166,7 +166,7 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
     // PRINT INFO
     //-----------------------------------------------------------------------
-    void FB2TOEPUB_DECL DoPrintInfo(LexScanner *scanner);
+    void FB2TOEPUB_DECL DoPrintInfo(const String &in);
 
     //-----------------------------------------------------------------------
     // CONVERTION PASS 1 (DETERMINE DOCUMENT STRUCTURE AND COLLECT ALL CROSS-REFERENCES INSIDE THE FB2 FILE)

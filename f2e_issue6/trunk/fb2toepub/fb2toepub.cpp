@@ -84,9 +84,7 @@ static int Info(const String &in)
 
     try
     {
-        // create input stream
-        Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
-        return PrintInfo(pin);
+        return PrintInfo(in);
     }
     catch(const String &s)
     {

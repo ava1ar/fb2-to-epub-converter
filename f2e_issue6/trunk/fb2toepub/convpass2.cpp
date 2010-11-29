@@ -1349,9 +1349,10 @@ void ConverterPass2::date()
 //-----------------------------------------------------------------------
 String ConverterPass2::date__textonly()
 {
-    String text;
+    if(!s_->BeginElement("date"))
+        return "";
 
-    s_->BeginNotEmptyElement("date");
+    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
@@ -1540,9 +1541,10 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
 //-----------------------------------------------------------------------
 String ConverterPass2::isbn()
 {
-    String text;
+    if(!s_->BeginElement("isbn"))
+        return "";
 
-    s_->BeginNotEmptyElement("isbn");
+    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
