@@ -34,7 +34,8 @@ int PrintInfo(const String &in)
 }
 
 //-----------------------------------------------------------------------
-int Convert(InStm *pin, const strvector &css, const strvector &fonts, XlitConv *xlitConv, OutPackStm *pout)
+int Convert(InStm *pin, const strvector &css, const strvector &fonts, const strvector &mfonts,
+            XlitConv *xlitConv, OutPackStm *pout)
 {
     // perform pass 1 to determine fb2 document structure and to collect all cross-references inside the fb2 file
     UnitArray units;
@@ -46,7 +47,7 @@ int Convert(InStm *pin, const strvector &css, const strvector &fonts, XlitConv *
         Error("internal error: I don't know why but it happened that there is no content in input file!");
 
     // perform pass 2 to create epub document
-    DoConvertionPass2(CreateScanner(pin), css, fonts, xlitConv, &units, pout);
+    DoConvertionPass2(CreateScanner(pin), css, fonts, mfonts, xlitConv, &units, pout);
     return 0;
 }
 

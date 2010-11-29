@@ -179,6 +179,7 @@ namespace Fb2ToEpub
     void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,
                                             const strvector &css,
                                             const strvector &fonts,
+                                            const strvector &mfonts,
                                             XlitConv *xlitConv,
                                             UnitArray *units,
                                             OutPackStm *pout);
