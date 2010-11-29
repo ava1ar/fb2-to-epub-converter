@@ -96,12 +96,14 @@ public:
     ConverterPass2 (LexScanner *scanner,
                     const strvector &css,
                     const strvector &fonts,
+                    const strvector &mfonts,
                     XlitConv *xlitConv,
                     UnitArray *units,
                     OutPackStm *pout)
                         :   s_                  (scanner),
                             css_                (css),
                             fonts_              (fonts),
+                            mfonts_             (mfonts),
                             xlitConv_           (xlitConv),
                             units_              (*units),
                             pout_               (pout),
@@ -159,7 +161,7 @@ public:
 
 private:
     Ptr<LexScanner>         s_;
-    const strvector         &css_, &fonts_;
+    const strvector         &css_, &fonts_, &mfonts_;
     Ptr<XlitConv>           xlitConv_;
     UnitArray               &units_;
     Ptr<OutPackStm>         pout_;
@@ -775,6 +777,9 @@ void ConverterPass2::AddContentOpf()
             AddContentManifestFile(pout_, MakeFileName("css", i++).c_str(), cit->c_str(), "text/css");
 
         for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+
+        for(cit = mfonts_.begin(), cit_end = mfonts_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
 
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
@@ -2080,11 +2085,12 @@ void ConverterPass2::v()
 void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,
                                         const strvector &css,
                                         const strvector &fonts,
+                                        const strvector &mfonts,
                                         XlitConv *xlitConv,
                                         UnitArray *units,
                                         OutPackStm *pout)
 {
-    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, xlitConv, units, pout);
+    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, mfonts, xlitConv, units, pout);
     conv->Scan();
 }
 

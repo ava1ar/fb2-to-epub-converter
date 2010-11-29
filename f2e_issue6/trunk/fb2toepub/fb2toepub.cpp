@@ -62,16 +62,19 @@ static void Usage()
     printf("                              (optional, any number)\n");
     printf("    -sf <path>              Path to font and style directory\n");
     printf("                              (optional, any number)\n");
-    printf("    -t <path>               Path to transliteration XML file\n");
+    printf("    -t <path>               Path to configuration XML file\n");
+    printf("                              for transliteration of title and TOC\n");
     printf("                              (optional, no more than one)\n");
+    printf("    -mf <path>              Add ttf font path to manifest only\n");
+    printf("                              (optional, any number)\n");
     printf("    -h, --help              Help and exit\n\n");
-    printf("Options are case-sensitive.\nSpace between -s/-f/-sf/-t and path is mandatory.\n");
+    printf("Options are case-sensitive.\nSpace between -i/-s/-f/-sf/-t/-mf and path is mandatory.\n");
 }
 
 //-----------------------------------------------------------------------
-static int ErrorExit(const char *err)
+static int ErrorExit(const String &err)
 {
-    fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err);
+    fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err.c_str());
     return 1;
 }
 
@@ -119,7 +122,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    strvector css, fonts;
+    strvector css, fonts, mfonts;
     String xlit, in, out;
     bool infoOnly = false;
 
@@ -127,22 +130,22 @@ int main(int argc, char **argv)
     while(i < argc)
         if(!strcmp(argv[i], "-s"))
         {
-            bool isFile = (argv[i] == "-s1");
+            //bool isFile = (argv[i] == "-s1");
             if(++i >= argc)
-                return ErrorExit("incomplete style path definition");
+                return ErrorExit("incomplete -s option");
             css.push_back(argv[i++]);
         }
         else if(!strcmp(argv[i], "-f"))
         {
-            bool isFile = (argv[i] == "-f1");
+            //bool isFile = (argv[i] == "-f1");
             if(++i >= argc)
-                return ErrorExit("incomplete style path definition");
+                return ErrorExit("incomplete -f option");
             fonts.push_back(argv[i++]);
         }
         else if(!strcmp(argv[i], "-sf") || !strcmp(argv[i], "-fs"))
         {
             if(++i >= argc)
-                return ErrorExit("incomplete style/font path definition");
+                return ErrorExit("incomplete -sf option");
             const char *p = argv[i++];
             css.push_back(p);
             fonts.push_back(p);
@@ -150,7 +153,7 @@ int main(int argc, char **argv)
         else if(!strcmp(argv[i], "-t"))
         {
             if(++i >= argc)
-                return ErrorExit("incomplete transliteration file definition");
+                return ErrorExit("incomplete -t option");
             if(!xlit.empty())
                 return ErrorExit("transliteration file redefinition");
             xlit = argv[i++];
@@ -162,12 +165,20 @@ int main(int argc, char **argv)
             infoOnly = true;
             ++i;
         }
-        else if(argv[i][0] != '-' && in.empty())
+        else if(!strcmp(argv[i], "-mf"))
+        {
+            if(++i >= argc)
+                return ErrorExit("incomplete -mf option");
+            mfonts.push_back(argv[i++]);
+        }
+        else if(argv[i][0] == '-')
+            return ErrorExit(String("unrecognized command line switch ") + argv[i]);
+        else if(in.empty())
             in = argv[i++];
-        else if(argv[i][0] != '-' && out.empty())
+        else if(out.empty())
             out = argv[i++];
         else
-            return ErrorExit("unrecognized command line switch");
+            return ErrorExit(String("unrecognized file ") + argv[i]);
 
     if(infoOnly)
         return Info(in);
@@ -191,7 +202,7 @@ int main(int argc, char **argv)
         if(!xlit.empty())
             xlitConv = CreateXlitConverter(CreateInUnicodeStm(CreateUnpackStm(xlit.c_str())));
 
-        return Convert(pin, css, fonts, xlitConv, pout);
+        return Convert(pin, css, fonts, mfonts, xlitConv, pout);
     }
     catch(const String &s)
     {
