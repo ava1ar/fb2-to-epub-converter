@@ -63,8 +63,12 @@ namespace Fb2ToEpub
                     pout->Write(buf, p - buf);
                 return;
             }
+#if defined (_DEBUG)
             unsigned char c = *udata++;
             BufType t = table[c];
+#else
+            BufType t = table[*udata++];
+#endif
             if(t >= 0xfd)
             {
                 if(t == 0xfd)           // whitespace

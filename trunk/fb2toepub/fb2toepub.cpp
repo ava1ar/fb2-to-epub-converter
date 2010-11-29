@@ -30,178 +30,31 @@
 #include <stdio.h>
 #include <errno.h>
 
+#if (defined unix)
+#include <unistd.h>
+#endif
+
 using namespace Fb2ToEpub;
-
-/*
-static int test1(int argc, char **argv)
-{
-    if(argc != 3)
-    {
-        printf("Usage: fb2toepub <input file> <output file>");
-        return 1;
-    }
-
-    //Ptr<InStm> pin      = CreateInFileStm(argv[1]);
-    Ptr<InStm> pin      = CreateUnpackStm(argv[1]);
-    Ptr<OutStm> pout    = CreateOutFileStm(argv[2]);
-
-    while(!pin->IsEOF())
-    {
-        char buf[1024];
-        pout->Write(buf, pin->Read(buf, sizeof(buf)));
-    }
-
-    //while(!pin->IsEOF())
-    //    pout->PutChar(pin->GetChar());
-
-    printf("fb2toepub done!!!");
-    return 0;
-}
-
-static int test2(int argc, char **argv)
-{
-    if(argc < 3)
-    {
-        printf("Usage: fb2toepub <input file> <output file>");
-        return 1;
-    }
-
-    Ptr<OutPackStm> pout = CreatePackStm(argv[argc - 1]);
-    for(int i = 1; i < argc - 1; ++i)
-    {
-        char sz[100];
-        sprintf(sz, "dir%d/file%d", i, i);
-        pout->BeginFile(sz, i != 1);
-        Ptr<InStm> pin = CreateUnpackStm(argv[i]);
-        while(!pin->IsEOF())
-        {
-            char buf[1024];
-            pout->Write(buf, pin->Read(buf, sizeof(buf)));
-        }
-    }
-
-    printf("fb2toepub done!!!");
-    return 0;
-}
-
-static int test3(int argc, char **argv)
-{
-    if(argc < 3)
-    {
-        printf("Usage: fb2toepub <input file> <output file>");
-        return 1;
-    }
-
-    Ptr<InStm> pin      = CreateUnpackStm(argv[1]);
-    pin                 = CreateInConvStm(pin, "Windows-1251", "UTF-16LE");
-    //pin                 = CreateInConvStm(pin, "UTF-16", "Windows-1251");
-    //pin                 = CreateInConvStm(pin, "UTF-16", "UTF-8");
-    //pin                 = CreateInUnicodeStm(pin);
-    Ptr<OutStm> pout    = CreateOutFileStm(argv[2]);
-
-    while(!pin->IsEOF())
-    {
-        char buf[1024];
-        pout->Write(buf, pin->Read(buf, sizeof(buf)));
-    }
-
-    //while(!pin->IsEOF())
-    //    pout->PutChar(pin->GetChar());
-
-    printf("fb2toepub done!!!");
-    return 0;
-}
-
-class MyDriver : public Driver, Noncopyable
-{
-    Ptr<LexScanner> scanner_;
-public:
-    explicit MyDriver(InStm *stm) : scanner_(CreateScanner(stm))
-    {
-    }
-
-    //virtual
-    int Lex(yy::parser::semantic_type* yylval, yy::parser::location_type* yylloc)
-        {return LexFromScanner(scanner_, yylval, yylloc);}
-
-    bool SetEncoding(const String&)  {return true;}
-};
-
-static int test4(int argc, char **argv)
-{
-    if(argc < 2)
-    {
-        printf("Usage: fb2toepub <input file> <output file>");
-        return 1;
-    }
-
-    Ptr<InStm> pin      = CreateUnpackStm(argv[1]);
-    pin                 = CreateInUnicodeStm(pin);
-
-    MyDriver driver (pin);
-    yy::parser parser(driver);
-    
-    parser.parse();
-
-    printf("fb2toepub done!!!");
-    return 0;
-}
-
-static int test5(int argc, char **argv)
-{
-    if(argc < 5)
-    {
-        printf("Usage: fb2toepub <css directory> <font directory> <input file> <output file>");
-        return 1;
-    }
-
-    // create input stream
-    Ptr<InStm> pin      = CreateUnpackStm(argv[3]);
-    pin                 = CreateInUnicodeStm(pin);
-
-    // create output stream
-    Ptr<OutPackStm> pout = CreatePackStm(argv[4]);
-
-    // create translite converter
-    Ptr<XlitConv> xlitConv;// = CreateXlitConverter(CreateInUnicodeStm(CreateUnpackStm("D:/Development/eBooks/TestFiles/translit.xml")));
-
-    int ret = Convert(pin, argv[1], argv[2], xlitConv, pout);
-    if(ret)
-        return ret;
-
-    printf("fb2toepub done!!!");
-    return 0;
-}
-
-static int test6(int argc, char **argv)
-{
-    if(argc < 2)
-    {
-        printf("Usage: fb2toepub <input file> <output file>");
-        return 1;
-    }
-
-    Ptr<InStm> pin      = CreateInFileStm(argv[1]);
-    Ptr<OutStm> pout    = CreateOutFileStm(argv[2]);
-
-    DecodeBase64(pin, pout);
-
-    return 0;
-}
-*/
 
 //-----------------------------------------------------------------------
 const char name[]       = "FB2 to EPUB format converter";
-const char version[]    = "0.10";
+const char version[]    = "1.0";
 
+//-----------------------------------------------------------------------
 static void Logo()
 {
     printf("%s version %s\n", name, version);
 }
 
+//-----------------------------------------------------------------------
 static void Usage()
 {
-    printf("Usage: fb2toepub <options> <input file> <output file>\n");
+    printf("Usage:\n\n");
+    printf("Print input fb2 file info to console and exit:\n");
+    printf("    fb2toepub -i <input file>\n\n");
+    printf("or\n\n");
+    printf("Convert input fb2 file to output epub file:\n");
+    printf("    fb2toepub <options> <input file> <output file>\n\n");
     printf("Options:\n");
     printf("    -s <path>               Path to .css style directory\n");
     printf("                              (optional, any number)\n");
@@ -209,20 +62,46 @@ static void Usage()
     printf("                              (optional, any number)\n");
     printf("    -sf <path>              Path to font and style directory\n");
     printf("                              (optional, any number)\n");
-    printf("    -t <path>               Path to transliteration XML file\n");
+    printf("    -t <path>               Path to configuration XML file\n");
+    printf("                              for transliteration of title and TOC\n");
     printf("                              (optional, no more than one)\n");
+    printf("    -mf <path>              Add ttf font path to manifest only\n");
+    printf("                              (optional, any number)\n");
     printf("    -h, --help              Help and exit\n\n");
-    printf("Options are case-sensitive.\nSpace between -s/-f/-sf/-t and path is mandatory.\n");
+    printf("Options are case-sensitive.\nSpace between -i/-s/-f/-sf/-t/-mf and path is mandatory.\n");
 }
 
-static int ErrorExit(const char *err)
+//-----------------------------------------------------------------------
+static int ErrorExit(const String &err)
 {
-    Logo();
-    printf("Command line error: %s\n", err);
-    Usage();
+    fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err.c_str());
     return 1;
 }
 
+//-----------------------------------------------------------------------
+static int Info(const String &in)
+{
+    // check
+    if(in.empty())
+        return ErrorExit("input file is not defined");
+
+    try
+    {
+        return PrintInfo(in);
+    }
+    catch(const String &s)
+    {
+        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        return 1;
+    }
+    catch(...)
+    {
+        fprintf(stderr, "Unknown error\n[%d]%s\n", errno, strerror(errno));
+        return 1;
+    }
+}
+
+//-----------------------------------------------------------------------
 static void DeleteFile(const String &name)
 {
 #if defined(WIN32)
@@ -232,6 +111,7 @@ static void DeleteFile(const String &name)
 #endif
 }
 
+//-----------------------------------------------------------------------
 int main(int argc, char **argv)
 {
     // parse command line
@@ -242,29 +122,30 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    strvector css, fonts;
+    strvector css, fonts, mfonts;
     String xlit, in, out;
+    bool infoOnly = false;
 
     int i = 1;
     while(i < argc)
         if(!strcmp(argv[i], "-s"))
         {
-            bool isFile = (argv[i] == "-s1");
+            //bool isFile = (argv[i] == "-s1");
             if(++i >= argc)
-                return ErrorExit("incomplete style path definition");
+                return ErrorExit("incomplete -s option");
             css.push_back(argv[i++]);
         }
         else if(!strcmp(argv[i], "-f"))
         {
-            bool isFile = (argv[i] == "-f1");
+            //bool isFile = (argv[i] == "-f1");
             if(++i >= argc)
-                return ErrorExit("incomplete style path definition");
+                return ErrorExit("incomplete -f option");
             fonts.push_back(argv[i++]);
         }
         else if(!strcmp(argv[i], "-sf") || !strcmp(argv[i], "-fs"))
         {
             if(++i >= argc)
-                return ErrorExit("incomplete style/font path definition");
+                return ErrorExit("incomplete -sf option");
             const char *p = argv[i++];
             css.push_back(p);
             fonts.push_back(p);
@@ -272,19 +153,35 @@ int main(int argc, char **argv)
         else if(!strcmp(argv[i], "-t"))
         {
             if(++i >= argc)
-                return ErrorExit("incomplete transliteration file definition");
+                return ErrorExit("incomplete -t option");
             if(!xlit.empty())
                 return ErrorExit("transliteration file redefinition");
             xlit = argv[i++];
         }
         else if(!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help"))
             ++i;
+        else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info"))
+        {
+            infoOnly = true;
+            ++i;
+        }
+        else if(!strcmp(argv[i], "-mf"))
+        {
+            if(++i >= argc)
+                return ErrorExit("incomplete -mf option");
+            mfonts.push_back(argv[i++]);
+        }
+        else if(argv[i][0] == '-')
+            return ErrorExit(String("unrecognized command line switch ") + argv[i]);
         else if(in.empty())
             in = argv[i++];
         else if(out.empty())
             out = argv[i++];
         else
-            return ErrorExit("unrecognized command line switch");
+            return ErrorExit(String("unrecognized file ") + argv[i]);
+
+    if(infoOnly)
+        return Info(in);
 
     // check
     if(in.empty() || out.empty())
@@ -305,20 +202,18 @@ int main(int argc, char **argv)
         if(!xlit.empty())
             xlitConv = CreateXlitConverter(CreateInUnicodeStm(CreateUnpackStm(xlit.c_str())));
 
-        return Convert(pin, css, fonts, xlitConv, pout);
+        return Convert(pin, css, fonts, mfonts, xlitConv, pout);
     }
     catch(const String &s)
     {
-        fprintf(stderr, "%s\n", s.c_str());
-        fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;
     }
     catch(...)
     {
-        fprintf(stderr, "Unknown error\n");
-        fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
+        fprintf(stderr, "Unknown error\n[%d]%s\n", errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;

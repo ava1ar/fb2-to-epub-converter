@@ -38,6 +38,7 @@ namespace Fb2ToEpub
     const std::size_t UNIT_SIZE1        = MAX_UNIT_SIZE*3/4;
     const std::size_t UNIT_SIZE2        = MAX_UNIT_SIZE*5/6;
 
+    /*
     //-----------------------------------------------------------------------
     // All elements
     //-----------------------------------------------------------------------
@@ -110,6 +111,7 @@ namespace Fb2ToEpub
         E_VERSION,
         E_YEAR
     };
+    */
 
     //-----------------------------------------------------------------------
     struct Unit
@@ -162,6 +164,11 @@ namespace Fb2ToEpub
 
 
     //-----------------------------------------------------------------------
+    // PRINT INFO
+    //-----------------------------------------------------------------------
+    void FB2TOEPUB_DECL DoPrintInfo(const String &in);
+
+    //-----------------------------------------------------------------------
     // CONVERTION PASS 1 (DETERMINE DOCUMENT STRUCTURE AND COLLECT ALL CROSS-REFERENCES INSIDE THE FB2 FILE)
     //-----------------------------------------------------------------------
     void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units);
@@ -172,6 +179,7 @@ namespace Fb2ToEpub
     void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,
                                             const strvector &css,
                                             const strvector &fonts,
+                                            const strvector &mfonts,
                                             XlitConv *xlitConv,
                                             UnitArray *units,
                                             OutPackStm *pout);
