@@ -20,7 +20,6 @@
 
 #include "hdr.h"
 
-#include "fb2toepubconv.h"
 #include "scanner.h"
 #include "converter.h"
 #include "streamconv.h"
