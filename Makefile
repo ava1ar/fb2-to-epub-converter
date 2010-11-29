@@ -17,6 +17,7 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		$(wildcard $(srcdir)/minizip/*.c) \
 		$(wildcard $(srcdir)/tiniconv/*.c) \
 		base64.cpp \
+		convinfo.cpp \
 		convpass1.cpp \
 		convpass2.cpp \
 		fb2toepub.cpp \

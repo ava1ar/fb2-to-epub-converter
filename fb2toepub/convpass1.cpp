@@ -78,8 +78,8 @@ private:
     //void history                ();
     //void home_page              ();
     //void id                     ();
-    //void isbn                   ();
     void image                  (bool in_line, Unit::Type unitType = Unit::UNIT_NONE);
+    //void isbn                   ();
     //void keywords               ();
     //void lang                   ();
     //void last_name              ();
@@ -154,7 +154,12 @@ String ConverterPass1::Findhref(const AttrMap &attrmap) const
     std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
     for(; cit != cit_end; ++cit)
     {
-        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : (*cit)+":href");
+        String href;
+        if(cit->empty())
+            href = "href";
+        else
+            href = (*cit)+":href";
+        AttrMap::const_iterator ait = attrmap.find(href);
         if(ait != attrmap.end())
             return ait->second;
     }

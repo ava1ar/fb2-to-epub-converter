@@ -20,7 +20,6 @@
 
 #include "hdr.h"
 
-#include "fb2toepubconv.h"
 #include "scanner.h"
 #include "scandir.h"
 #include "converter.h"
@@ -58,6 +57,22 @@ private:
 };
 */
 
+class SetLanguage
+{
+    String *pstr_, old_;
+public:
+    SetLanguage(String *pstr, const AttrMap &attrmap) : pstr_(pstr), old_(*pstr)
+    {
+        AttrMap::const_iterator cit = attrmap.find("xml:lang");
+        if(cit != attrmap.end())
+            *pstr_ = cit->second;
+    }
+    ~SetLanguage()
+    {
+        *pstr_ = old_;
+    }
+};
+
 
 //-----------------------------------------------------------------------
 static String EncodeStr(const String &str)
@@ -80,12 +95,15 @@ public:
     ConverterPass2 (LexScanner *scanner,
                     const strvector &css,
                     const strvector &fonts,
+                    const strvector &mfonts,
                     XlitConv *xlitConv,
                     UnitArray *units,
                     OutPackStm *pout)
                         :   s_                  (scanner),
                             css_                (css),
                             fonts_              (fonts),
+                            mfonts_             (mfonts),
+                            xlitConv_           (xlitConv),
                             units_              (*units),
                             pout_               (pout),
                             tocLevels_          (0),
@@ -93,8 +111,7 @@ public:
                             unitIdx_            (0),
                             unitActive_         (false),
                             unitHasId_          (false),
-                            sectionSize_        (0),
-                            xlitConv_           (xlitConv)
+                            sectionSize_        (0)
     {
         coverPgIt_ = units_.end();
     }
@@ -143,7 +160,8 @@ public:
 
 private:
     Ptr<LexScanner>         s_;
-    const strvector         &css_, &fonts_;
+    const strvector         &css_, &fonts_, &mfonts_;
+    Ptr<XlitConv>           xlitConv_;
     UnitArray               &units_;
     Ptr<OutPackStm>         pout_;
 
@@ -168,14 +186,15 @@ private:
     binvector               binaries_;
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
-    String                  authors_, title_, lang_, id_;
+    String                  title_, lang_, id_, title_info_date_, isbn_;
+    strvector               authors_;
 
     String                  prevUnitFile_;
     int                     unitIdx_;
     bool                    unitActive_;
     bool                    unitHasId_;
     std::size_t             sectionSize_;
-    Ptr<XlitConv>           xlitConv_;
+    String                  bodyXmlLang_, sectXmlLang_;
 
 
     void AdjustUnitSizes        ();
@@ -203,6 +222,7 @@ private:
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
+    void CopyXmlLang            (const AttrMap &attrmap);
     bool AddAnchorid            (const String &anchorid);
 
     // FictionBook elements
@@ -220,6 +240,7 @@ private:
     void coverpage              ();
     //void custom_info            ();
     void date                   ();
+    String date__textonly       ();
     void description            ();
     void document_info          ();
     //void email                  ();
@@ -231,8 +252,8 @@ private:
     //void history                ();
     //void home_page              ();
     void id                     ();
-    //void isbn                   ();
     void image                  (bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType = Unit::UNIT_NONE);
+    String isbn                 ();
     //void keywords               ();
     void lang                   ();
     //void last_name              ();
@@ -244,7 +265,7 @@ private:
     //void part                   ();
     void poem                   ();
     //void program_used           ();
-    //void publish_info           ();
+    void publish_info           ();
     //void publisher              ();
     void section                ();
     //void sequence               ();
@@ -404,12 +425,9 @@ void ConverterPass2::BuiltFileLayout(int levelToSplit)
         // assing unit file name
         it->file_ = file;
 
-        // make unique id
-        String id = MakeUniqueId();
-
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
-        // assing new unit id
-        it->fileId_ = id;
+        // make and assing new unit id
+        it->fileId_ = MakeUniqueId();
 #endif
 
         prevLevel = it->level_;
@@ -509,7 +527,12 @@ String ConverterPass2::Findhref(const AttrMap &attrmap) const
     std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
     for(; cit != cit_end; ++cit)
     {
-        AttrMap::const_iterator ait = attrmap.find(cit->empty() ? String("href") : (*cit)+":href");
+        String href;
+        if(cit->empty())
+            href = "href";
+        else
+            href = (*cit)+":href";
+        AttrMap::const_iterator ait = attrmap.find(href);
         if(ait != attrmap.end())
             return ait->second;
     }
@@ -558,7 +581,10 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
             pout_->WriteFmt("<link rel=\"stylesheet\" type=\"text/css\" href=\"%s\"/>\n", EncodeStr(*cit).c_str());
 
         pout_->WriteFmt("</head>\n");
-        pout_->WriteFmt("<body>\n");
+        if(!bodyXmlLang_.empty())
+            pout_->WriteFmt("<body xml:lang=\"%s\">\n", EncodeStr(bodyXmlLang_).c_str());
+        else
+            pout_->WriteFmt("<body>\n");
 
         switch(unit.bodyType_)
         {
@@ -570,7 +596,12 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
         }
     }
     if(unit.type_ == Unit::SECTION)
-        pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
+    {
+        if(!sectXmlLang_.empty())
+            pout_->WriteFmt("<div class=\"section%d\" xml:lang=\"%s\">\n", unit.level_+1, EncodeStr(sectXmlLang_).c_str());
+        else
+            pout_->WriteFmt("<div class=\"section%d\">\n", unit.level_+1);
+    }
 #if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
     pout_->WriteFmt("<div id=\"%s\">\n", unit.fileId_.c_str()); // file id
 #endif
@@ -718,7 +749,15 @@ void ConverterPass2::AddContentOpf()
     pout_->WriteFmt("    <dc:title>%s</dc:title>\n", (xlitConv_ ? xlitConv_->Convert(title_) : title_).c_str());
     pout_->WriteFmt("    <dc:language>%s</dc:language>\n", lang_.c_str());
     pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"ID\">%s</dc:identifier>\n", id_.c_str());
-    pout_->WriteFmt("    <dc:creator opf:role=\"aut\">%s</dc:creator>\n", (xlitConv_ ? xlitConv_->Convert(authors_) : authors_).c_str());
+    {
+        strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
+        for(; cit < cit_end; ++cit)
+            pout_->WriteFmt("    <dc:creator opf:role=\"aut\">%s</dc:creator>\n", (xlitConv_ ? xlitConv_->Convert(*cit) : *cit).c_str());
+    }
+    if(!title_info_date_.empty())
+        pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
+    if(!isbn_.empty())
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
     pout_->WriteStr("  </metadata>\n\n");
 
     pout_->WriteStr("  <manifest>\n");
@@ -739,8 +778,11 @@ void ConverterPass2::AddContentOpf()
         for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
 
+        for(cit = mfonts_.begin(), cit_end = mfonts_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "application/x-font-otf");
+            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "font/opentype");
 
         for(cit = files.begin(), cit_end = files.end(); cit < cit_end; ++cit)
             AddContentManifestFile(pout_, cit->c_str(), (*cit + ".xhtml").c_str(), "application/xhtml+xml");
@@ -900,6 +942,12 @@ void ConverterPass2::CopyAttribute(const String &attr, const AttrMap &attrmap)
     AttrMap::const_iterator cit = attrmap.find(attr);
     if(cit != attrmap.end())
         pout_->WriteFmt(" %s=\"%s\"", attr.c_str(), EncodeStr(cit->second).c_str());
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::CopyXmlLang(const AttrMap &attrmap)
+{
+    CopyAttribute("xml:lang", attrmap);
 }
 
 //-----------------------------------------------------------------------
@@ -1080,6 +1128,7 @@ void ConverterPass2::annotation(bool startUnit)
 
     pout_->WriteStr("<div class=\"annotation\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     if(!notempty)
     {
         pout_->WriteStr("/>");
@@ -1135,7 +1184,7 @@ void ConverterPass2::author()
     else
         Error("<first-name> or <nickname> expected");
 
-    authors_ = Concat(authors_, ", ", author);
+    authors_.push_back(author);
     s_->SkipRestOfElementContent();
 }
 
@@ -1170,7 +1219,11 @@ void ConverterPass2::binary()
 //-----------------------------------------------------------------------
 void ConverterPass2::body()
 {
-    s_->BeginNotEmptyElement("body");
+    AttrMap attrmap;
+    s_->BeginNotEmptyElement("body", &attrmap);
+
+    // set body language
+    SetLanguage l(&bodyXmlLang_, attrmap);
 
     //<image>
     if(s_->IsNextElement("image"))
@@ -1213,6 +1266,7 @@ void ConverterPass2::cite()
     bool notempty = s_->BeginElement("cite", &attrmap);
     pout_->WriteStr("<div class=\"citation\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     if(!notempty)
     {
         pout_->WriteStr("/>");
@@ -1282,13 +1336,32 @@ void ConverterPass2::coverpage()
 //-----------------------------------------------------------------------
 void ConverterPass2::date()
 {
-    if(s_->BeginElement("date"))
+    AttrMap attrmap;
+    if(s_->BeginElement("date"), &attrmap)
     {
         SetScannerDataMode setDataMode(s_);
         if(s_->LookAhead().type_ == LexScanner::DATA)
-            pout_->WriteFmt("<p class=\"date\">%s</p>\n", s_->GetToken().s_.c_str());
+        {
+            pout_->WriteFmt("<p class=\"date\"");
+            CopyXmlLang(attrmap);
+            pout_->WriteFmt(">%s</p>\n", s_->GetToken().s_.c_str());
+        }
         s_->EndElement();
     }
+}
+
+//-----------------------------------------------------------------------
+String ConverterPass2::date__textonly()
+{
+    if(!s_->BeginElement("date"))
+        return "";
+
+    String text;
+    SetScannerDataMode setDataMode(s_);
+    if(s_->LookAhead().type_ == LexScanner::DATA)
+        text = s_->GetToken().s_;
+    s_->EndElement();
+    return text;
 }
 
 //-----------------------------------------------------------------------
@@ -1308,6 +1381,11 @@ void ConverterPass2::description()
     //<document-info>
     document_info();
     //</document-info>
+
+    //<publish-info>
+    if(s_->IsNextElement("publish-info"))
+        publish_info();
+    //</publish-info>
 
     s_->SkipRestOfElementContent(); // skip rest of <description>
 }
@@ -1465,6 +1543,20 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
 }
 
 //-----------------------------------------------------------------------
+String ConverterPass2::isbn()
+{
+    if(!s_->BeginElement("isbn"))
+        return "";
+
+    String text;
+    SetScannerDataMode setDataMode(s_);
+    if(s_->LookAhead().type_ == LexScanner::DATA)
+        text = s_->GetToken().s_;
+    s_->EndElement();
+    return text;
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::lang()
 {
     lang_ = s_->SimpleTextElement("lang");
@@ -1474,21 +1566,18 @@ void ConverterPass2::lang()
 void ConverterPass2::p(const char *pelement, const char *cls)
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("p", &attrmap);
-
-    pout_->WriteFmt("<%s", pelement);
-    if(cls)
-        pout_->WriteFmt(" class=\"%s\"", cls);
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("p", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteFmt("<%s", pelement);
+        if(cls)
+            pout_->WriteFmt(" class=\"%s\"", cls);
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("p");
-    pout_->WriteFmt("</%s>\n", pelement);
+        ParseTextAndEndElement("p");
+        pout_->WriteFmt("</%s>\n", pelement);
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1498,6 +1587,7 @@ void ConverterPass2::poem()
     s_->BeginNotEmptyElement("poem", &attrmap);
     pout_->WriteStr("<div class=\"poem\"");
     AddId(attrmap);
+    CopyXmlLang(attrmap);
     pout_->WriteStr(">");
 
     //<title>
@@ -1531,10 +1621,47 @@ void ConverterPass2::poem()
 }
 
 //-----------------------------------------------------------------------
+void ConverterPass2::publish_info()
+{
+    if(!s_->BeginElement("publish-info"))
+        return;
+
+    //<book-name>
+    if(s_->IsNextElement("book-name"))
+        s_->SkipElement();
+    //</book-name>
+
+    //<publisher>
+    if(s_->IsNextElement("publisher"))
+        s_->SkipElement();
+    //</publisher>
+
+    //<city>
+    if(s_->IsNextElement("city"))
+        s_->SkipElement();
+    //</city>
+
+    //<year>
+    if(s_->IsNextElement("year"))
+        s_->SkipElement();
+    //</year>
+
+    //<isbn>
+    if(s_->IsNextElement("isbn"))
+        isbn_ = isbn();
+    //</isbn>
+
+    s_->SkipRestOfElementContent(); // skip rest of <publish-info>
+}
+
+//-----------------------------------------------------------------------
 void ConverterPass2::section()
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("section", &attrmap);
+
+    // set section language
+    SetLanguage l(&sectXmlLang_, attrmap);
 
     sectionSize_ = 0;
     StartUnit(Unit::SECTION, &attrmap);
@@ -1682,9 +1809,9 @@ void ConverterPass2::strong()
 //-----------------------------------------------------------------------
 void ConverterPass2::style()
 {
-    s_->SkipElement();
-    //if(s_->BeginElement("style"))
-    //    ParseTextAndEndElement("style");
+    // ignore style
+    if(s_->BeginElement("style"))
+        ParseTextAndEndElement("strong");
 }
 
 //-----------------------------------------------------------------------
@@ -1702,19 +1829,16 @@ void ConverterPass2::sub()
 void ConverterPass2::subtitle()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("subtitle", &attrmap);
-
-    pout_->WriteStr("<h2 class=\"e_h2\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("subtitle", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteStr("<h2 class=\"e_h2\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("subtitle");
-    pout_->WriteStr("</h2>\n");
+        ParseTextAndEndElement("subtitle");
+        pout_->WriteStr("</h2>\n");
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1764,7 +1888,7 @@ void ConverterPass2::td()
     CopyAttribute("rowspan", attrmap);
     CopyAttribute("align", attrmap);
     CopyAttribute("valign", attrmap);
-    CopyAttribute("xml::lang", attrmap);
+    CopyXmlLang(attrmap);
 
     if(!notempty)
     {
@@ -1781,19 +1905,16 @@ void ConverterPass2::td()
 void ConverterPass2::text_author()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("text-author", &attrmap);
-
-    pout_->WriteFmt("<div class=\"text_author\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("text-author", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteFmt("<div class=\"text_author\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("text-author");
-    pout_->WriteStr("</div>\n");
+        ParseTextAndEndElement("text-author");
+        pout_->WriteStr("</div>\n");
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1810,7 +1931,7 @@ void ConverterPass2::th()
     CopyAttribute("rowspan", attrmap);
     CopyAttribute("align", attrmap);
     CopyAttribute("valign", attrmap);
-    CopyAttribute("xml::lang", attrmap);
+    CopyXmlLang(attrmap);
 
     if(!notempty)
     {
@@ -1826,13 +1947,16 @@ void ConverterPass2::th()
 //-----------------------------------------------------------------------
 void ConverterPass2::title(bool startUnit, const String &anchorid)
 {
-    if(!s_->BeginElement("title"))
+    AttrMap attrmap;
+    if(!s_->BeginElement("title", &attrmap))
         return;
 
     if(startUnit)
         StartUnit(Unit::TITLE);
 
-    pout_->WriteFmt("<div class=\"title\">\n");
+    pout_->WriteFmt("<div class=\"title\"");
+    CopyXmlLang(attrmap);
+    pout_->WriteFmt(">\n");
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
         if(!t.s_.compare("p"))
@@ -1893,7 +2017,7 @@ void ConverterPass2::title_info()
 
     //<date>
     if(s_->IsNextElement("date"))
-        s_->SkipElement();
+        title_info_date_ = date__textonly();
     //<date>
 
     //<coverpage>
@@ -1944,30 +2068,28 @@ void ConverterPass2::tr()
 void ConverterPass2::v()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("v", &attrmap);
-
-    pout_->WriteStr("<p class=\"v\"");
-    AddId(attrmap);
-    if(!notempty)
+    if(s_->BeginElement("v", &attrmap))
     {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+        pout_->WriteStr("<p class=\"v\"");
+        AddId(attrmap);
+        CopyXmlLang(attrmap);
+        pout_->WriteStr(">");
 
-    ParseTextAndEndElement("v");
-    pout_->WriteStr("</p>\n");
+        ParseTextAndEndElement("v");
+        pout_->WriteStr("</p>\n");
+    }
 }
 
 
 void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,
                                         const strvector &css,
                                         const strvector &fonts,
+                                        const strvector &mfonts,
                                         XlitConv *xlitConv,
                                         UnitArray *units,
                                         OutPackStm *pout)
 {
-    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, xlitConv, units, pout);
+    Ptr<ConverterPass2> conv = new ConverterPass2(scanner, css, fonts, mfonts, xlitConv, units, pout);
     conv->Scan();
 }
 
