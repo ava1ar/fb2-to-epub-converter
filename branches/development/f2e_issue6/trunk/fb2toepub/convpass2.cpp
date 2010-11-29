@@ -20,7 +20,6 @@
 
 #include "hdr.h"
 
-#include "fb2toepubconv.h"
 #include "scanner.h"
 #include "scandir.h"
 #include "converter.h"
@@ -783,7 +782,7 @@ void ConverterPass2::AddContentOpf()
             AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
 
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "application/x-font-otf");
+            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "font/opentype");
 
         for(cit = files.begin(), cit_end = files.end(); cit < cit_end; ++cit)
             AddContentManifestFile(pout_, cit->c_str(), (*cit + ".xhtml").c_str(), "application/xhtml+xml");
