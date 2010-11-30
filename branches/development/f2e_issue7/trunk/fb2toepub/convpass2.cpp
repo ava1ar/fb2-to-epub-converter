@@ -1374,8 +1374,7 @@ void ConverterPass2::description()
     //</title-info>
 
     //<src-title-info>
-    if(s_->IsNextElement("src-title-info"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-title-info");
     //</src-title-info>
 
     //<document-info>
@@ -1401,8 +1400,7 @@ void ConverterPass2::document_info()
     //</author>
 
     //<program-used>
-    if(s_->IsNextElement("program-used"))
-        s_->SkipElement();
+    s_->SkipIfElement("program-used");
     //</program-used>
 
     //<date>
@@ -1414,8 +1412,7 @@ void ConverterPass2::document_info()
     //</src-url>
 
     //<src-ocr>
-    if(s_->IsNextElement("src-ocr"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-ocr");
     //</src-ocr>
 
     //<id>
@@ -1627,23 +1624,19 @@ void ConverterPass2::publish_info()
         return;
 
     //<book-name>
-    if(s_->IsNextElement("book-name"))
-        s_->SkipElement();
+    s_->SkipIfElement("book-name");
     //</book-name>
 
     //<publisher>
-    if(s_->IsNextElement("publisher"))
-        s_->SkipElement();
+    s_->SkipIfElement("publisher");
     //</publisher>
 
     //<city>
-    if(s_->IsNextElement("city"))
-        s_->SkipElement();
+    s_->SkipIfElement("city");
     //</city>
 
     //<year>
-    if(s_->IsNextElement("year"))
-        s_->SkipElement();
+    s_->SkipIfElement("year");
     //</year>
 
     //<isbn>
@@ -2011,8 +2004,7 @@ void ConverterPass2::title_info()
     //</annotation>
 
     //<keywords>
-    if(s_->IsNextElement("keywords"))
-        s_->SkipElement();
+    s_->SkipIfElement("keywords");
     //</keywords>
 
     //<date>

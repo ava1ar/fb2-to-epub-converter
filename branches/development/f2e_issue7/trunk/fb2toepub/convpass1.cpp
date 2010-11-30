@@ -472,11 +472,6 @@ void ConverterPass1::description()
     title_info();
     //</title-info>
 
-    //<src-title-info>
-    if(s_->IsNextElement("src-title-info"))
-        s_->SkipElement();
-    //</src-title-info>
-
     s_->SkipRestOfElementContent(); // skip rest of <description>
 }
 
@@ -588,10 +583,9 @@ void ConverterPass1::poem()
         text_author();
     //</text-author>
 
-    //<data>
-    if(s_->IsNextElement("date"))
-        s_->SkipElement();
-    //</data>
+    //<date>
+    s_->SkipIfElement("date");
+    //</date>
 
     s_->EndElement();
 }
@@ -883,13 +877,11 @@ void ConverterPass1::title_info()
     //</annotation>
 
     //<keywords>
-    if(s_->IsNextElement("keywords"))
-        s_->SkipElement();
+    s_->SkipIfElement("keywords");
     //</keywords>
 
     //<date>
-    if(s_->IsNextElement("date"))
-        s_->SkipElement();
+    s_->SkipIfElement("date");
     //<date>
 
     //<coverpage>
