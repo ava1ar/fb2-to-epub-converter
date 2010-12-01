@@ -107,6 +107,7 @@ public:
                             units_              (*units),
                             pout_               (pout),
                             tocLevels_          (0),
+                            coverBinIdx_        (-1),
                             uniqueIdIdx_        (0),
                             unitIdx_            (0),
                             unitActive_         (false),
@@ -177,6 +178,8 @@ private:
 
     int                     tocLevels_;
     UnitArray::iterator     coverPgIt_;
+    String                  coverFile_;
+    int                     coverBinIdx_;
     int                     uniqueIdIdx_;
     ReferenceMap            refidToNew_;        // (re)mapping of original reference id to unique reference id
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
@@ -252,7 +255,7 @@ private:
     //void history                ();
     //void home_page              ();
     void id                     ();
-    void image                  (bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType = Unit::UNIT_NONE);
+    void image                  (bool fb2_inline, bool html_inline, bool scale);
     String isbn                 ();
     //void keywords               ();
     void lang                   ();
@@ -758,6 +761,8 @@ void ConverterPass2::AddContentOpf()
         pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
     if(!isbn_.empty())
         pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
+    if(coverBinIdx_ >= 0)
+        pout_->WriteFmt("    <meta name=\"cover\" content=\"%s\"/>\n", MakeFileName("bin", coverBinIdx_).c_str());
     pout_->WriteStr("  </metadata>\n\n");
 
     pout_->WriteStr("  <manifest>\n");
@@ -1199,6 +1204,10 @@ void ConverterPass2::binary()
     //if(b.file_.empty() || (b.type_ != "image/jpeg" && b.type_ != "image/png"))
     if(b.file_.empty() || b.type_.empty())
         Error("invalid <binary> attributes");
+
+    if(b.file_ == coverFile_ && coverBinIdx_ < 0)
+        coverBinIdx_ = binaries_.size();
+
     b.file_ = String("bin/") + b.file_;
     binaries_.push_back(b);
 
@@ -1227,7 +1236,10 @@ void ConverterPass2::body()
 
     //<image>
     if(s_->IsNextElement("image"))
-        image(false, false, true, Unit::IMAGE);
+    {
+        StartUnit(Unit::IMAGE);
+        image(false, false, true);
+    }
     //</image>
 
     //<title>
@@ -1494,13 +1506,11 @@ void ConverterPass2::id()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType)
+void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("image", &attrmap);
 
-    if(unitType != Unit::UNIT_NONE)
-        StartUnit(unitType);
     bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
     if(has_id)
     {
@@ -1513,6 +1523,9 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
     String href = Findhref(attrmap), alt = attrmap["alt"];
     if(!href.empty())
     {
+        if(href[0] == '#' && units_[unitIdx_].type_ == Unit::COVERPAGE && coverFile_.empty())
+            coverFile_ = href.substr(1);
+
         String group = html_inline ? "span" : "div";
 
         pout_->WriteFmt("<%s class=\"image\">", group.c_str());
