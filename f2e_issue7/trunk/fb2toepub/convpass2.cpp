@@ -29,6 +29,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <ctype.h>
 
 namespace Fb2ToEpub
 {
@@ -243,7 +244,7 @@ private:
     void coverpage              ();
     //void custom_info            ();
     void date                   ();
-    String date__textonly       ();
+    String date__epub           ();
     void description            ();
     void document_info          ();
     //void email                  ();
@@ -761,8 +762,11 @@ void ConverterPass2::AddContentOpf()
         pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
     if(!isbn_.empty())
         pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
+
+    // Add cover image description
     if(coverBinIdx_ >= 0)
         pout_->WriteFmt("    <meta name=\"cover\" content=\"%s\"/>\n", MakeFileName("bin", coverBinIdx_).c_str());
+
     pout_->WriteStr("  </metadata>\n\n");
 
     pout_->WriteStr("  <manifest>\n");
@@ -1204,12 +1208,14 @@ void ConverterPass2::binary()
     //if(b.file_.empty() || (b.type_ != "image/jpeg" && b.type_ != "image/png"))
     if(b.file_.empty() || b.type_.empty())
         Error("invalid <binary> attributes");
-
-    if(b.file_ == coverFile_ && coverBinIdx_ < 0)
-        coverBinIdx_ = binaries_.size();
-
     b.file_ = String("bin/") + b.file_;
     binaries_.push_back(b);
+
+    // If it is a cover page image file, remember binary index.
+    // It is necessary to add cover image description to metadata
+    // section of content.opf
+    if(b.file_ == coverFile_ && coverBinIdx_ < 0)
+        coverBinIdx_ = binaries_.size()-1;
 
     // store binary file
     {
@@ -1363,17 +1369,41 @@ void ConverterPass2::date()
 }
 
 //-----------------------------------------------------------------------
-String ConverterPass2::date__textonly()
+static bool IsDateCorrect(const String &s)
 {
-    if(!s_->BeginElement("date"))
+    // date format should be YYYY[-MM[-DD]]
+    // (but we don't check if year, month or day value is valid!)
+    if(s.length() < 4 || !isdigit(s[0]) || !isdigit(s[1]) || !isdigit(s[2]) || !isdigit(s[3]))
+        return false;
+    if(s.length() > 4 && (s.length() < 7 || s[4] != '-' || !isdigit(s[5]) || !isdigit(s[6])))
+        return false;
+    if(s.length() > 7 && (s.length() != 10 || s[7] != '-' || !isdigit(s[8]) || !isdigit(s[9])))
+        return false;
+    return true;
+}
+
+//-----------------------------------------------------------------------
+String ConverterPass2::date__epub()
+{
+    AttrMap attrmap;
+    bool notempty = s_->BeginElement("date", &attrmap);
+
+    String text = attrmap["value"];
+    if(IsDateCorrect(text))
+    {
+        if(notempty)
+            s_->EndElement();
+        return text;
+    }
+
+    if(!notempty)
         return "";
 
-    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
     s_->EndElement();
-    return text;
+    return IsDateCorrect(text) ? text : String("");
 }
 
 //-----------------------------------------------------------------------
@@ -1511,28 +1541,35 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale)
     AttrMap attrmap;
     bool notempty = s_->BeginElement("image", &attrmap);
 
-    bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
-    if(has_id)
-    {
-        pout_->WriteStr("<div");
-        AddId(attrmap);
-        pout_->WriteStr(">");
-    }
-
     // get file href
     String href = Findhref(attrmap), alt = attrmap["alt"];
     if(!href.empty())
     {
-        if(href[0] == '#' && units_[unitIdx_].type_ == Unit::COVERPAGE && coverFile_.empty())
-            coverFile_ = href.substr(1);
+        if(href[0] == '#')
+        {
+            // internal reference
+            href = String("bin/") + href.substr(1);
+
+            // remember name of the cover page image file
+            if(units_[unitIdx_].type_ == Unit::COVERPAGE && coverFile_.empty())
+                coverFile_ = href;
+        }
+
+        bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
+        if(has_id)
+        {
+            pout_->WriteStr("<div");
+            AddId(attrmap);
+            pout_->WriteStr(">");
+        }
 
         String group = html_inline ? "span" : "div";
 
         pout_->WriteFmt("<%s class=\"image\">", group.c_str());
         if(scale)
-            pout_->WriteFmt("<img style=\"height: 100%%;\" alt=\"%s\" src=\"bin/%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str()+1);
+            pout_->WriteFmt("<img style=\"height: 100%%;\" alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
         else
-            pout_->WriteFmt("<img alt=\"%s\" src=\"bin/%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str()+1);
+            pout_->WriteFmt("<img alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
 
         if(!fb2_inline)
         {
@@ -1543,9 +1580,10 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale)
                 pout_->WriteFmt("<p>%s</p>\n", EncodeStr(cit->second).c_str());
         }
         pout_->WriteFmt("</%s>", group.c_str());
+
+        if(has_id)
+            pout_->WriteStr("</div>\n");
     }
-    if(has_id)
-        pout_->WriteStr("</div>\n");
     if(!notempty)
         return;
     ClrScannerDataMode clrDataMode(s_);
@@ -2022,7 +2060,7 @@ void ConverterPass2::title_info()
 
     //<date>
     if(s_->IsNextElement("date"))
-        title_info_date_ = date__textonly();
+        title_info_date_ = date__epub();
     //<date>
 
     //<coverpage>
