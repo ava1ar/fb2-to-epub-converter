@@ -51,7 +51,7 @@ public:
 
     void Scan()
     {
-        std::size_t size;
+        std::size_t size = 0;
         {
             struct stat st;
             ::stat(in_.c_str(), &st);
