@@ -88,8 +88,8 @@ static int ErrorExit(const String &err)
 #if FB2TOEPUB_DONT_OVERWRITE
 static bool FileExists(const String &path)
 {
-    struct stat sts;
-    return stat(path.c_str(), &sts) != -1 || errno != ENOENT;
+    struct stat st;
+    return ::stat(path.c_str(), &st) != -1 || errno != ENOENT;
 }
 #endif
 
