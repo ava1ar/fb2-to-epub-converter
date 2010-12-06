@@ -52,7 +52,7 @@ String GenerateUUID()
 }
     
 //-----------------------------------------------------------------------
-void MakeAdobeKey(const String &uuid, char *adobeKey)
+void MakeAdobeKey(const String &uuid, unsigned char *adobeKey)
 {
 #if defined(_DEBUG)
     if(!IsValidUUID(uuid))
@@ -63,7 +63,7 @@ void MakeAdobeKey(const String &uuid, char *adobeKey)
     bool high = true;
     for(;;)
     {
-        char nibble;
+        unsigned char nibble;
         char c = *p++;
         switch(c)
         {

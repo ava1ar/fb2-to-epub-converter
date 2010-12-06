@@ -26,7 +26,7 @@
 namespace Fb2ToEpub
 {
 
-    Ptr<InStm> FB2TOEPUB_DECL CreateManglingStm(InStm *stm, char *key, size_t keySize, size_t maxSize);
+    Ptr<InStm> FB2TOEPUB_DECL CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySize, size_t maxSize);
 
 };  //namespace Fb2ToEpub
 
