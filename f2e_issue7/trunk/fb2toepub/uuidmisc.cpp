@@ -55,12 +55,12 @@ bool IsValidUUID(const String &id)
 }
 
 //-----------------------------------------------------------------------
-inline void AddRandonHex(std::vector<char> *buf, int cnt)
+inline void AddRandomHex(std::vector<char> *buf, int cnt)
 {
     while(--cnt >= 0)
     {
         int x = rand() & 0xf;
-        buf->push_back(static_cast<char>((x < 10) ? '0' + x : 'a' + (x - 10)));
+        buf->push_back(static_cast<char>((x < 10) ? '0' + x : 'A' + (x - 10)));
     }
 }
 
@@ -70,19 +70,19 @@ String GenerateUUID()
     srand(static_cast<unsigned int>(time(NULL)));
     std::vector<char> buf;
 
-    AddRandonHex(&buf, 8);
+    AddRandomHex(&buf, 8);
     buf.push_back('-');
-    AddRandonHex(&buf, 4);
+    AddRandomHex(&buf, 4);
     buf.push_back('-');
-    AddRandonHex(&buf, 4);
+    AddRandomHex(&buf, 4);
     buf.push_back('-');
 
     int x = (rand() & 0x3) | 0x8;
     buf.push_back(static_cast<char>((x < 10) ? '0' + x : 'a' + (x - 10)));
 
-    AddRandonHex(&buf, 3);
+    AddRandomHex(&buf, 3);
     buf.push_back('-');
-    AddRandonHex(&buf, 12);
+    AddRandomHex(&buf, 12);
     buf.push_back('\0');
 
     return &buf[0];

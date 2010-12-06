@@ -285,6 +285,14 @@
 			<File
 				RelativePath=".\mangling.cpp"
 				>
+				<FileConfiguration
+					Name="Release Static|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="ZLIB_WINAPI"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath=".\scandir.cpp"
