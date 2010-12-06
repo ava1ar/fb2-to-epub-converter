@@ -28,7 +28,7 @@ namespace Fb2ToEpub
 
     bool    FB2TOEPUB_DECL   IsValidUUID     (const String &id);
     String  FB2TOEPUB_DECL   GenerateUUID    ();
-    void    FB2TOEPUB_DECL   MakeAdobeKey    (const String &uuid, char *adobeKey);
+    void    FB2TOEPUB_DECL   MakeAdobeKey    (const String &uuid, unsigned char *adobeKey);
 
 };  //namespace Fb2ToEpub
 

@@ -208,7 +208,7 @@ private:
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
     String                  title_, lang_, id_, title_info_date_, isbn_;
-    char                    adobeKey_[16];
+    unsigned char           adobeKey_[16];
     strvector               authors_;
 
     String                  prevUnitFile_;

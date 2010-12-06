@@ -30,6 +30,8 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		streamutf8.cpp \
 		streamzip.cpp \
 		translit.cpp \
+		uuidmisc.cpp \
+		mangling.cpp \
 		types.cpp
 
 COBJ=$(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC)))))

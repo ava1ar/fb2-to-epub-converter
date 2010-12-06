@@ -31,12 +31,12 @@ namespace Fb2ToEpub
 //-----------------------------------------------------------------------
 class InManglingStm : public InStm, Noncopyable
 {
-    Ptr<InStm>  stm_;
-    char        *key_;
-    size_t      keySize_, maxSize_, keyPos_, pos_;
+    Ptr<InStm>          stm_;
+    const unsigned char *key_;
+    size_t              keySize_, maxSize_, keyPos_, pos_;
 
 public:
-    InManglingStm(InStm *stm, char *key, size_t keySize, size_t maxSize)
+    InManglingStm(InStm *stm, const unsigned char *key, size_t keySize, size_t maxSize)
         : stm_(stm), key_(key), keySize_(keySize), maxSize_(maxSize), keyPos_(0), pos_(0) {}
 
     //virtuals
@@ -93,7 +93,7 @@ size_t InManglingStm::Read(void *buffer, size_t max_cnt)
 
 
 //-----------------------------------------------------------------------
-Ptr<InStm> CreateManglingStm(InStm *stm, char *key, size_t keySize, size_t maxSize)
+Ptr<InStm> CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySize, size_t maxSize)
 {
     return new InManglingStm(stm, key, keySize, maxSize);
 }
