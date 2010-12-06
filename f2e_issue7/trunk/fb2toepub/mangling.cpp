@@ -20,6 +20,8 @@
 
 #include "hdr.h"
 
+#if FB2TOEPUB_FONT_MANGLING
+
 #include "mangling.h"
 #include "zlib.h"
 
@@ -71,7 +73,7 @@ InDeflateStm::InDeflateStm(InStm *stm)
     df_.opaque  = Z_NULL;
     int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
     if (ret != Z_OK)
-        Error("deflateInit2 error");
+        Error("InDeflateStm: deflateInit2 error");
 }
 
 //-----------------------------------------------------------------------
@@ -123,7 +125,7 @@ size_t InDeflateStm::Fill() const
 char InDeflateStm::GetChar()
 {
     if(ocur_ == oend_ && !Fill())
-        Error("conv: EOF");
+        Error("InDeflateStm: EOF");
     return *ocur_++;
 }
 
@@ -169,7 +171,7 @@ void InDeflateStm::Rewind()
     df_.opaque  = Z_NULL;
     int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
     if (ret != Z_OK)
-        Error("deflateInit2 error");
+        Error("InDeflateStm: deflateInit2 error");
 }
 
 
@@ -190,7 +192,7 @@ public:
     bool        IsEOF() const                       {return stm_->IsEOF();}
     char        GetChar();
     size_t      Read(void *buffer, size_t max_cnt);
-    void        UngetChar(char c)                   {Error("InManglingStm unget not implemented");}
+    void        UngetChar(char c)                   {Error("InManglingStm: unget not implemented");}
     void        Rewind()                            {stm_->Rewind(); keyPos_ = pos_ = 0;}
 };
 
@@ -248,3 +250,5 @@ Ptr<InStm> CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySiz
 
 
 };  //namespace Fb2ToEpub
+
+#endif  //FB2TOEPUB_FONT_MANGLING

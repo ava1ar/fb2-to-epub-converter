@@ -18,6 +18,8 @@
 //
 
 
+#if FB2TOEPUB_FONT_MANGLING
+
 #ifndef FB2TOEPUB__MANGLING_H
 #define FB2TOEPUB__MANGLING_H
 
@@ -29,5 +31,7 @@ namespace Fb2ToEpub
     Ptr<InStm> FB2TOEPUB_DECL CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySize, size_t maxSize);
 
 };  //namespace Fb2ToEpub
+
+#endif
 
 #endif
