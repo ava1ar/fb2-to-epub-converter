@@ -18,17 +18,15 @@
 //
 
 
-#ifndef FB2TOEPUB__UUIDMISC_H
-#define FB2TOEPUB__UUIDMISC_H
+#ifndef FB2TOEPUB__MANGLING_H
+#define FB2TOEPUB__MANGLING_H
 
-#include "types.h"
+#include "stream.h"
 
 namespace Fb2ToEpub
 {
 
-    bool    FB2TOEPUB_DECL   IsValidUUID     (const String &id);
-    String  FB2TOEPUB_DECL   GenerateUUID    ();
-    void    FB2TOEPUB_DECL   MakeAdobeKey    (const String &uuid, char *adobeKey);
+    Ptr<InStm> FB2TOEPUB_DECL CreateManglingStm(InStm *stm, char *key, size_t keySize, size_t maxSize);
 
 };  //namespace Fb2ToEpub
 

@@ -25,6 +25,7 @@
 #include "converter.h"
 #include "base64.h"
 #include "uuidmisc.h"
+#include "mangling.h"
 //#include <streambuf>
 #include <sstream>
 #include <vector>
@@ -90,58 +91,6 @@ static void AddContentManifestFile(OutPackStm *pout, const String &id, const Str
     pout->WriteFmt("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>\n", EncodeStr(id).c_str(), EncodeStr(ref).c_str(), EncodeStr(media_type).c_str());
 }
 
-
-//-----------------------------------------------------------------------
-// InMangleFont
-//-----------------------------------------------------------------------
-class InMangleFont : public InStm, Noncopyable
-{
-    Ptr<InStm>  stm_;
-    char        *key_;
-    size_t      keySize_, keyPos_;
-
-public:
-    InMangleFont(InStm *stm, char *key, size_t keySize)
-        : stm_(stm), key_(key), keySize_(keySize), keyPos_(0) {}
-
-    //virtuals
-    bool IsEOF() const {return stm_->IsEOF();}
-
-    char GetChar()
-    {
-        if(keyPos_ >= keySize_)
-            return stm_->GetChar();
-        else
-            return stm_->GetChar() ^ key_[keyPos_++];
-    }
-
-    size_t Read(void *buffer, size_t max_cnt)
-    {
-        size_t cnt = stm_->Read(buffer, max_cnt);
-        if(keyPos_ < keySize_)
-        {
-            char *cb = reinterpret_cast<char*>(buffer);
-            size_t to_mangle = keySize_ - keyPos_;
-            if(to_mangle > cnt)
-                to_mangle = cnt;
-            while(to_mangle-- > 0)
-            {
-                *cb = *cb ^ key_[keyPos_++];
-                ++cb;
-            }
-        }
-        return cnt;
-    }
-
-    void UngetChar(char c) {Error("InMangleFont unget not implemented");}
-
-    void Rewind() {stm_->Rewind(); keyPos_ = 0;}
-
-    static Ptr<InStm> Create(InStm *stm, char *key, size_t keySize)
-    {
-        return new InMangleFont(stm, key, keySize);
-    }
-};
 
 //-----------------------------------------------------------------------
 class ConverterPass2 : public Object, Noncopyable
@@ -259,7 +208,7 @@ private:
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
     String                  title_, lang_, id_, title_info_date_, isbn_;
-    char                    adobeKey_[1024];
+    char                    adobeKey_[16];
     strvector               authors_;
 
     String                  prevUnitFile_;
@@ -785,7 +734,7 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
     ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
     for(; cit < cit_end; ++cit)
     {
-        Ptr<InStm> stm = InMangleFont::Create(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_));
+        Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
         pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
     }
 }
