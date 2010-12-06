@@ -283,6 +283,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\mangling.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\scandir.cpp"
 				>
 			</File>
@@ -395,6 +399,10 @@
 			</File>
 			<File
 				RelativePath=".\hdr.h"
+				>
+			</File>
+			<File
+				RelativePath=".\mangling.h"
 				>
 			</File>
 			<File
