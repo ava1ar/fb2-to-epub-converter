@@ -78,7 +78,7 @@ String GenerateUUID()
     buf.push_back('-');
 
     int x = (rand() & 0x3) | 0x8;
-    buf.push_back(static_cast<char>((x < 10) ? '0' + x : 'a' + (x - 10)));
+    buf.push_back(static_cast<char>((x < 10) ? '0' + x : 'A' + (x - 10)));
 
     AddRandomHex(&buf, 3);
     buf.push_back('-');

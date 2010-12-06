@@ -207,7 +207,7 @@ private:
     binvector               binaries_;
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
-    String                  title_, lang_, id_, title_info_date_, isbn_;
+    String                  title_, lang_, id_, id1_, title_info_date_, isbn_;
     unsigned char           adobeKey_[16];
     strvector               authors_;
 
@@ -779,7 +779,7 @@ void ConverterPass2::AddContentOpf()
     pout_->WriteStr("    xmlns:opf=\"http://www.idpf.org/2007/opf\">\n");
     pout_->WriteFmt("    <dc:title>%s</dc:title>\n", (xlitConv_ ? xlitConv_->Convert(title_) : title_).c_str());
     pout_->WriteFmt("    <dc:language>%s</dc:language>\n", lang_.c_str());
-    pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"ID\">%s</dc:identifier>\n", id_.c_str());
+    pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"uuid\">%s</dc:identifier>\n", id_.c_str());
     {
         strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
         for(; cit < cit_end; ++cit)
@@ -787,8 +787,10 @@ void ConverterPass2::AddContentOpf()
     }
     if(!title_info_date_.empty())
         pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
+    if(!id1_.empty())
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"ID\">%s</dc:identifier>\n", id1_.c_str());
     if(!isbn_.empty())
-        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid2\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
 
     // Add cover image description
     if(coverBinIdx_ >= 0)
@@ -1607,7 +1609,10 @@ void ConverterPass2::id()
 {
     String uuid = s_->SimpleTextElement("id");
     if(!IsValidUUID(uuid))
+    {
+        id1_ = uuid;
         uuid = GenerateUUID();
+    }
     MakeAdobeKey(uuid, adobeKey_);
     id_ = String("urn:uuid:") + uuid;
 }
