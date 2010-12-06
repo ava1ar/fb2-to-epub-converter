@@ -147,23 +147,31 @@ public:
 #endif
 #endif
 
+        // start epub
         AddMimetype();
         AddContainer();
 
-        AddFonts("ttf", &ttffiles_);
-        AddFonts("otf", &otffiles_);
+        // scan all embedded fonts
+        ScanFonts("ttf", &ttffiles_);
+        ScanFonts("otf", &otffiles_);
+
 #if FB2TOEPUB_FONT_MANGLING
+        // add encryption.xml
         AddEncryption();
 #endif
 
-        // add style and fonts
+        // scan and add stylesheet files
         AddStyles();
+
+        // perform fb2 file parsing
         s_->SkipXMLDeclaration();
         FictionBook();
 
+        // add font files
         AddFontFiles(ttffiles_);
         AddFontFiles(otffiles_);
 
+        // rest of epub
         MakeCoverPageFirst();
         AddContentOpf();
         AddTocNcx();
@@ -187,7 +195,7 @@ private:
     // external file - result of directory scanning
     struct ExtFile
     {
-        String fname_, ospath_;
+        String fname_, ospath_; // file name and OS path
         ExtFile() {}
         ExtFile(const String &fname, const String &ospath) : fname_(fname), ospath_(ospath) {}
     };
@@ -195,23 +203,25 @@ private:
 
     typedef std::map<String, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
 
-    int                     tocLevels_;
-    UnitArray::iterator     coverPgIt_;
-    String                  coverFile_;
-    int                     coverBinIdx_;
-    int                     uniqueIdIdx_;
+    int                     tocLevels_;         // number of levels of table of content
+    UnitArray::iterator     coverPgIt_;         // pointer to unit describing cover image
+    String                  coverFile_;         // cover image file name
+    int                     coverBinIdx_;       // cover image index in binary section
+    int                     uniqueIdIdx_;       // unique id counter
     ReferenceMap            refidToNew_;        // (re)mapping of original reference id to unique reference id
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
     ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
     std::set<String>        usedAnchorsids_;    // anchor ids already set
-    strvector               cssfiles_;
-    ExtFileVector           ttffiles_, otffiles_;
-    binvector               binaries_;
+    strvector               cssfiles_;          // all stylesheet files
+    ExtFileVector           ttffiles_, otffiles_; // all font file description
+    binvector               binaries_;          // all binary files
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
-    String                  title_, lang_, id_, id1_, title_info_date_, isbn_;
-    unsigned char           adobeKey_[16];
-    strvector               authors_;
+    String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
+#if FB2TOEPUB_FONT_MANGLING
+    unsigned char           adobeKey_[16];      // adobe key
+#endif
+    strvector               authors_;           // book authors
 
     String                  prevUnitFile_;
     int                     unitIdx_;
@@ -239,7 +249,7 @@ private:
     void AddMimetype            ();
     void AddContainer           ();
     void AddStyles              ();
-    void AddFonts               (const char *ext, ExtFileVector *fontfiles);
+    void ScanFonts              (const char *ext, ExtFileVector *fontfiles);
     void AddFontFiles           (const ExtFileVector &fontfiles);    
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
@@ -720,7 +730,7 @@ void ConverterPass2::AddStyles()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::AddFonts(const char *ext, ExtFileVector *fontfiles)
+void ConverterPass2::ScanFonts(const char *ext, ExtFileVector *fontfiles)
 {
     strvector::const_iterator cit = fonts_.begin(), cit_end = fonts_.end();
     for(; cit < cit_end; ++cit)
@@ -1618,14 +1628,21 @@ void ConverterPass2::epigraph()
 //-----------------------------------------------------------------------
 void ConverterPass2::id()
 {
-    String uuid = s_->SimpleTextElement("id");
+    static const String uuidpfx = "urn:uuid:";
+
+    String id = s_->SimpleTextElement("id"), uuid = id;
+    if(!uuid.compare(0, uuidpfx.length(), uuidpfx))
+        uuid = uuid.substr(uuidpfx.length());
     if(!IsValidUUID(uuid))
     {
-        id1_ = uuid;
+        id1_ = id;
         uuid = GenerateUUID();
     }
+
+    id_ = uuidpfx + uuid;
+#if FB2TOEPUB_FONT_MANGLING
     MakeAdobeKey(uuid, adobeKey_);
-    id_ = String("urn:uuid:") + uuid;
+#endif
 }
 
 //-----------------------------------------------------------------------
