@@ -152,7 +152,9 @@ public:
 
         AddFonts("ttf", &ttffiles_);
         AddFonts("otf", &otffiles_);
+#if FB2TOEPUB_FONT_MANGLING
         AddEncryption();
+#endif
 
         // add style and fonts
         AddStyles();
@@ -242,7 +244,9 @@ private:
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
     void AddTocNcx              ();
+#if FB2TOEPUB_FONT_MANGLING
     void AddEncryption          ();
+#endif
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
@@ -734,8 +738,13 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
     ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
     for(; cit < cit_end; ++cit)
     {
+#if FB2TOEPUB_FONT_MANGLING
         Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
         pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
+#else
+        Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
+        pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
+#endif
     }
 }
 
@@ -815,10 +824,10 @@ void ConverterPass2::AddContentOpf()
         ExtFileVector::const_iterator cit, cit_end;
 
         for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/octet-stream");
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/x-font-ttf");
 
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->fname_.c_str(), "application/octet-stream");
+            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->fname_.c_str(), "application/vnd.ms-opentype");
     }
 
     // describe stylesheets, manifest-only-fonts, text files
@@ -913,6 +922,7 @@ void ConverterPass2::AddTocNcx()
     pout_->WriteStr("</ncx>\n");
 }
 
+#if FB2TOEPUB_FONT_MANGLING
 //-----------------------------------------------------------------------
 void ConverterPass2::AddEncryption()
 {
@@ -948,6 +958,7 @@ void ConverterPass2::AddEncryption()
 
     pout_->WriteStr("</encryption>\n");
 }
+#endif
 
 //-----------------------------------------------------------------------
 const String* ConverterPass2::AddId(const AttrMap &attrmap)

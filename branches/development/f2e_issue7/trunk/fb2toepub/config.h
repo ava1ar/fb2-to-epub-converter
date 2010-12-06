@@ -24,6 +24,12 @@
 #define FB2TOEPUB_DECL
 
 //-----------------------------------------------------------------------
+// MAKE FONT MANGLING
+// DEFAULT: ON
+//-----------------------------------------------------------------------
+//#define FB2TOEPUB_FONT_MANGLING 1
+
+//-----------------------------------------------------------------------
 // DO NOT OVERWRITE OUTPUT FILE UNLESS --overwrite IS SET
 // DEFAULT: OFF
 //-----------------------------------------------------------------------
@@ -60,6 +66,9 @@
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
 // DEFAULTS
+#ifndef FB2TOEPUB_FONT_MANGLING
+#define FB2TOEPUB_FONT_MANGLING 1
+#endif
 #ifndef FB2TOEPUB_DONT_OVERWRITE
 #define FB2TOEPUB_DONT_OVERWRITE 0
 #endif
