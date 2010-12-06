@@ -90,6 +90,58 @@ static void AddContentManifestFile(OutPackStm *pout, const String &id, const Str
 }
 
 //-----------------------------------------------------------------------
+// InMangleFont
+//-----------------------------------------------------------------------
+class InMangleFont : public InStm, Noncopyable
+{
+    Ptr<InStm>  stm_;
+    char        *key_;
+    size_t      keySize_, keyPos_;
+
+public:
+    InMangleFont(InStm *stm, char *key, size_t keySize)
+        : stm_(stm), key_(key), keySize_(keySize), keyPos_(0) {}
+
+    //virtuals
+    bool IsEOF() const {return stm_->IsEOF();}
+
+    char GetChar()
+    {
+        if(keyPos_ >= keySize_)
+            return stm_->GetChar();
+        else
+            return stm_->GetChar() ^ key_[keyPos_++];
+    }
+
+    size_t Read(void *buffer, size_t max_cnt)
+    {
+        size_t cnt = stm_->Read(buffer, max_cnt);
+        if(keyPos_ < keySize_)
+        {
+            char *cb = reinterpret_cast<char*>(buffer);
+            size_t to_mangle = keySize_ - keyPos_;
+            if(to_mangle > cnt)
+                to_mangle = cnt;
+            while(to_mangle-- > 0)
+            {
+                *cb = *cb ^ key_[keyPos_++];
+                ++cb;
+            }
+        }
+        return cnt;
+    }
+
+    void UngetChar(char c) {Error("InMangleFont unget not implemented");}
+
+    void Rewind() {stm_->Rewind(); keyPos_ = 0;}
+
+    static Ptr<InStm> Create(InStm *stm, char *key, size_t keySize)
+    {
+        return new InMangleFont(stm, key, keySize);
+    }
+};
+
+//-----------------------------------------------------------------------
 class ConverterPass2 : public Object, Noncopyable
 {
 public:
@@ -147,13 +199,17 @@ public:
         AddMimetype();
         AddContainer();
 
-        // add style and fonts
-        AddStyles();
         AddFonts("ttf", &ttffiles_);
         AddFonts("otf", &otffiles_);
+        AddEncryption();
 
+        // add style and fonts
+        AddStyles();
         s_->SkipXMLDeclaration();
         FictionBook();
+
+        AddFontFiles(ttffiles_);
+        AddFontFiles(otffiles_);
 
         MakeCoverPageFirst();
         AddContentOpf();
@@ -175,6 +231,15 @@ private:
     };
     typedef std::vector<Binary> binvector;
 
+    // external file - result of directory scanning
+    struct ExtFile
+    {
+        String fname_, ospath_;
+        ExtFile() {}
+        ExtFile(const String &fname, const String &ospath) : fname_(fname), ospath_(ospath) {}
+    };
+    typedef std::vector<ExtFile> ExtFileVector;
+
     typedef std::map<String, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
 
     int                     tocLevels_;
@@ -186,11 +251,13 @@ private:
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
     ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
     std::set<String>        usedAnchorsids_;    // anchor ids already set
-    strvector               cssfiles_, ttffiles_, otffiles_;
+    strvector               cssfiles_;
+    ExtFileVector           ttffiles_, otffiles_;
     binvector               binaries_;
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
     String                  title_, lang_, id_, title_info_date_, isbn_;
+    char                    adobeKey_[1024];
     strvector               authors_;
 
     String                  prevUnitFile_;
@@ -219,10 +286,12 @@ private:
     void AddMimetype            ();
     void AddContainer           ();
     void AddStyles              ();
-    void AddFonts               (const char *ext, strvector *fontfiles);
+    void AddFonts               (const char *ext, ExtFileVector *fontfiles);
+    void AddFontFiles           (const ExtFileVector &fontfiles);    
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
     void AddTocNcx              ();
+    void AddEncryption          ();
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
@@ -696,7 +765,7 @@ void ConverterPass2::AddStyles()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::AddFonts(const char *ext, strvector *fontfiles)
+void ConverterPass2::AddFonts(const char *ext, ExtFileVector *fontfiles)
 {
     strvector::const_iterator cit = fonts_.begin(), cit_end = fonts_.end();
     for(; cit < cit_end; ++cit)
@@ -704,11 +773,18 @@ void ConverterPass2::AddFonts(const char *ext, strvector *fontfiles)
         Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), ext);
         String fname;
         for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
-        {
-            fname = String("fonts/") + fname;
-            pout_->AddFile(CreateInFileStm(ospath.c_str()), (String("OPS/") + fname).c_str(), true);
-            fontfiles->push_back(fname);
-        }
+            fontfiles->push_back(ExtFile(String("fonts/") + fname, ospath));
+    }
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
+{
+    ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
+    for(; cit < cit_end; ++cit)
+    {
+        Ptr<InStm> stm = InMangleFont::Create(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_));
+        pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
     }
 }
 
@@ -771,12 +847,28 @@ void ConverterPass2::AddContentOpf()
 
     pout_->WriteStr("  <manifest>\n");
     AddContentManifestFile(pout_, "ncx", "toc.ncx", "application/x-dtbncx+xml");
+
+    // describe binary files
     {
         int i = 0;
         binvector::const_iterator cit = binaries_.begin(), cit_end = binaries_.end();
         for(; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("bin", i++).c_str(), cit->file_.c_str(), cit->type_.c_str());
     }
+
+    // describe fonts
+    {
+        int i;
+        ExtFileVector::const_iterator cit, cit_end;
+
+        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/octet-stream");
+
+        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->fname_.c_str(), "application/octet-stream");
+    }
+
+    // describe stylesheets, manifest-only-fonts, text files
     {
         int i;
         strvector::const_iterator cit, cit_end;
@@ -784,14 +876,8 @@ void ConverterPass2::AddContentOpf()
         for(cit = cssfiles_.begin(), cit_end = cssfiles_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("css", i++).c_str(), cit->c_str(), "text/css");
 
-        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
-
         for(cit = mfonts_.begin(), cit_end = mfonts_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
-
-        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "font/opentype");
 
         for(cit = files.begin(), cit_end = files.end(); cit < cit_end; ++cit)
             AddContentManifestFile(pout_, cit->c_str(), (*cit + ".xhtml").c_str(), "application/xhtml+xml");
@@ -872,6 +958,42 @@ void ConverterPass2::AddTocNcx()
 
     pout_->WriteStr("  </navMap>\n");
     pout_->WriteStr("</ncx>\n");
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::AddEncryption()
+{
+    pout_->BeginFile("META-INF/encryption.xml", true);
+    pout_->WriteStr("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    pout_->WriteStr("<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
+
+    {
+        int i;
+        ExtFileVector::const_iterator cit, cit_end;
+
+        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+        //AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+
+        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+    }
+
+    pout_->WriteStr("</encryption>\n");
 }
 
 //-----------------------------------------------------------------------
@@ -1224,7 +1346,7 @@ void ConverterPass2::binary()
         if(t.type_ != LexScanner::DATA)
             Error("<binary> data expected");
 
-        pout_->BeginFile((String("OPS/") + b.file_).c_str(), true);
+        pout_->BeginFile((String("OPS/") + b.file_).c_str(), false);
         DecodeBase64(t.s_.c_str(), pout_);
     }
 
@@ -1532,7 +1654,20 @@ void ConverterPass2::epigraph()
 //-----------------------------------------------------------------------
 void ConverterPass2::id()
 {
-    id_ = s_->SimpleTextElement("id");;
+    //id_ = s_->SimpleTextElement("id");;
+    //id_ = "urn:uuid:00000000-0000-0000-0000-000000000000";
+    id_ = "urn:uuid:49fdf150-b8dd-11de-92bf-00a0d1e7a3b4";
+    //id_ = "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
+
+    char *p = adobeKey_;
+    for(int i = 0; i < 1024/16; ++i)
+    {
+        //memset(p, 0, 16);
+        //memcpy(p, "\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00", 16);
+        memcpy(p, "\x49\xfd\xf1\x50\xb8\xdd\x11\xde\x92\xbf\x00\xa0\xd1\xe7\xa3\xb4", 16);
+        //memcpy(p, "\xf8\x1d\x4f\xae\x7d\xec\x11\xd0\xa7\x65\x00\xa0\xc9\x1e\x6b\xf6", 16);
+        p += 16;
+    }
 }
 
 //-----------------------------------------------------------------------
