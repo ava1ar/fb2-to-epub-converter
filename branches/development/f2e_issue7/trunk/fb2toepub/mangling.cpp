@@ -21,9 +21,156 @@
 #include "hdr.h"
 
 #include "mangling.h"
+#include "zlib.h"
 
 namespace Fb2ToEpub
 {
+
+
+//-----------------------------------------------------------------------
+// stream converter buffer sizes
+const size_t IN_CONVBUF_SIZE = 1024;
+const size_t OUT_CONVBUF_SIZE = 256;
+
+//-----------------------------------------------------------------------
+// InDeflateStm
+//-----------------------------------------------------------------------
+class InDeflateStm : public InStm, Noncopyable
+{
+    Ptr<InStm>          stm_;                       // input stream
+    mutable ::z_stream  df_;                        // converter
+    mutable char        ibuf_[IN_CONVBUF_SIZE];     // input buffer
+    mutable char        *iend_;                     // input buffer unconverted data end
+    mutable char        obuf_[OUT_CONVBUF_SIZE];    // output buffer
+    mutable char        *ocur_;                     // output buffer current position
+    mutable char        *oend_;                     // output buffer concerted data end
+
+    size_t Fill() const;
+
+public:
+    InDeflateStm(InStm *stm);
+    ~InDeflateStm();
+
+    //virtuals
+    bool        IsEOF() const;
+    char        GetChar();
+    size_t      Read(void *buffer, size_t max_cnt);
+    void        UngetChar(char c);
+    void        Rewind();
+};
+
+//-----------------------------------------------------------------------
+InDeflateStm::InDeflateStm(InStm *stm)
+                            :   stm_(stm),
+                                iend_(ibuf_),
+                                ocur_(obuf_),
+                                oend_(obuf_)
+{
+    df_.zalloc  = Z_NULL;
+    df_.zfree   = Z_NULL;
+    df_.opaque  = Z_NULL;
+    int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+    if (ret != Z_OK)
+        Error("deflateInit2 error");
+}
+
+//-----------------------------------------------------------------------
+InDeflateStm::~InDeflateStm()
+{
+    ::deflateEnd(&df_);
+}
+
+//-----------------------------------------------------------------------
+bool InDeflateStm::IsEOF() const
+{
+    return (ocur_ == oend_) && (stm_->IsEOF() || !Fill());
+}
+
+//-----------------------------------------------------------------------
+size_t InDeflateStm::Fill() const
+{
+    df_.next_out = reinterpret_cast<Bytef*>(obuf_);
+    df_.avail_out = sizeof(obuf_);
+
+    int flush;
+    do
+    {
+        // read data to input buffer
+        iend_ += stm_->Read(iend_, ibuf_ + sizeof(ibuf_) - iend_);
+
+        flush = stm_->IsEOF() ? Z_FINISH : Z_NO_FLUSH;
+        df_.next_in = reinterpret_cast<Bytef*>(ibuf_);
+        df_.avail_in = iend_ - ibuf_;
+
+        int ret = ::deflate(&df_, flush);
+        if(ret == Z_STREAM_ERROR)
+            Error("InDeflateStm: stream error");
+
+        // fix input data and pointers
+        iend_ = ibuf_ + df_.avail_in;
+        if(df_.avail_in)
+            ::memmove(ibuf_, df_.next_in, df_.avail_in); // move unconverted rest to beginning
+    }
+    while(df_.avail_out == sizeof(obuf_) && flush != Z_FINISH);
+
+    // fix output pointers
+    ocur_ = obuf_;
+    oend_ = obuf_ + (sizeof(obuf_) - df_.avail_out);
+    return oend_ - ocur_;
+}
+
+//-----------------------------------------------------------------------
+char InDeflateStm::GetChar()
+{
+    if(ocur_ == oend_ && !Fill())
+        Error("conv: EOF");
+    return *ocur_++;
+}
+
+//-----------------------------------------------------------------------
+size_t InDeflateStm::Read(void *buffer, size_t max_cnt)
+{
+    char *pc = reinterpret_cast<char*> (buffer);
+    for (size_t cnt = 0; cnt < max_cnt;)
+    {
+        size_t num_to_copy = oend_ - ocur_;
+        if (num_to_copy <= 0 && (num_to_copy = Fill ()) == 0)
+            return cnt;
+        if (num_to_copy > max_cnt - cnt)
+            num_to_copy = max_cnt - cnt;
+
+        ::memcpy (pc, ocur_, num_to_copy);
+
+        pc      += num_to_copy;
+        ocur_   += num_to_copy;
+        cnt     += num_to_copy;
+    }
+    return max_cnt;
+}
+
+//-----------------------------------------------------------------------
+void InDeflateStm::UngetChar(char c)
+{
+    if(ocur_ == obuf_)
+        Error("InDeflateStm: can't unget");
+    --ocur_;
+}
+
+//-----------------------------------------------------------------------
+void InDeflateStm::Rewind()
+{
+    stm_->Rewind();
+    iend_ = ibuf_;
+    ocur_ = oend_ = obuf_;
+
+    ::deflateEnd(&df_);
+    df_.zalloc  = Z_NULL;
+    df_.zfree   = Z_NULL;
+    df_.opaque  = Z_NULL;
+    int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+    if (ret != Z_OK)
+        Error("deflateInit2 error");
+}
 
 
 //-----------------------------------------------------------------------
@@ -95,7 +242,8 @@ size_t InManglingStm::Read(void *buffer, size_t max_cnt)
 //-----------------------------------------------------------------------
 Ptr<InStm> CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySize, size_t maxSize)
 {
-    return new InManglingStm(stm, key, keySize, maxSize);
+    Ptr<InStm> tmp = new InDeflateStm(stm);
+    return new InManglingStm(tmp, key, keySize, maxSize);
 }
 
 
