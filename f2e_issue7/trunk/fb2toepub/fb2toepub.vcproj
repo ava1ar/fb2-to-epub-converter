@@ -367,6 +367,10 @@
 				RelativePath=".\types.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\uuidmisc.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -419,6 +423,10 @@
 			</File>
 			<File
 				RelativePath=".\types.h"
+				>
+			</File>
+			<File
+				RelativePath=".\uuidmisc.h"
 				>
 			</File>
 		</Filter>
