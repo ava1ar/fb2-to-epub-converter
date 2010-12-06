@@ -21,11 +21,19 @@
 #include "hdr.h"
 
 #include "uuidmisc.h"
-//#include <algorithm>
 #include <ctype.h>
+#include <vector>
+#include <time.h>
 
 namespace Fb2ToEpub
 {
+
+//-----------------------------------------------------------------------
+// uuid variant
+inline bool isxdigit_variant(char c)
+{
+    return c == '8' || c == '9' || c == 'a' || c == 'b' || c == 'A' || c == 'B';
+}
 
 //-----------------------------------------------------------------------
 bool IsValidUUID(const String &id)
@@ -38,7 +46,8 @@ bool IsValidUUID(const String &id)
             id[13] == '-' &&
             isxdigit(id[14]) && isxdigit(id[15]) && isxdigit(id[16]) && isxdigit(id[17]) &&
             id[18] == '-' &&
-            isxdigit(id[19]) && isxdigit(id[20]) && isxdigit(id[21]) && isxdigit(id[22]) &&
+            isxdigit_variant(id[19]) &&
+            isxdigit(id[20]) && isxdigit(id[21]) && isxdigit(id[22]) &&
             id[23] == '-' &&
             isxdigit(id[24]) && isxdigit(id[25]) && isxdigit(id[26]) && isxdigit(id[27]) &&
             isxdigit(id[28]) && isxdigit(id[29]) && isxdigit(id[30]) && isxdigit(id[31]) &&
@@ -46,9 +55,39 @@ bool IsValidUUID(const String &id)
 }
 
 //-----------------------------------------------------------------------
+inline void AddRandonHex(std::vector<char> *buf, int cnt)
+{
+    while(--cnt >= 0)
+    {
+        int x = rand() & 0xf;
+        buf->push_back(static_cast<char>((x < 10) ? '0' + x : 'a' + (x - 10)));
+    }
+}
+
+//-----------------------------------------------------------------------
 String GenerateUUID()
 {
-    return "49fdf150-b8dd-11de-92bf-00a0d1e7a3b4";
+    srand(static_cast<unsigned int>(time(NULL)));
+    std::vector<char> buf;
+
+    AddRandonHex(&buf, 8);
+    buf.push_back('-');
+    AddRandonHex(&buf, 4);
+    buf.push_back('-');
+    AddRandonHex(&buf, 4);
+    buf.push_back('-');
+
+    int x = (rand() & 0x3) | 0x8;
+    buf.push_back(static_cast<char>((x < 10) ? '0' + x : 'a' + (x - 10)));
+
+    AddRandonHex(&buf, 3);
+    buf.push_back('-');
+    AddRandonHex(&buf, 12);
+    buf.push_back('\0');
+
+    return &buf[0];
+
+    //return "49fdf150-b8dd-11de-92bf-00a0d1e7a3b4";
 }
     
 //-----------------------------------------------------------------------
