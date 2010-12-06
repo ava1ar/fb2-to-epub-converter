@@ -24,6 +24,7 @@
 #include "scandir.h"
 #include "converter.h"
 #include "base64.h"
+#include "uuidmisc.h"
 //#include <streambuf>
 #include <sstream>
 #include <vector>
@@ -88,6 +89,7 @@ static void AddContentManifestFile(OutPackStm *pout, const String &id, const Str
 {
     pout->WriteFmt("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>\n", EncodeStr(id).c_str(), EncodeStr(ref).c_str(), EncodeStr(media_type).c_str());
 }
+
 
 //-----------------------------------------------------------------------
 // InMangleFont
@@ -1654,20 +1656,11 @@ void ConverterPass2::epigraph()
 //-----------------------------------------------------------------------
 void ConverterPass2::id()
 {
-    //id_ = s_->SimpleTextElement("id");;
-    //id_ = "urn:uuid:00000000-0000-0000-0000-000000000000";
-    id_ = "urn:uuid:49fdf150-b8dd-11de-92bf-00a0d1e7a3b4";
-    //id_ = "urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
-
-    char *p = adobeKey_;
-    for(int i = 0; i < 1024/16; ++i)
-    {
-        //memset(p, 0, 16);
-        //memcpy(p, "\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00", 16);
-        memcpy(p, "\x49\xfd\xf1\x50\xb8\xdd\x11\xde\x92\xbf\x00\xa0\xd1\xe7\xa3\xb4", 16);
-        //memcpy(p, "\xf8\x1d\x4f\xae\x7d\xec\x11\xd0\xa7\x65\x00\xa0\xc9\x1e\x6b\xf6", 16);
-        p += 16;
-    }
+    String uuid = s_->SimpleTextElement("id");
+    if(!IsValidUUID(uuid))
+        uuid = GenerateUUID();
+    MakeAdobeKey(uuid, adobeKey_);
+    id_ = String("urn:uuid:") + uuid;
 }
 
 //-----------------------------------------------------------------------
