@@ -749,9 +749,11 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
     for(; cit < cit_end; ++cit)
     {
 #if FB2TOEPUB_FONT_MANGLING
+        // mangle (mangling == deflating + XORing), then store without compression
         Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
         pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
 #else
+        // just compress
         Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
         pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
 #endif
