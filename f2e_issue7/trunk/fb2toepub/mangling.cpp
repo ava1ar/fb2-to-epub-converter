@@ -47,7 +47,8 @@ class InDeflateStm : public InStm, Noncopyable
     mutable char        *ocur_;                     // output buffer current position
     mutable char        *oend_;                     // output buffer concerted data end
 
-    size_t Fill() const;
+    void    DeflateInit();
+    size_t  Fill() const;
 
 public:
     InDeflateStm(InStm *stm);
@@ -68,18 +69,24 @@ InDeflateStm::InDeflateStm(InStm *stm)
                                 ocur_(obuf_),
                                 oend_(obuf_)
 {
-    df_.zalloc  = Z_NULL;
-    df_.zfree   = Z_NULL;
-    df_.opaque  = Z_NULL;
-    int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
-    if (ret != Z_OK)
-        Error("InDeflateStm: deflateInit2 error");
+    DeflateInit();
 }
 
 //-----------------------------------------------------------------------
 InDeflateStm::~InDeflateStm()
 {
     ::deflateEnd(&df_);
+}
+
+//-----------------------------------------------------------------------
+void InDeflateStm::DeflateInit()
+{
+    df_.zalloc  = Z_NULL;
+    df_.zfree   = Z_NULL;
+    df_.opaque  = Z_NULL;
+    int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);     // some magic numbers
+    if (ret != Z_OK)
+        Error("InDeflateStm: deflateInit2 error");
 }
 
 //-----------------------------------------------------------------------
@@ -166,12 +173,7 @@ void InDeflateStm::Rewind()
     ocur_ = oend_ = obuf_;
 
     ::deflateEnd(&df_);
-    df_.zalloc  = Z_NULL;
-    df_.zfree   = Z_NULL;
-    df_.opaque  = Z_NULL;
-    int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
-    if (ret != Z_OK)
-        Error("InDeflateStm: deflateInit2 error");
+    DeflateInit();
 }
 
 
@@ -223,16 +225,13 @@ size_t InManglingStm::Read(void *buffer, size_t max_cnt)
     for(;;)
     {
         size_t to_mangle = keySize_ - keyPos_;
-        if(to_mangle > maxSize_ - pos_)
+        if (to_mangle > maxSize_ - pos_)
             to_mangle = maxSize_ - pos_;
-        if(to_mangle > max_cnt)
+        if (to_mangle > max_cnt)
             to_mangle = max_cnt;
 
         for(size_t u = to_mangle; u-- > 0;)
-        {
-            *cb = *cb ^ key_[keyPos_++];
-            ++cb;
-        }
+            *cb++ ^= key_[keyPos_++];
 
         if(keyPos_ >= keySize_)
             keyPos_ = 0;

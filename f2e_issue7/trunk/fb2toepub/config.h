@@ -31,7 +31,7 @@
 
 
 //-----------------------------------------------------------------------
-// MAX TEXT FILE SIZE (APPROXIMATE, NOT TAKING XML STUFF INTO ACCOUNT)
+// MAX TEXT FILE SIZE (APPROXIMATE, DOESN'T TAKE XML STUFF INTO ACCOUNT)
 // DEFAULT: 0x30000 (192K)
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
@@ -64,7 +64,7 @@
 
 
 //-----------------------------------------------------------------------
-// Remove references to std::string::compare
+// REMOVE REFERENCES TO std::string::compare
 // (Custom option for ARM Linux)
 // DEFAULT: OFF
 //-----------------------------------------------------------------------
@@ -72,14 +72,15 @@
 
 
 
+
 //-----------------------------------------------------------------------
+// DEFAULTS - DON'T EDIT
 //-----------------------------------------------------------------------
-// DEFAULTS
-#ifndef FB2TOEPUB_MAX_TEXT_FILE_SIZE
-#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
-#endif
 #ifndef FB2TOEPUB_FONT_MANGLING
 #define FB2TOEPUB_FONT_MANGLING 1
+#endif
+#ifndef FB2TOEPUB_MAX_TEXT_FILE_SIZE
+#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
 #endif
 #ifndef FB2TOEPUB_DONT_OVERWRITE
 #define FB2TOEPUB_DONT_OVERWRITE 0
