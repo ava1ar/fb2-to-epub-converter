@@ -29,11 +29,20 @@
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_FONT_MANGLING 1
 
+
+//-----------------------------------------------------------------------
+// MAX TEXT FILE SIZE (APPROXIMATE, NOT TAKING XML STUFF INTO ACCOUNT)
+// DEFAULT: 0x30000 (192K)
+//-----------------------------------------------------------------------
+//#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
+
+
 //-----------------------------------------------------------------------
 // DO NOT OVERWRITE OUTPUT FILE UNLESS --overwrite IS SET
 // DEFAULT: OFF
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_DONT_OVERWRITE 0
+
 
 //-----------------------------------------------------------------------
 // SUPPRESS EMPTY TITLES IN TABLE OF CONTENTS
@@ -66,6 +75,9 @@
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
 // DEFAULTS
+#ifndef FB2TOEPUB_MAX_TEXT_FILE_SIZE
+#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
+#endif
 #ifndef FB2TOEPUB_FONT_MANGLING
 #define FB2TOEPUB_FONT_MANGLING 1
 #endif

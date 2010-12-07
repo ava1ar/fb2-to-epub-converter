@@ -35,7 +35,7 @@ void OutPackStm::AddFile(InStm *pin, const char *name, bool compress)
     BeginFile(name, compress);
     while(!pin->IsEOF())
     {
-        char buf[1024];
+        char buf[512];
         Write(buf, pin->Read(buf, sizeof(buf)));
     }
 }
