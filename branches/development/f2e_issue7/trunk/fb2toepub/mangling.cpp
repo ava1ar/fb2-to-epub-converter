@@ -215,18 +215,18 @@ char InManglingStm::GetChar()
 size_t InManglingStm::Read(void *buffer, size_t max_cnt)
 {
     size_t cnt = stm_->Read(buffer, max_cnt);
+    if(!cnt || pos_ >= maxSize_)
+        return cnt;
 
     char *cb = reinterpret_cast<char*>(buffer);
+    max_cnt = cnt;
     for(;;)
     {
-        if(pos_ >= maxSize_)
-            return cnt;
-
         size_t to_mangle = keySize_ - keyPos_;
         if(to_mangle > maxSize_ - pos_)
             to_mangle = maxSize_ - pos_;
-        if(to_mangle > cnt)
-            to_mangle = cnt;
+        if(to_mangle > max_cnt)
+            to_mangle = max_cnt;
 
         for(size_t u = to_mangle; u-- > 0;)
         {
@@ -234,9 +234,11 @@ size_t InManglingStm::Read(void *buffer, size_t max_cnt)
             ++cb;
         }
 
-        pos_ += to_mangle;
         if(keyPos_ >= keySize_)
             keyPos_ = 0;
+
+        if((pos_ += to_mangle) >= maxSize_ || !(max_cnt -= to_mangle))
+            return cnt;
     }
 }
 
