@@ -57,11 +57,9 @@ bool IsValidUUID(const String &id)
 //-----------------------------------------------------------------------
 inline void AddRandomHex(std::vector<char> *buf, int cnt)
 {
+    static const char tbl[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
     while(--cnt >= 0)
-    {
-        int x = rand() & 0xf;
-        buf->push_back(static_cast<char>((x < 10) ? '0' + x : 'A' + (x - 10)));
-    }
+        buf->push_back(tbl[rand()%16]);
 }
 
 //-----------------------------------------------------------------------
@@ -77,8 +75,10 @@ String GenerateUUID()
     AddRandomHex(&buf, 4);
     buf.push_back('-');
 
-    int x = (rand() & 0x3) | 0x8;
-    buf.push_back(static_cast<char>((x < 10) ? '0' + x : 'A' + (x - 10)));
+    {
+        static const char tbl[4] = {'8','9','A','B'};
+        buf.push_back(tbl[rand()%4]);
+    }
 
     AddRandomHex(&buf, 3);
     buf.push_back('-');

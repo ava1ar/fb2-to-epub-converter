@@ -24,13 +24,6 @@
 #define FB2TOEPUB_DECL
 
 //-----------------------------------------------------------------------
-// MAKE FONT MANGLING
-// DEFAULT: ON
-//-----------------------------------------------------------------------
-//#define FB2TOEPUB_FONT_MANGLING 1
-
-
-//-----------------------------------------------------------------------
 // MAX TEXT FILE SIZE (APPROXIMATE, DOESN'T TAKE XML STUFF INTO ACCOUNT)
 // DEFAULT: 0x30000 (192K)
 //-----------------------------------------------------------------------
@@ -76,9 +69,6 @@
 //-----------------------------------------------------------------------
 // DEFAULTS - DON'T EDIT
 //-----------------------------------------------------------------------
-#ifndef FB2TOEPUB_FONT_MANGLING
-#define FB2TOEPUB_FONT_MANGLING 1
-#endif
 #ifndef FB2TOEPUB_MAX_TEXT_FILE_SIZE
 #define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
 #endif

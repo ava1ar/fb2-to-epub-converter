@@ -155,10 +155,8 @@ public:
         ScanFonts("ttf", &ttffiles_);
         ScanFonts("otf", &otffiles_);
 
-#if FB2TOEPUB_FONT_MANGLING
         // add encryption.xml
         AddEncryption();
-#endif
 
         // scan and add stylesheet files
         AddStyles();
@@ -218,9 +216,7 @@ private:
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
     String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
-#if FB2TOEPUB_FONT_MANGLING
     unsigned char           adobeKey_[16];      // adobe key
-#endif
     strvector               authors_;           // book authors
 
     String                  prevUnitFile_;
@@ -254,9 +250,7 @@ private:
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
     void AddTocNcx              ();
-#if FB2TOEPUB_FONT_MANGLING
     void AddEncryption          ();
-#endif
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
@@ -748,15 +742,13 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
     ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
     for(; cit < cit_end; ++cit)
     {
-#if FB2TOEPUB_FONT_MANGLING
         // mangle (mangling == deflating + XORing), then store without compression
         Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
         pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
-#else
+
         // just compress
-        Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
-        pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
-#endif
+        //Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
+        //pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
     }
 }
 
@@ -836,7 +828,7 @@ void ConverterPass2::AddContentOpf()
         ExtFileVector::const_iterator cit, cit_end;
 
         for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/x-font-ttf");
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/vnd.ms-opentype");
 
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->fname_.c_str(), "application/vnd.ms-opentype");
@@ -851,7 +843,7 @@ void ConverterPass2::AddContentOpf()
             AddContentManifestFile(pout_, MakeFileName("css", i++).c_str(), cit->c_str(), "text/css");
 
         for(cit = mfonts_.begin(), cit_end = mfonts_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+            AddContentManifestFile(pout_, MakeFileName("mttf", i++).c_str(), cit->c_str(), "application/vnd.ms-opentype");
 
         for(cit = files.begin(), cit_end = files.end(); cit < cit_end; ++cit)
             AddContentManifestFile(pout_, cit->c_str(), (*cit + ".xhtml").c_str(), "application/xhtml+xml");
@@ -934,7 +926,6 @@ void ConverterPass2::AddTocNcx()
     pout_->WriteStr("</ncx>\n");
 }
 
-#if FB2TOEPUB_FONT_MANGLING
 //-----------------------------------------------------------------------
 void ConverterPass2::AddEncryption()
 {
@@ -970,7 +961,6 @@ void ConverterPass2::AddEncryption()
 
     pout_->WriteStr("</encryption>\n");
 }
-#endif
 
 //-----------------------------------------------------------------------
 const String* ConverterPass2::AddId(const AttrMap &attrmap)
@@ -1642,9 +1632,7 @@ void ConverterPass2::id()
     }
 
     id_ = uuidpfx + uuid;
-#if FB2TOEPUB_FONT_MANGLING
     MakeAdobeKey(uuid, adobeKey_);
-#endif
 }
 
 //-----------------------------------------------------------------------
