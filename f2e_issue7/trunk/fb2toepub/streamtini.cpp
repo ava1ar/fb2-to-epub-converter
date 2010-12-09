@@ -110,7 +110,9 @@ int ConvTini::EncToCharset(String code)
         TblEntry("CP1256",          TINICONV_CHARSET_CP1256),
         TblEntry("CP1257",          TINICONV_CHARSET_CP1257),
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
         TblEntry("CP1258",          TINICONV_CHARSET_CP1258),
+#endif
 
         TblEntry("WINDOWS1250",     TINICONV_CHARSET_CP1250),
         TblEntry("WINDOWS1251",     TINICONV_CHARSET_CP1251),
@@ -121,16 +123,20 @@ int ConvTini::EncToCharset(String code)
         TblEntry("WINDOWS1256",     TINICONV_CHARSET_CP1256),
         TblEntry("WINDOWS1257",     TINICONV_CHARSET_CP1257),
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
         TblEntry("WINDOWS1258",     TINICONV_CHARSET_CP1258),
         TblEntry("CP936",           TINICONV_CHARSET_CP936),
         TblEntry("MS936",           TINICONV_CHARSET_CP936),
         TblEntry("WINDOWS936",      TINICONV_CHARSET_CP936),
+#endif
 
         TblEntry("MSCYRL",          TINICONV_CHARSET_CP1251),
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
         TblEntry("GB2312",          TINICONV_CHARSET_GB2312),
         TblEntry("GBK",             TINICONV_CHARSET_GBK),
         TblEntry("ISO2022JP",       TINICONV_CHARSET_ISO_2022_JP),
+#endif
 
         TblEntry("ISO88591",        TINICONV_CHARSET_ISO_8859_1),
         TblEntry("ISO88592",        TINICONV_CHARSET_ISO_8859_2),
@@ -143,7 +149,9 @@ int ConvTini::EncToCharset(String code)
         TblEntry("ISO88599",        TINICONV_CHARSET_ISO_8859_9),
         TblEntry("ISO885910",       TINICONV_CHARSET_ISO_8859_10),
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
         TblEntry("ISO885911",       TINICONV_CHARSET_ISO_8859_11),
+#endif
 
         TblEntry("ISO885913",       TINICONV_CHARSET_ISO_8859_13),
         TblEntry("ISO885914",       TINICONV_CHARSET_ISO_8859_14),
@@ -164,8 +172,10 @@ int ConvTini::EncToCharset(String code)
         TblEntry("UTF7",            TINICONV_CHARSET_UTF_7),
         TblEntry("UTF8",            TINICONV_CHARSET_UFT_8),
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
         TblEntry("CHINESE",         TINICONV_CHARSET_CHINESE),
         TblEntry("BIG5",            TINICONV_CHARSET_BIG5)
+#endif
     };
 
     // remove all non digits and letters, convert to uppercase

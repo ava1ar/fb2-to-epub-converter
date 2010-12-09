@@ -20,8 +20,6 @@
 
 #include "hdr.h"
 
-#if FB2TOEPUB_FONT_MANGLING
-
 #include "mangling.h"
 #include "zlib.h"
 
@@ -251,5 +249,3 @@ Ptr<InStm> CreateManglingStm(InStm *stm, const unsigned char *key, size_t keySiz
 
 
 };  //namespace Fb2ToEpub
-
-#endif  //FB2TOEPUB_FONT_MANGLING

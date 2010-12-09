@@ -36,7 +36,10 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 
 COBJ=$(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC)))))
 
-#CFLAGS= -O2 -I$(incdir) -D FB2TOEPUB_NO_STD_STRING_COMPARE=1
+# PRS-300/PRS-505 FLAGS
+#CFLAGS= -O2 -I$(incdir) -D FB2TOEPUB_NO_STD_STRING_COMPARE=1 -D TINICONV_NO_ASIAN_ENCODINGS
+
+# default flags
 CFLAGS= -O2 -I$(incdir)
 
 all : makedirs $(distdir)/fb2toepub
