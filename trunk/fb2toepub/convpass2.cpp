@@ -24,11 +24,14 @@
 #include "scandir.h"
 #include "converter.h"
 #include "base64.h"
+#include "uuidmisc.h"
+#include "mangling.h"
 //#include <streambuf>
 #include <sstream>
 #include <vector>
 #include <map>
 #include <set>
+#include <ctype.h>
 
 namespace Fb2ToEpub
 {
@@ -88,6 +91,7 @@ static void AddContentManifestFile(OutPackStm *pout, const String &id, const Str
     pout->WriteFmt("    <item id=\"%s\" href=\"%s\" media-type=\"%s\"/>\n", EncodeStr(id).c_str(), EncodeStr(ref).c_str(), EncodeStr(media_type).c_str());
 }
 
+
 //-----------------------------------------------------------------------
 class ConverterPass2 : public Object, Noncopyable
 {
@@ -107,6 +111,7 @@ public:
                             units_              (*units),
                             pout_               (pout),
                             tocLevels_          (0),
+                            coverBinIdx_        (-1),
                             uniqueIdIdx_        (0),
                             unitIdx_            (0),
                             unitActive_         (false),
@@ -142,17 +147,29 @@ public:
 #endif
 #endif
 
+        // start epub
         AddMimetype();
         AddContainer();
 
-        // add style and fonts
-        AddStyles();
-        AddFonts("ttf", &ttffiles_);
-        AddFonts("otf", &otffiles_);
+        // scan all embedded fonts
+        ScanFonts("ttf", &ttffiles_);
+        ScanFonts("otf", &otffiles_);
 
+        // add encryption.xml
+        AddEncryption();
+
+        // scan and add stylesheet files
+        AddStyles();
+
+        // perform fb2 file parsing
         s_->SkipXMLDeclaration();
         FictionBook();
 
+        // add font files
+        AddFontFiles(ttffiles_);
+        AddFontFiles(otffiles_);
+
+        // rest of epub
         MakeCoverPageFirst();
         AddContentOpf();
         AddTocNcx();
@@ -173,21 +190,34 @@ private:
     };
     typedef std::vector<Binary> binvector;
 
+    // external file - result of directory scanning
+    struct ExtFile
+    {
+        String fname_, ospath_; // file name and OS path
+        ExtFile() {}
+        ExtFile(const String &fname, const String &ospath) : fname_(fname), ospath_(ospath) {}
+    };
+    typedef std::vector<ExtFile> ExtFileVector;
+
     typedef std::map<String, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
 
-    int                     tocLevels_;
-    UnitArray::iterator     coverPgIt_;
-    int                     uniqueIdIdx_;
+    int                     tocLevels_;         // number of levels of table of content
+    UnitArray::iterator     coverPgIt_;         // pointer to unit describing cover image
+    String                  coverFile_;         // cover image file name
+    int                     coverBinIdx_;       // cover image index in binary section
+    int                     uniqueIdIdx_;       // unique id counter
     ReferenceMap            refidToNew_;        // (re)mapping of original reference id to unique reference id
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
     ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
     std::set<String>        usedAnchorsids_;    // anchor ids already set
-    strvector               cssfiles_, ttffiles_, otffiles_;
-    binvector               binaries_;
+    strvector               cssfiles_;          // all stylesheet files
+    ExtFileVector           ttffiles_, otffiles_; // all font file description
+    binvector               binaries_;          // all binary files
     std::set<String>        xlns_;              // xlink namespaces
     std::set<String>        allRefIds_;         // all ref ids
-    String                  title_, lang_, id_, title_info_date_, isbn_;
-    strvector               authors_;
+    String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
+    unsigned char           adobeKey_[16];      // adobe key
+    strvector               authors_;           // book authors
 
     String                  prevUnitFile_;
     int                     unitIdx_;
@@ -215,10 +245,12 @@ private:
     void AddMimetype            ();
     void AddContainer           ();
     void AddStyles              ();
-    void AddFonts               (const char *ext, strvector *fontfiles);
+    void ScanFonts              (const char *ext, ExtFileVector *fontfiles);
+    void AddFontFiles           (const ExtFileVector &fontfiles);    
     void MakeCoverPageFirst     ();
     void AddContentOpf          ();
     void AddTocNcx              ();
+    void AddEncryption          ();
     const String* AddId         (const AttrMap &attrmap);
     void ParseTextAndEndElement (const String &element);
     void CopyAttribute          (const String &attr, const AttrMap &attrmap);
@@ -240,7 +272,7 @@ private:
     void coverpage              ();
     //void custom_info            ();
     void date                   ();
-    String date__textonly       ();
+    String date__epub           ();
     void description            ();
     void document_info          ();
     //void email                  ();
@@ -252,7 +284,7 @@ private:
     //void history                ();
     //void home_page              ();
     void id                     ();
-    void image                  (bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType = Unit::UNIT_NONE);
+    void image                  (bool fb2_inline, bool html_inline, bool scale);
     String isbn                 ();
     //void keywords               ();
     void lang                   ();
@@ -692,7 +724,7 @@ void ConverterPass2::AddStyles()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::AddFonts(const char *ext, strvector *fontfiles)
+void ConverterPass2::ScanFonts(const char *ext, ExtFileVector *fontfiles)
 {
     strvector::const_iterator cit = fonts_.begin(), cit_end = fonts_.end();
     for(; cit < cit_end; ++cit)
@@ -700,11 +732,23 @@ void ConverterPass2::AddFonts(const char *ext, strvector *fontfiles)
         Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), ext);
         String fname;
         for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
-        {
-            fname = String("fonts/") + fname;
-            pout_->AddFile(CreateInFileStm(ospath.c_str()), (String("OPS/") + fname).c_str(), true);
-            fontfiles->push_back(fname);
-        }
+            fontfiles->push_back(ExtFile(String("fonts/") + fname, ospath));
+    }
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
+{
+    ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
+    for(; cit < cit_end; ++cit)
+    {
+        // mangle (mangling == deflating + XORing), then store without compression
+        Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
+        pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
+
+        // just compress
+        //Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
+        //pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
     }
 }
 
@@ -748,7 +792,7 @@ void ConverterPass2::AddContentOpf()
     pout_->WriteStr("    xmlns:opf=\"http://www.idpf.org/2007/opf\">\n");
     pout_->WriteFmt("    <dc:title>%s</dc:title>\n", (xlitConv_ ? xlitConv_->Convert(title_) : title_).c_str());
     pout_->WriteFmt("    <dc:language>%s</dc:language>\n", lang_.c_str());
-    pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"ID\">%s</dc:identifier>\n", id_.c_str());
+    pout_->WriteFmt("    <dc:identifier id=\"dcidid\" opf:scheme=\"uuid\">%s</dc:identifier>\n", id_.c_str());
     {
         strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
         for(; cit < cit_end; ++cit)
@@ -756,18 +800,41 @@ void ConverterPass2::AddContentOpf()
     }
     if(!title_info_date_.empty())
         pout_->WriteFmt("    <dc:date>%s</dc:date>\n", title_info_date_.c_str());
+    if(!id1_.empty())
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"ID\">%s</dc:identifier>\n", id1_.c_str());
     if(!isbn_.empty())
-        pout_->WriteFmt("    <dc:identifier id=\"dcidid1\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
+        pout_->WriteFmt("    <dc:identifier id=\"dcidid2\" opf:scheme=\"isbn\">%s</dc:identifier>\n", isbn_.c_str());
+
+    // Add cover image description
+    if(coverBinIdx_ >= 0)
+        pout_->WriteFmt("    <meta name=\"cover\" content=\"%s\"/>\n", MakeFileName("bin", coverBinIdx_).c_str());
+
     pout_->WriteStr("  </metadata>\n\n");
 
     pout_->WriteStr("  <manifest>\n");
     AddContentManifestFile(pout_, "ncx", "toc.ncx", "application/x-dtbncx+xml");
+
+    // describe binary files
     {
         int i = 0;
         binvector::const_iterator cit = binaries_.begin(), cit_end = binaries_.end();
         for(; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("bin", i++).c_str(), cit->file_.c_str(), cit->type_.c_str());
     }
+
+    // describe fonts
+    {
+        int i;
+        ExtFileVector::const_iterator cit, cit_end;
+
+        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->fname_.c_str(), "application/vnd.ms-opentype");
+
+        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
+            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->fname_.c_str(), "application/vnd.ms-opentype");
+    }
+
+    // describe stylesheets, manifest-only-fonts, text files
     {
         int i;
         strvector::const_iterator cit, cit_end;
@@ -775,14 +842,8 @@ void ConverterPass2::AddContentOpf()
         for(cit = cssfiles_.begin(), cit_end = cssfiles_.end(), i = 0; cit < cit_end; ++cit)
             AddContentManifestFile(pout_, MakeFileName("css", i++).c_str(), cit->c_str(), "text/css");
 
-        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
-
         for(cit = mfonts_.begin(), cit_end = mfonts_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
-
-        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-            AddContentManifestFile(pout_, MakeFileName("otf", i++).c_str(), cit->c_str(), "font/opentype");
+            AddContentManifestFile(pout_, MakeFileName("mttf", i++).c_str(), cit->c_str(), "application/vnd.ms-opentype");
 
         for(cit = files.begin(), cit_end = files.end(); cit < cit_end; ++cit)
             AddContentManifestFile(pout_, cit->c_str(), (*cit + ".xhtml").c_str(), "application/xhtml+xml");
@@ -863,6 +924,42 @@ void ConverterPass2::AddTocNcx()
 
     pout_->WriteStr("  </navMap>\n");
     pout_->WriteStr("</ncx>\n");
+}
+
+//-----------------------------------------------------------------------
+void ConverterPass2::AddEncryption()
+{
+    pout_->BeginFile("META-INF/encryption.xml", true);
+    pout_->WriteStr("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    pout_->WriteStr("<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
+
+    {
+        int i;
+        ExtFileVector::const_iterator cit, cit_end;
+
+        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+        //AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+
+        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+    }
+
+    pout_->WriteStr("</encryption>\n");
 }
 
 //-----------------------------------------------------------------------
@@ -1202,6 +1299,12 @@ void ConverterPass2::binary()
     b.file_ = String("bin/") + b.file_;
     binaries_.push_back(b);
 
+    // If it is a cover page image file, remember binary index.
+    // It is necessary to add cover image description to metadata
+    // section of content.opf
+    if(b.file_ == coverFile_ && coverBinIdx_ < 0)
+        coverBinIdx_ = binaries_.size()-1;
+
     // store binary file
     {
         SetScannerDataMode setDataMode(s_);
@@ -1209,7 +1312,7 @@ void ConverterPass2::binary()
         if(t.type_ != LexScanner::DATA)
             Error("<binary> data expected");
 
-        pout_->BeginFile((String("OPS/") + b.file_).c_str(), true);
+        pout_->BeginFile((String("OPS/") + b.file_).c_str(), false);
         DecodeBase64(t.s_.c_str(), pout_);
     }
 
@@ -1227,7 +1330,10 @@ void ConverterPass2::body()
 
     //<image>
     if(s_->IsNextElement("image"))
-        image(false, false, true, Unit::IMAGE);
+    {
+        StartUnit(Unit::IMAGE);
+        image(false, false, true);
+    }
     //</image>
 
     //<title>
@@ -1351,17 +1457,41 @@ void ConverterPass2::date()
 }
 
 //-----------------------------------------------------------------------
-String ConverterPass2::date__textonly()
+static bool IsDateCorrect(const String &s)
 {
-    if(!s_->BeginElement("date"))
+    // date format should be YYYY[-MM[-DD]]
+    // (but we don't check if year, month or day value is valid!)
+    if(s.length() < 4 || !isdigit(s[0]) || !isdigit(s[1]) || !isdigit(s[2]) || !isdigit(s[3]))
+        return false;
+    if(s.length() > 4 && (s.length() < 7 || s[4] != '-' || !isdigit(s[5]) || !isdigit(s[6])))
+        return false;
+    if(s.length() > 7 && (s.length() != 10 || s[7] != '-' || !isdigit(s[8]) || !isdigit(s[9])))
+        return false;
+    return true;
+}
+
+//-----------------------------------------------------------------------
+String ConverterPass2::date__epub()
+{
+    AttrMap attrmap;
+    bool notempty = s_->BeginElement("date", &attrmap);
+
+    String text = attrmap["value"];
+    if(IsDateCorrect(text))
+    {
+        if(notempty)
+            s_->EndElement();
+        return text;
+    }
+
+    if(!notempty)
         return "";
 
-    String text;
     SetScannerDataMode setDataMode(s_);
     if(s_->LookAhead().type_ == LexScanner::DATA)
         text = s_->GetToken().s_;
     s_->EndElement();
-    return text;
+    return IsDateCorrect(text) ? text : String("");
 }
 
 //-----------------------------------------------------------------------
@@ -1374,8 +1504,7 @@ void ConverterPass2::description()
     //</title-info>
 
     //<src-title-info>
-    if(s_->IsNextElement("src-title-info"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-title-info");
     //</src-title-info>
 
     //<document-info>
@@ -1401,8 +1530,7 @@ void ConverterPass2::document_info()
     //</author>
 
     //<program-used>
-    if(s_->IsNextElement("program-used"))
-        s_->SkipElement();
+    s_->SkipIfElement("program-used");
     //</program-used>
 
     //<date>
@@ -1414,8 +1542,7 @@ void ConverterPass2::document_info()
     //</src-url>
 
     //<src-ocr>
-    if(s_->IsNextElement("src-ocr"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-ocr");
     //</src-ocr>
 
     //<id>
@@ -1493,36 +1620,56 @@ void ConverterPass2::epigraph()
 //-----------------------------------------------------------------------
 void ConverterPass2::id()
 {
-    id_ = s_->SimpleTextElement("id");;
+    static const String uuidpfx = "urn:uuid:";
+
+    String id = s_->SimpleTextElement("id"), uuid = id;
+    if(!uuid.compare(0, uuidpfx.length(), uuidpfx))
+        uuid = uuid.substr(uuidpfx.length());
+    if(!IsValidUUID(uuid))
+    {
+        id1_ = id;
+        uuid = GenerateUUID();
+    }
+
+    id_ = uuidpfx + uuid;
+    MakeAdobeKey(uuid, adobeKey_);
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::Type unitType)
+void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("image", &attrmap);
-
-    if(unitType != Unit::UNIT_NONE)
-        StartUnit(unitType);
-    bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
-    if(has_id)
-    {
-        pout_->WriteStr("<div");
-        AddId(attrmap);
-        pout_->WriteStr(">");
-    }
 
     // get file href
     String href = Findhref(attrmap), alt = attrmap["alt"];
     if(!href.empty())
     {
+        if(href[0] == '#')
+        {
+            // internal reference
+            href = String("bin/") + href.substr(1);
+
+            // remember name of the cover page image file
+            if(units_[unitIdx_].type_ == Unit::COVERPAGE && coverFile_.empty())
+                coverFile_ = href;
+        }
+
+        bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
+        if(has_id)
+        {
+            pout_->WriteStr("<div");
+            AddId(attrmap);
+            pout_->WriteStr(">");
+        }
+
         String group = html_inline ? "span" : "div";
 
         pout_->WriteFmt("<%s class=\"image\">", group.c_str());
         if(scale)
-            pout_->WriteFmt("<img style=\"height: 100%%;\" alt=\"%s\" src=\"bin/%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str()+1);
+            pout_->WriteFmt("<img style=\"height: 100%%;\" alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
         else
-            pout_->WriteFmt("<img alt=\"%s\" src=\"bin/%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str()+1);
+            pout_->WriteFmt("<img alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
 
         if(!fb2_inline)
         {
@@ -1533,9 +1680,10 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale, Unit::
                 pout_->WriteFmt("<p>%s</p>\n", EncodeStr(cit->second).c_str());
         }
         pout_->WriteFmt("</%s>", group.c_str());
+
+        if(has_id)
+            pout_->WriteStr("</div>\n");
     }
-    if(has_id)
-        pout_->WriteStr("</div>\n");
     if(!notempty)
         return;
     ClrScannerDataMode clrDataMode(s_);
@@ -1627,23 +1775,19 @@ void ConverterPass2::publish_info()
         return;
 
     //<book-name>
-    if(s_->IsNextElement("book-name"))
-        s_->SkipElement();
+    s_->SkipIfElement("book-name");
     //</book-name>
 
     //<publisher>
-    if(s_->IsNextElement("publisher"))
-        s_->SkipElement();
+    s_->SkipIfElement("publisher");
     //</publisher>
 
     //<city>
-    if(s_->IsNextElement("city"))
-        s_->SkipElement();
+    s_->SkipIfElement("city");
     //</city>
 
     //<year>
-    if(s_->IsNextElement("year"))
-        s_->SkipElement();
+    s_->SkipIfElement("year");
     //</year>
 
     //<isbn>
@@ -2011,13 +2155,12 @@ void ConverterPass2::title_info()
     //</annotation>
 
     //<keywords>
-    if(s_->IsNextElement("keywords"))
-        s_->SkipElement();
+    s_->SkipIfElement("keywords");
     //</keywords>
 
     //<date>
     if(s_->IsNextElement("date"))
-        title_info_date_ = date__textonly();
+        title_info_date_ = date__epub();
     //<date>
 
     //<coverpage>

@@ -283,6 +283,18 @@
 				>
 			</File>
 			<File
+				RelativePath=".\mangling.cpp"
+				>
+				<FileConfiguration
+					Name="Release Static|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="ZLIB_WINAPI"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath=".\scandir.cpp"
 				>
 			</File>
@@ -367,6 +379,10 @@
 				RelativePath=".\types.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\uuidmisc.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -391,6 +407,10 @@
 			</File>
 			<File
 				RelativePath=".\hdr.h"
+				>
+			</File>
+			<File
+				RelativePath=".\mangling.h"
 				>
 			</File>
 			<File
@@ -419,6 +439,10 @@
 			</File>
 			<File
 				RelativePath=".\types.h"
+				>
+			</File>
+			<File
+				RelativePath=".\uuidmisc.h"
 				>
 			</File>
 		</Filter>

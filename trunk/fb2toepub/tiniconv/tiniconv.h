@@ -16,6 +16,16 @@
  * Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+/*
+ * Insignificantly modified by Alexey Bobkov
+ * Modifications:
+ *  - Dec 08, 2010: Conditional compilation option TINICONV_NO_ASIAN_ENCODINGS
+ *    was added to allow to compile the library without Asian encodngs.
+ *
+ * This modification doesn't change orignal License: this software is distributed
+ * under the terms of the Library General Public License version 2
+ */
+
 #ifndef TINICONV_H_
 #define TINICONV_H_
 
@@ -82,6 +92,8 @@ struct tiniconv_ctx_s {
  * tiniconv_init
  */
 
+#if !defined(TINICONV_NO_ASIAN_ENCODINGS)
+
 #define TINICONV_CHARSET_ASCII       0
 #define TINICONV_CHARSET_CP1250      1
 #define TINICONV_CHARSET_CP1251      2
@@ -122,6 +134,43 @@ struct tiniconv_ctx_s {
 #define TINICONV_CHARSET_CHINESE     37
 #define TINICONV_CHARSET_BIG5        38
 #define TINICONV_CHARSETSIZE         39
+
+#else
+
+#define TINICONV_CHARSET_ASCII       0
+#define TINICONV_CHARSET_CP1250      1
+#define TINICONV_CHARSET_CP1251      2
+#define TINICONV_CHARSET_CP1252      3
+#define TINICONV_CHARSET_CP1253      4
+#define TINICONV_CHARSET_CP1254      5
+#define TINICONV_CHARSET_CP1255      6
+#define TINICONV_CHARSET_CP1256      7
+#define TINICONV_CHARSET_CP1257      8
+#define TINICONV_CHARSET_ISO_8859_1  9
+#define TINICONV_CHARSET_ISO_8859_2  10
+#define TINICONV_CHARSET_ISO_8859_3  11
+#define TINICONV_CHARSET_ISO_8859_4  12
+#define TINICONV_CHARSET_ISO_8859_5  13
+#define TINICONV_CHARSET_ISO_8859_6  14
+#define TINICONV_CHARSET_ISO_8859_7  15
+#define TINICONV_CHARSET_ISO_8859_8  16
+#define TINICONV_CHARSET_ISO_8859_9  17
+#define TINICONV_CHARSET_ISO_8859_10 18
+#define TINICONV_CHARSET_ISO_8859_13 19
+#define TINICONV_CHARSET_ISO_8859_14 20
+#define TINICONV_CHARSET_ISO_8859_15 21
+#define TINICONV_CHARSET_ISO_8859_16 22
+#define TINICONV_CHARSET_CP866       23
+#define TINICONV_CHARSET_KOI8_R      24
+#define TINICONV_CHARSET_KOI8_RU     25
+#define TINICONV_CHARSET_KOI8_U      26
+#define TINICONV_CHARSET_MACCYRILLIC 27
+#define TINICONV_CHARSET_UCS_2       28
+#define TINICONV_CHARSET_UTF_7       29
+#define TINICONV_CHARSET_UFT_8       30
+#define TINICONV_CHARSETSIZE         31
+
+#endif
 
 #define TINICONV_OPTION_IGNORE_IN_ILSEQ 1 /*< ignore incorrect input sequences */
 #define TINICONV_OPTION_IGNORE_OUT_ILSEQ 2 /*< replace sequence which can't be converted to OUT charset with OUTIL_CHAR */

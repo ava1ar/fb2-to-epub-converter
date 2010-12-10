@@ -24,10 +24,25 @@
 #define FB2TOEPUB_DECL
 
 //-----------------------------------------------------------------------
+// MAX TEXT FILE SIZE (APPROXIMATE, DOESN'T TAKE XML STUFF INTO ACCOUNT)
+// DEFAULT: 0x30000 (192K)
+//-----------------------------------------------------------------------
+//#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
+
+
+//-----------------------------------------------------------------------
+// DO NOT OVERWRITE OUTPUT FILE UNLESS --overwrite IS SET
+// DEFAULT: OFF
+//-----------------------------------------------------------------------
+//#define FB2TOEPUB_DONT_OVERWRITE 0
+
+
+//-----------------------------------------------------------------------
 // SUPPRESS EMPTY TITLES IN TABLE OF CONTENTS
 // If the value is nonzero, fb2 section without title don't appear in TOC,
 // and their nested section are moved one level up.
 // Otherwise, every section without title is assigned a title "- - - - -"
+// DEFAULT: ON
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
 
@@ -36,21 +51,30 @@
 // ENABLE IDS IN TABLE OF CONTENTS
 // If the value is nonzero, TOC contains references to file only
 // Otherwise, TOC contains "file#id" references.
+// DEFAULT: ON
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_TOC_REFERS_FILES_ONLY 1
 
 
 //-----------------------------------------------------------------------
-// Remove references to std::string::compare
+// REMOVE REFERENCES TO std::string::compare
 // (Custom option for ARM Linux)
+// DEFAULT: OFF
 //-----------------------------------------------------------------------
 //#define FB2TOEPUB_NO_STD_STRING_COMPARE 0
 
 
 
+
 //-----------------------------------------------------------------------
+// DEFAULTS - DON'T EDIT
 //-----------------------------------------------------------------------
-// Default
+#ifndef FB2TOEPUB_MAX_TEXT_FILE_SIZE
+#define FB2TOEPUB_MAX_TEXT_FILE_SIZE 0x30000
+#endif
+#ifndef FB2TOEPUB_DONT_OVERWRITE
+#define FB2TOEPUB_DONT_OVERWRITE 0
+#endif
 #ifndef FB2TOEPUB_SUPPRESS_EMPTY_TITLES
 #define FB2TOEPUB_SUPPRESS_EMPTY_TITLES 1
 #endif

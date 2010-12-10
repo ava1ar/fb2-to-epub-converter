@@ -29,6 +29,8 @@
 #include <string>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #if (defined unix)
 #include <unistd.h>
@@ -65,6 +67,10 @@ static void Usage()
     printf("    -t <path>               Path to configuration XML file\n");
     printf("                              for transliteration of title and TOC\n");
     printf("                              (optional, no more than one)\n");
+#if FB2TOEPUB_DONT_OVERWRITE
+    printf("        --overwrite         Overwrite output file if exists\n");
+    printf("                              If not set and file exists, exit with error\n");
+#endif
     printf("    -mf <path>              Add ttf font path to manifest only\n");
     printf("                              (optional, any number)\n");
     printf("    -h, --help              Help and exit\n\n");
@@ -77,6 +83,15 @@ static int ErrorExit(const String &err)
     fprintf(stderr, "Command line error: %s, use option -h or --help for help\n", err.c_str());
     return 1;
 }
+
+//-----------------------------------------------------------------------
+#if FB2TOEPUB_DONT_OVERWRITE
+static bool FileExists(const String &path)
+{
+    struct stat st;
+    return ::stat(path.c_str(), &st) != -1 || errno != ENOENT;
+}
+#endif
 
 //-----------------------------------------------------------------------
 static int Info(const String &in)
@@ -124,6 +139,9 @@ int main(int argc, char **argv)
 
     strvector css, fonts, mfonts;
     String xlit, in, out;
+#if FB2TOEPUB_DONT_OVERWRITE
+    bool overwrite = false;
+#endif
     bool infoOnly = false;
 
     int i = 1;
@@ -158,6 +176,13 @@ int main(int argc, char **argv)
                 return ErrorExit("transliteration file redefinition");
             xlit = argv[i++];
         }
+#if FB2TOEPUB_DONT_OVERWRITE
+        else if(!strcmp(argv[i], "--overwrite"))
+        {
+            overwrite = true;
+            ++i;
+        }
+#endif
         else if(!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help"))
             ++i;
         else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info"))
@@ -190,6 +215,11 @@ int main(int argc, char **argv)
     bool fOutputFileCreated = false;
     try
     {
+#if FB2TOEPUB_DONT_OVERWRITE
+        if(!overwrite && FileExists(out))   
+            Error((String("output file ") + out + " exists").c_str());
+#endif
+
         // create input stream
         Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
 
