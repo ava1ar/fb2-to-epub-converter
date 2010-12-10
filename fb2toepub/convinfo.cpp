@@ -51,7 +51,7 @@ public:
 
     void Scan()
     {
-        std::size_t size;
+        std::size_t size = 0;
         {
             struct stat st;
             ::stat(in_.c_str(), &st);
@@ -248,8 +248,7 @@ void ConverterInfo::description()
     //</title-info>
 
     //<src-title-info>
-    if(s_->IsNextElement("src-title-info"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-title-info");
     //</src-title-info>
 
     //<document-info>
@@ -291,23 +290,19 @@ void ConverterInfo::publish_info()
         return;
 
     //<book-name>
-    if(s_->IsNextElement("book-name"))
-        s_->SkipElement();
+    s_->SkipIfElement("book-name");
     //</book-name>
 
     //<publisher>
-    if(s_->IsNextElement("publisher"))
-        s_->SkipElement();
+    s_->SkipIfElement("publisher");
     //</publisher>
 
     //<city>
-    if(s_->IsNextElement("city"))
-        s_->SkipElement();
+    s_->SkipIfElement("city");
     //</city>
 
     //<year>
-    if(s_->IsNextElement("year"))
-        s_->SkipElement();
+    s_->SkipIfElement("year");
     //</year>
 
     //<isbn>
@@ -353,13 +348,11 @@ void ConverterInfo::title_info()
     //</book-title>
 
     //<annotation>
-    if(s_->IsNextElement("annotation"))
-        s_->SkipElement();
+    s_->SkipIfElement("annotation");
     //</annotation>
 
     //<keywords>
-    if(s_->IsNextElement("keywords"))
-        s_->SkipElement();
+    s_->SkipIfElement("keywords");
     //</keywords>
 
     //<date>
@@ -368,8 +361,7 @@ void ConverterInfo::title_info()
     //<date>
 
     //<coverpage>
-    if(s_->IsNextElement("coverpage"))
-        s_->SkipElement();
+    s_->SkipIfElement("coverpage");
     //</coverpage>
 
     //<lang>
@@ -377,13 +369,11 @@ void ConverterInfo::title_info()
     //</lang>
 
     //<src-lang>
-    if(s_->IsNextElement("src-lang"))
-        s_->SkipElement();
+    s_->SkipIfElement("src-lang");
     //</src-lang>
 
     //<translator>
-    if(s_->IsNextElement("translator"))
-        s_->SkipElement();
+    s_->SkipIfElement("translator");
     //</translator>
 
     //<sequence>

@@ -1,0 +1,17 @@
+tiniconv - is a charset conversion library, based on libiconv (uses it's converters).
+Intended to be used in embedded systems and other resource-critical facilities.
+Doesn't use any memory management/file system calls, any OS calls at all -
+    COPMPLETELY OS-INDEPENDENT
+(supposed to be, at least;).
+
+Tested on LE x32 and x64 8086-like systems.
+
+
+******************************************************************************
+Insignificantly modified by Alexey Bobkov
+Modifications:
+ - Dec 08, 2010: Conditional compilation option TINICONV_NO_ASIAN_ENCODINGS
+   was added to allow to compile the library without Asian encodngs.
+This modification doesn't change orignal License: this software is distributed
+under the terms of the Library General Public License version 2
+******************************************************************************
