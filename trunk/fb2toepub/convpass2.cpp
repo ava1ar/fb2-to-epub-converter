@@ -929,6 +929,9 @@ void ConverterPass2::AddTocNcx()
 //-----------------------------------------------------------------------
 void ConverterPass2::AddEncryption()
 {
+    if(ttffiles_.empty() && otffiles_.empty())
+        return;
+
     pout_->BeginFile("META-INF/encryption.xml", true);
     pout_->WriteStr("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     pout_->WriteStr("<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
