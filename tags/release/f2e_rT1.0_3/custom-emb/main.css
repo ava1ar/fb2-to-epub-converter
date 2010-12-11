@@ -1,0 +1,32 @@
+@font-face
+{
+ font-family: "_bd-a2b81e-20eb-3a4e-ee8f-1664-26e3-bef744";
+ font-style: normal;
+ src:  url(../fonts/LiberationSerif-Regular.ttf) ;
+ font-weight: normal;
+}
+@font-face
+{
+ font-family: "_bd-a2b81e-20eb-3a4e-ee8f-1664-26e3-bef744";
+ font-style: italic;
+ src:  url(../fonts/LiberationSerif-Italic.ttf) ;
+ font-weight: normal;
+}
+@font-face
+{
+ font-family: "_bd-a2b81e-20eb-3a4e-ee8f-1664-26e3-bef744";
+ font-style: normal;
+ src:  url(../fonts/LiberationSerif-Bold.ttf) ;
+ font-weight: bold;
+}
+@font-face
+{
+ font-family: "_bd-a2b81e-20eb-3a4e-ee8f-1664-26e3-bef744";
+ font-style: italic;
+ src:  url(../fonts/LiberationSerif-BoldItalic.ttf) ;
+ font-weight: bold;
+}
+body
+{
+ font-family: "_bd-a2b81e-20eb-3a4e-ee8f-1664-26e3-bef744";
+}
