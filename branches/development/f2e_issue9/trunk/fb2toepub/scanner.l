@@ -40,12 +40,13 @@ namespace Fb2ToEpub
         bool                        skipMode_;
         bool                        dataMode_;
         int                         doctypeCnt_;
+        int                         lineNo_;
         Token                       last_;      // for debug purposes
 
         Token ScanToken();
 
     public:
-        explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), last_(STOP) {}
+        explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), lineNo_(1), last_(STOP) {}
 
         //-----------------------------------------------------------------------
         //virtual
@@ -123,13 +124,11 @@ namespace Fb2ToEpub
 nl              (\r\n|\r|\n)
 ws              [ \t\r\n]+
 
-xmlver          "<?xml"{ws}"version"{ws}?"="{ws}?
-version         "1."[0-9]+
-encoding        "encoding"{ws}?"="{ws}?
-standalone      "standalone"{ws}?"="{ws}?
+xmlstart        "<?xml"
+version         \""1."[0-9]+\"|\'"1."[0-9]+\'
 encname         [A-Za-z]([A-Za-z0-9._]|"-")*
 sdname          "yes"|"no"
-xmlname         {encname}|{sdname}
+xmlvalue        \"({encname}|{sdname})\"|\'({encname}|{sdname})\'
 xmlclose        "?>"
 
 chardata        ([^<&\]]|"]"[^<&\]]|"]]"[^<&>])*("]"|"]]")?
@@ -155,7 +154,7 @@ cdatablock      "<![CDATA["([^\]]|"]"[^\]]|"]]"[^>])*"]]>"
 xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 
 /*
- * The XML, XML1 and XML2 modes are used for XML header parsing.
+ * The XML9 mode is used for XML header parsing.
  * The OUTSIDE mode is used outside XML top-level element.
  * The MARKUP mode is used inside markup.
  * The CONTENT mode is used for the content of elements, i.e.,
@@ -163,7 +162,7 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
  * The DOCTYPE mode is used to skip DOCTYPE definition.
  */
 
-%s XML XML1 XML2
+%s XML0 XML1 XML2 XML9
 %s OUTSIDE MARKUP CONTENT DOCTYPE
 
 
@@ -171,17 +170,24 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 
     /* XML declaration */
 
-{xmlver}                        {BEGIN(XML); return XMLDECL;}
-<XML>{encoding}                 {return ENCODING;}
-<XML>{standalone}               {return STANDALONE;}
-<XML>"'"                        {BEGIN(XML1); return '"';}
-<XML>"\""                       {BEGIN(XML2); return '"';}
-<XML1,XML2>{version}            {return Token(VERSION, yytext);}
-<XML1,XML2>{xmlname}            {return Token(VALUE, yytext);}
-<XML1>"'"{ws}?                  {BEGIN(XML); return '"';}
-<XML2>"\""{ws}?                 {BEGIN(XML); return '"';}
-<XML>{xmlclose}                 {BEGIN(OUTSIDE); return CLOSE;}
-<XML,XML1,XML2>.                {Fb2ToEpub::Error("xmldecl: closing expected"); yyterminate();}
+{xmlstart}                      {BEGIN(XML0); return XMLDECL;}
+<XML0>"version"                 {BEGIN(XML1);}
+<XML1>"="                       {BEGIN(XML2);}
+<XML2>{version}                 {
+                                    BEGIN(XML9);
+                                    yytext[yyleng-1] = '\0';
+                                    return Token(VERSION, yytext+1);
+                                }
+<XML9>"encoding"                {return ENCODING;}
+<XML9>"standalone"              {return STANDALONE;}
+<XML9>"="                       {return EQ;}
+<XML9>{xmlvalue}                {
+                                    yytext[yyleng-1] = '\0';
+                                    return Token(VALUE, yytext+1);
+                                }
+<XML9>{xmlclose}                {BEGIN(OUTSIDE); return CLOSE;}
+<XML0,XML1,XML2,XML9>{ws}       {}
+<XML9>.                         {Fb2ToEpub::Error("xmldecl: closing expected"); yyterminate();}
 
 
     /* Ignored or not implemented */

@@ -123,36 +123,23 @@ void LexScanner::SkipAll(const String &element)
 void LexScanner::SkipXMLDeclaration ()
 {
     // skip version
-    if (GetToken() != Token(XMLDECL) ||
-        GetToken() != Token('"') ||
-        GetToken().type_ != VERSION ||
-        GetToken() != Token('"'))
-    {
+    if (GetToken() != Token(XMLDECL) || GetToken().type_ != VERSION)
         Error("xmldecl parsing error");
-    }
     
     // skip initial encoding (the stream is already converted to UTF-8)
     Token t = GetToken();
     if  (t == Token(ENCODING))
     {
-        if (GetToken() != Token('"') ||
-            GetToken().type_ != VALUE ||
-            GetToken() != Token('"'))
-        {
+        if (GetToken().type_ != EQ || GetToken().type_ != VALUE)
             Error("xmldecl 'encoding' parsing error");
-        }
         t = GetToken();
     }
 
     // skip standalone
     if  (t == Token(STANDALONE))
     {
-        if (GetToken() != Token('"') ||
-            GetToken().type_ != VALUE ||
-            GetToken() != Token('"'))
-        {
+        if (GetToken().type_ != EQ || GetToken().type_ != VALUE)
             Error("xmldecl 'standalone' parsing error");
-        }
         t = GetToken();
     }
 
