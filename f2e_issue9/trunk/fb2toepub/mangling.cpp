@@ -215,7 +215,7 @@ char InManglingStm::GetChar()
 size_t InManglingStm::Read(void *buffer, size_t max_cnt)
 {
     size_t cnt = stm_->Read(buffer, max_cnt);
-    if(!cnt || pos_ >= maxSize_)
+    if(pos_ >= maxSize_ || !cnt)
         return cnt;
 
     char *cb = reinterpret_cast<char*>(buffer);

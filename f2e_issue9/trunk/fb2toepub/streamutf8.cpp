@@ -113,9 +113,7 @@ static String ParseEncoding(InStm *stm)
 
     // skip version
     if (scanner->GetToken() != LexScanner::Token(LexScanner::XMLDECL) ||
-        scanner->GetToken() != LexScanner::Token('"') ||
-        scanner->GetToken().type_ != LexScanner::VERSION ||
-        scanner->GetToken() != LexScanner::Token('"'))
+        scanner->GetToken().type_ != LexScanner::VERSION)
     {
         Error("encoding parsing error 1");
     }
@@ -125,8 +123,8 @@ static String ParseEncoding(InStm *stm)
     if(t != LexScanner::Token(LexScanner::ENCODING))
         return "UTF-8";
 
-    // skip '"'
-    if (scanner->GetToken() != LexScanner::Token('"'))
+    // skip '='
+    if (scanner->GetToken().type_ != LexScanner::EQ)
         Error("encoding parsing error 2");
 
     // next should be string value
