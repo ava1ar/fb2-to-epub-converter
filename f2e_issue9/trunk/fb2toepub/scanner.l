@@ -41,12 +41,13 @@ namespace Fb2ToEpub
         bool                        dataMode_;
         int                         doctypeCnt_;
         int                         lineNo_;
+        int                         stateCaller_;
         Token                       last_;      // for debug purposes
 
         Token ScanToken();
 
     public:
-        explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), lineNo_(1), last_(STOP) {}
+        explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), lineNo_(1), stateCaller_(0), last_(STOP) {}
 
         //-----------------------------------------------------------------------
         //virtual
@@ -150,7 +151,8 @@ attrvalue       \"([^<&"]|{reference})*\"|\'([^<&']|{reference})*\'
 /*
  * Ignored stuff
  */
-comment         "<!--"([^-]|"-"[^-])*"-->"
+commentstart    "<!--"
+commentend      "-->"
 cdatablock      "<![CDATA["([^\]]|"]"[^\]]|"]]"[^>])*"]]>"
 xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
 
@@ -165,6 +167,7 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
 
 %s X0 X1 X2 X3 X4
 %s OUTSIDE MARKUP CONTENT DOCTYPE
+%s COMMENT CDB
 
 
 %%
@@ -200,7 +203,6 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
 
     /* Ignored or not implemented */
 
-<CONTENT,OUTSIDE>{comment}      {/* skip comment */}
 <OUTSIDE>{ws}                   {}
 <OUTSIDE>{nl}                   {++lineNo_;}
 <CONTENT,OUTSIDE>{cdatablock}   {/* skip CDATA block */}
@@ -208,12 +210,20 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
 <CONTENT,OUTSIDE>"<!"           {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
 
 
+    /* Skip comment */
+
+<CONTENT,OUTSIDE>{commentstart} {stateCaller_ = YY_START; BEGIN(COMMENT);}
+<COMMENT>[^-\r\n]|"-"[^-\n\r]   {/* eat */}
+<COMMENT>{nl}                   {++lineNo_;}
+<COMMENT>{commentend}           {BEGIN(stateCaller_);}
+
+
     /* Skip DOCTYPE */
 
 <OUTSIDE>"<!DOCTYPE"            {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 <DOCTYPE>"<"                    {++doctypeCnt_;}
 <DOCTYPE>">"                    {if(--doctypeCnt_ <= 0) BEGIN(OUTSIDE);}
-<DOCTYPE>[^<>\r\n]*             {}
+<DOCTYPE>[^<>\r\n]*             {/* eat */}
 <DOCTYPE>{nl}                   {++lineNo_;}
 
 
