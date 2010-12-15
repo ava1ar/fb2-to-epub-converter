@@ -45,6 +45,34 @@ namespace Fb2ToEpub
         Token                       last_;      // for debug purposes
 
         Token ScanToken();
+        void ConcatenateData(Token *t)
+        {
+            for(;;)     // concatenate all DATA together
+            {
+                Token t1 = ScanToken();
+                if(t1.type_ != DATA)
+                {
+                    UngetToken(t1);
+                    return;
+                }
+
+                t->s_    += t1.s_;
+                t->size_ += t1.size_;
+            }
+        }
+        void ConcatenateValue(Token *t)
+        {
+            for(;;)     // concatenate all VALUE together
+            {
+                Token t1 = ScanToken();
+                if(t1.type_ != VALUE)
+                {
+                    UngetToken(t1);
+                    return;
+                }
+                t->s_ += t1.s_;
+            }
+        }
 
     public:
         explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), lineNo_(1), stateCaller_(0), last_(STOP) {}
@@ -65,19 +93,12 @@ namespace Fb2ToEpub
             }
 
             Token t = ScanToken();
-            if(t.type_ == DATA)
-                for(;;)     // concatenate all DATA together
-                {
-                    Token t1 = ScanToken();
-                    if(t1.type_ != DATA)
-                    {
-                        UngetToken(t1);
-                        break;
-                    }
-
-                    t.s_    += t1.s_;
-                    t.size_ += t1.size_;
-                }
+            switch(t.type_)
+            {
+            case DATA:  ConcatenateData(&t); break;
+            case VALUE: ConcatenateValue(&t); break;
+            default:    break;
+            }
 
 #if defined(_DEBUG)
             last_ = t;
@@ -116,7 +137,11 @@ namespace Fb2ToEpub
     };
 };
 
-#define yyterminate() return Fb2ToEpub::LexScanner::STOP
+static Fb2ToEpub::LexScanner::Token yyterminate()
+{
+    return Fb2ToEpub::LexScanner::STOP;
+}
+/*#define YY_USER_ACTION printf("line: %d state: %d len: %d \"%s\"\n", lineNo_, (YY_START), yyleng, yytext);*/
 #define YY_DECL	 Fb2ToEpub::LexScanner::Token Fb2ToEpub::ScannerImpl::ScanToken()
 
 %}
@@ -125,13 +150,11 @@ namespace Fb2ToEpub
 nl              (\r\n|\r|\n)
 ws              [ \t]+
 
-xmlstart        "<?xml"
 vervalue        \""1."[0-9]+\"|\'"1."[0-9]+\'
 encname         [A-Za-z]([A-Za-z0-9._]|"-")*
 encvalue        \"{encname}\"|\'{encname}\'
 sdname          "yes"|"no"
 sdvalue         \"{sdname}\"|\'{sdname}\'
-xmlclose        "?>"
 
 chardata        ([^<&\r\n\]]|"]"[^<&\r\n\]]|"]]"[^<&>\r\n])*("]"|"]]")?
 letter          [A-Za-z]
@@ -148,13 +171,15 @@ stagstart       "<"{name}
 etagstart       "</"{name}
 attrvalue       \"([^<&"]|{reference})*\"|\'([^<&']|{reference})*\'
 
+
 /*
- * Ignored stuff
+ * Unused but kept for possible future references
+ * (and BTW some are not correct)
  */
-commentstart    "<!--"
-commentend      "-->"
+comment         "<!--"([^-]|"-"[^-])*"-->"
 cdatablock      "<![CDATA["([^\]]|"]"[^\]]|"]]"[^>])*"]]>"
-xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
+xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
+
 
 /*
  * The X0-4 modes are used for XML header parsing.
@@ -163,18 +188,19 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
  * The CONTENT mode is used for the content of elements, i.e.,
  * between the ">" and "<" of element tags.
  * The DOCTYPE mode is used to skip DOCTYPE definition.
+ * The COMMENT, CDB, RESERVED modes are used to ignore comment, CDATA block, XML reserved stuff
  */
 
 %s X0 X1 X2 X3 X4
 %s OUTSIDE MARKUP CONTENT DOCTYPE
-%s COMMENT CDB
+%s COMMENT CDB RESERVED
 
 
 %%
 
     /* XML declaration */
 
-{xmlstart}                      {BEGIN(X0); return XMLDECL;}
+<INITIAL>"<?xml"                {BEGIN(X0); return XMLDECL;}
 <X0>"version"                   {BEGIN(X1);}
 <X1>"="                         {BEGIN(X2);}
 <X2>{vervalue}                  {
@@ -195,40 +221,56 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
                                     yytext[yyleng-1] = '\0';
                                     return Token(VALUE, yytext+1);
                                 }
-<X4>{xmlclose}                  {BEGIN(OUTSIDE); return CLOSE;}
+<X4>"?>"                        {BEGIN(OUTSIDE); return CLOSE;}
 <X0,X1,X2,X3,X4>{ws}            {}
 <X0,X1,X2,X3,X4>{nl}            {++lineNo_;}
 <X0,X1,X2,X3,X4>.               {Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
 
 
-    /* Ignored or not implemented */
-
-<OUTSIDE>{ws}                   {}
-<OUTSIDE>{nl}                   {++lineNo_;}
-<CONTENT,OUTSIDE>{cdatablock}   {/* skip CDATA block */}
-<CONTENT,OUTSIDE>{xmlreserved}  {/* skip reserved xml element */}
-<CONTENT,OUTSIDE>"<!"           {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
-
-
     /* Skip comment */
 
-<CONTENT,OUTSIDE>{commentstart} {stateCaller_ = YY_START; BEGIN(COMMENT);}
-<COMMENT>[^-\r\n]|"-"[^-\n\r]   {/* eat */}
-<COMMENT>{nl}                   {++lineNo_;}
-<COMMENT>{commentend}           {BEGIN(stateCaller_);}
+<CONTENT,OUTSIDE>"<!--"         {stateCaller_ = YY_START; BEGIN(COMMENT);}
+<COMMENT>"-->"                  {BEGIN(stateCaller_);}
+<COMMENT>[^-\r\n]*              {/* eat */}
+<COMMENT>"-"[^-\r\n]*           {/* eat */}
+<COMMENT>"-"?{nl}               {++lineNo_;}
+
+
+    /* Skip CDATA block */
+
+<CONTENT,OUTSIDE>"<![CDATA["    {stateCaller_ = YY_START; BEGIN(CDB);}
+<CDB>"]"*"]]>"                  {BEGIN(stateCaller_);}
+<CDB>[^\]\r\n]*                 {/* eat */}
+<CDB>("]"[^\]\r\n])*            {/* eat */}
+<CDB>("]]""]"*[^>\]\r\n])*      {/* eat */}
+<CDB>"]"*{nl}                   {++lineNo_;}
 
 
     /* Skip DOCTYPE */
 
 <OUTSIDE>"<!DOCTYPE"            {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 <DOCTYPE>"<"                    {++doctypeCnt_;}
-<DOCTYPE>">"                    {if(--doctypeCnt_ <= 0) BEGIN(OUTSIDE);}
+<DOCTYPE>">"                    {
+                                    if(--doctypeCnt_ <= 0)
+                                        BEGIN(OUTSIDE);
+                                }
 <DOCTYPE>[^<>\r\n]*             {/* eat */}
 <DOCTYPE>{nl}                   {++lineNo_;}
 
 
+    /* Skip reserved xml element */
+
+<CONTENT,OUTSIDE>"<?xml"        {stateCaller_ = YY_START; BEGIN(RESERVED);}
+<RESERVED>("?")*"?>"            {BEGIN(stateCaller_);}
+<RESERVED>[^\?\r\n]*            {/* eat */}
+<RESERVED>("?"*[^>\?\r\n])*     {/* eat */}
+<RESERVED>"?"*{nl}              {++lineNo_;}
+
+
     /* Content */
 
+<OUTSIDE>{ws}                   {}
+<OUTSIDE>{nl}                   {++lineNo_;}
 <CONTENT>{data}	                {
                                     // return DATA only in data mode, otherwise ignore
                                     if(dataMode_)
@@ -263,7 +305,7 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
                                     BEGIN(MARKUP);
                                     return Token(END, tagName);
                                 }
-
+<CONTENT,OUTSIDE>"<!"           {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
 <OUTSIDE>.                      {/* ignore outside garbage */}
 <CONTENT>.                      {
                                     // error character - try to process
@@ -299,7 +341,10 @@ xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
                                     std::vector<char> buf;
                                     Decode(yytext+1, &buf, true, true);
                                     return Token(VALUE, &buf[0]);
-                                    //return Token(VALUE, yytext);
+                                }
+<MARKUP>{nl}                    {
+                                    ++lineNo_;
+                                    return skipMode_ ? Token(VALUE) : Token(VALUE, "\n");
                                 }
 <MARKUP>"/>"                    {
                                     if(!tagStack_.size())
