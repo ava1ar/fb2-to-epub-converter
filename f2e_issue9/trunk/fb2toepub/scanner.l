@@ -122,16 +122,17 @@ namespace Fb2ToEpub
 
 
 nl              (\r\n|\r|\n)
-ws              [ \t\r\n]+
+ws              [ \t]+
 
 xmlstart        "<?xml"
-version         \""1."[0-9]+\"|\'"1."[0-9]+\'
+vervalue        \""1."[0-9]+\"|\'"1."[0-9]+\'
 encname         [A-Za-z]([A-Za-z0-9._]|"-")*
+encvalue        \"{encname}\"|\'{encname}\'
 sdname          "yes"|"no"
-xmlvalue        \"({encname}|{sdname})\"|\'({encname}|{sdname})\'
+sdvalue         \"{sdname}\"|\'{sdname}\'
 xmlclose        "?>"
 
-chardata        ([^<&\]]|"]"[^<&\]]|"]]"[^<&>])*("]"|"]]")?
+chardata        ([^<&\r\n\]]|"]"[^<&\r\n\]]|"]]"[^<&>\r\n])*("]"|"]]")?
 letter          [A-Za-z]
 digit           [0-9]
 namestart       ({letter}|"_"|":")
@@ -151,10 +152,10 @@ attrvalue       \"([^<&"]|{reference})*\"|\'([^<&']|{reference})*\'
  */
 comment         "<!--"([^-]|"-"[^-])*"-->"
 cdatablock      "<![CDATA["([^\]]|"]"[^\]]|"]]"[^>])*"]]>"
-xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
+xmlreserved     {xmlstart}([^\?]|"?"[^>])*("?")?{xmlclose}
 
 /*
- * The XML9 mode is used for XML header parsing.
+ * The X0-4 modes are used for XML header parsing.
  * The OUTSIDE mode is used outside XML top-level element.
  * The MARKUP mode is used inside markup.
  * The CONTENT mode is used for the content of elements, i.e.,
@@ -162,7 +163,7 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
  * The DOCTYPE mode is used to skip DOCTYPE definition.
  */
 
-%s XML0 XML1 XML2 XML9
+%s X0 X1 X2 X3 X4
 %s OUTSIDE MARKUP CONTENT DOCTYPE
 
 
@@ -170,30 +171,38 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 
     /* XML declaration */
 
-{xmlstart}                      {BEGIN(XML0); return XMLDECL;}
-<XML0>"version"                 {BEGIN(XML1);}
-<XML1>"="                       {BEGIN(XML2);}
-<XML2>{version}                 {
-                                    BEGIN(XML9);
+{xmlstart}                      {BEGIN(X0); return XMLDECL;}
+<X0>"version"                   {BEGIN(X1);}
+<X1>"="                         {BEGIN(X2);}
+<X2>{vervalue}                  {
+                                    BEGIN(X3);
                                     yytext[yyleng-1] = '\0';
                                     return Token(VERSION, yytext+1);
                                 }
-<XML9>"encoding"                {return ENCODING;}
-<XML9>"standalone"              {return STANDALONE;}
-<XML9>"="                       {return EQ;}
-<XML9>{xmlvalue}                {
+<X3>"encoding"                  {return ENCODING;}
+<X3>"="                         {return EQ;}
+<X3>{encvalue}                  {
+                                    BEGIN(X4);
                                     yytext[yyleng-1] = '\0';
                                     return Token(VALUE, yytext+1);
                                 }
-<XML9>{xmlclose}                {BEGIN(OUTSIDE); return CLOSE;}
-<XML0,XML1,XML2,XML9>{ws}       {}
-<XML9>.                         {Fb2ToEpub::Error("xmldecl: closing expected"); yyterminate();}
+<X3,X4>"standalone"             {BEGIN(X4); return STANDALONE;}
+<X4>"="                         {return EQ;}
+<X4>{sdvalue}                   {
+                                    yytext[yyleng-1] = '\0';
+                                    return Token(VALUE, yytext+1);
+                                }
+<X4>{xmlclose}                  {BEGIN(OUTSIDE); return CLOSE;}
+<X0,X1,X2,X3,X4>{ws}            {}
+<X0,X1,X2,X3,X4>{nl}            {++lineNo_;}
+<X0,X1,X2,X3,X4>.               {Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
 
 
     /* Ignored or not implemented */
 
 <CONTENT,OUTSIDE>{comment}      {/* skip comment */}
-<OUTSIDE>{ws}                   {/* skip whitespaces outside main element */}
+<OUTSIDE>{ws}                   {}
+<OUTSIDE>{nl}                   {++lineNo_;}
 <CONTENT,OUTSIDE>{cdatablock}   {/* skip CDATA block */}
 <CONTENT,OUTSIDE>{xmlreserved}  {/* skip reserved xml element */}
 <CONTENT,OUTSIDE>"<!"           {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
@@ -204,7 +213,8 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 <OUTSIDE>"<!DOCTYPE"            {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 <DOCTYPE>"<"                    {++doctypeCnt_;}
 <DOCTYPE>">"                    {if(--doctypeCnt_ <= 0) BEGIN(OUTSIDE);}
-<DOCTYPE>[^<>]*                 {}
+<DOCTYPE>[^<>\r\n]*             {}
+<DOCTYPE>{nl}                   {++lineNo_;}
 
 
     /* Content */
@@ -220,6 +230,12 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
                                         //return Token(DATA, &buf[0]);
                                         return Token(DATA, yytext, yyleng);
                                     }
+                                }
+<CONTENT>{nl}	                {
+                                    ++lineNo_;
+                                    // return DATA only in data mode, otherwise ignore
+                                    if(dataMode_)
+                                        return skipMode_ ? Token(DATA, 1) : Token(DATA, "\n", 1);
                                 }
 <CONTENT,OUTSIDE>{stagstart}    {
                                     char *tagName = &yytext[1];
@@ -262,7 +278,8 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 
     /* Markup */
 
-<MARKUP>{ws}                    {/* skip whitespace */}
+<MARKUP>{ws}                    {}
+<MARKUP>{nl}                    {++lineNo_;}
 <MARKUP>"="                     {return EQ;}
 <MARKUP>{name}	                {return Token(NAME, yytext);}
 <MARKUP>{attrvalue}             {
