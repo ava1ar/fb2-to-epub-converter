@@ -40,42 +40,51 @@ namespace Fb2ToEpub
         bool                        skipMode_;
         bool                        dataMode_;
         int                         doctypeCnt_;
-        int                         lineNo_;
+        Loc                         loc_;
         int                         stateCaller_;
+        bool                        attrHasValue_;
         Token                       last_;      // for debug purposes
 
         Token ScanToken();
-        void ConcatenateData(Token *t)
+
+        void ScanAndConcatenateTo(Token *t)
         {
             for(;;)     // concatenate all DATA together
             {
                 Token t1 = ScanToken();
-                if(t1.type_ != DATA)
+                t1.loc_ = loc_;
+
+                if(t1.type_ != t->type_)
                 {
                     UngetToken(t1);
                     return;
                 }
 
-                t->s_    += t1.s_;
-                t->size_ += t1.size_;
+                t->s_           += t1.s_;
+                t->size_        += t1.size_;
+                t->loc_.lstLn_  = t1.loc_.lstLn_;
+                t->loc_.lstCol_ = t1.loc_.lstCol_;
             }
         }
-        void ConcatenateValue(Token *t)
+
+        void NewLn()
         {
-            for(;;)     // concatenate all VALUE together
-            {
-                Token t1 = ScanToken();
-                if(t1.type_ != VALUE)
-                {
-                    UngetToken(t1);
-                    return;
-                }
-                t->s_ += t1.s_;
-            }
+            ++loc_.lstLn_;
+            loc_.lstCol_ = 1;
         }
 
     public:
-        explicit ScannerImpl(InStm *stm) : stm_(stm), skipMode_(false), dataMode_(false), doctypeCnt_(0), lineNo_(1), stateCaller_(0), last_(STOP) {}
+        explicit ScannerImpl(InStm *stm)
+                            :   stm_            (stm),
+                                skipMode_       (false),
+                                dataMode_       (false),
+                                doctypeCnt_     (0),
+                                loc_            (1,1,1,1),
+                                stateCaller_    (0),
+                                attrHasValue_   (false),
+                                last_           (STOP)
+        {
+        }
 
         //-----------------------------------------------------------------------
         //virtual
@@ -93,12 +102,9 @@ namespace Fb2ToEpub
             }
 
             Token t = ScanToken();
-            switch(t.type_)
-            {
-            case DATA:  ConcatenateData(&t); break;
-            case VALUE: ConcatenateValue(&t); break;
-            default:    break;
-            }
+            t.loc_ = loc_;
+            if(t.type_ == DATA || t.type_ == VALUE)
+                ScanAndConcatenateTo(&t);
 
 #if defined(_DEBUG)
             last_ = t;
@@ -141,7 +147,12 @@ static Fb2ToEpub::LexScanner::Token yyterminate()
 {
     return Fb2ToEpub::LexScanner::STOP;
 }
-//#define YY_USER_ACTION printf("line: %d state: %d len: %d \"%s\"\n", lineNo_, (YY_START), yyleng, yytext);
+#define YY_USER_ACTION  {\
+                            loc_.fstLn_ = loc_.lstLn_; \
+                            loc_.fstCol_ = loc_.lstCol_; \
+                            loc_.lstCol_ += yyleng; \
+                            /*printf("line: %d state: %d len: %d \"%s\"\n", loc_.fstLn_, (YY_START), yyleng, yytext);*/ \
+                        }
 #define YY_DECL	 Fb2ToEpub::LexScanner::Token Fb2ToEpub::ScannerImpl::ScanToken()
 
 %}
@@ -169,7 +180,8 @@ data            {chardata}?({reference}{chardata}?)*
 
 stagstart       "<"{name}
 etagstart       "</"{name}
-attrvalue       \"([^<&"]|{reference})*\"|\'([^<&']|{reference})*\'
+attrvalue1      ([^<&"\r\n]|{reference})*
+attrvalue2      ([^<&'\r\n]|{reference})*
 
 comment         ([^-\r\n]|"-"[^-\r\n])*
 cdatablock      ([^\]\r\n]|"]"[^\]\r\n]|"]]""]"*[^>\]\r\n])*
@@ -179,7 +191,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 /*
  * The X<n>, X<n>_WS modes are used for XML header parsing.
  * The OUTSIDE mode is used outside XML top-level element.
- * The MARKUP mode is used inside markup.
+ * The MARKUP, MARKUP1 and MARKUP2 modes are used inside markup.
  * The CONTENT mode is used for the content of elements, i.e.,
  * between the ">" and "<" of element tags.
  * The DOCTYPE mode is used to skip DOCTYPE definition.
@@ -187,7 +199,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
  */
 
 %s X0 X1 X2 X3 X4 X0_WS X3_WS X4_WS
-%s OUTSIDE MARKUP CONTENT DOCTYPE
+%s OUTSIDE MARKUP MARKUP1 MARKUP2 CONTENT DOCTYPE
 %s COMMENT CDB RESERVED
 
 
@@ -195,9 +207,9 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
     /* XML declaration */
 
-<INITIAL>"<?xml"                {BEGIN(X0_WS); return XMLDECL;}
+<INITIAL>"<?xml"                {BEGIN(X0_WS); return Token(XMLDECL);}
 <X0_WS>{ws}                     {BEGIN(X0);}
-<X0_WS>{nl}                     {++lineNo_; BEGIN(X0);}
+<X0_WS>{nl}                     {NewLn(); BEGIN(X0);}
 <X0>"version"                   {BEGIN(X1);}
 <X1>"="                         {BEGIN(X2);}
 <X2>{vervalue}                  {
@@ -206,7 +218,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     return Token(VERSION, yytext+1);
                                 }
 <X3_WS>{ws}                     {BEGIN(X3);}
-<X3_WS>{nl}                     {++lineNo_; BEGIN(X3);}
+<X3_WS>{nl}                     {NewLn(); BEGIN(X3);}
 <X3>"encoding"                  {return ENCODING;}
 <X3>"="                         {return EQ;}
 <X3>{encvalue}                  {
@@ -215,7 +227,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     return Token(VALUE, yytext+1);
                                 }
 <X4_WS>{ws}                     {BEGIN(X4);}
-<X4_WS>{nl}                     {++lineNo_; BEGIN(X4);}
+<X4_WS>{nl}                     {NewLn(); BEGIN(X4);}
 <X3,X4>"standalone"             {BEGIN(X4); return STANDALONE;}
 <X4>"="                         {return EQ;}
 <X4>{sdvalue}                   {
@@ -224,7 +236,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                 }
 <X3_WS,X3,X4_WS,X4>"?>"         {BEGIN(OUTSIDE); return CLOSE;}
 <X0,X1,X2,X3,X4>{ws}            {}
-<X0,X1,X2,X3,X4>{nl}            {++lineNo_;}
+<X0,X1,X2,X3,X4>{nl}            {NewLn();}
 <X0,X1,X2,X3,X4>.               {Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
 
 
@@ -232,7 +244,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 <CONTENT,OUTSIDE>"<!--"         {stateCaller_ = YY_START; BEGIN(COMMENT);}
 <COMMENT>{comment}              {/* eat */}
-<COMMENT>"-"?{nl}               {++lineNo_;}
+<COMMENT>"-"?{nl}               {NewLn();}
 <COMMENT>"-->"                  {BEGIN(stateCaller_);}
 
 
@@ -240,7 +252,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 <CONTENT,OUTSIDE>"<![CDATA["    {stateCaller_ = YY_START; BEGIN(CDB);}
 <CDB>{cdatablock}               {/* eat */}
-<CDB>("]")*{nl}                 {++lineNo_;}
+<CDB>("]")*{nl}                 {NewLn();}
 <CDB>("]")*"]]>"                {BEGIN(stateCaller_);}
 
 
@@ -249,7 +261,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 <OUTSIDE>"<!DOCTYPE"            {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 <DOCTYPE>"<"                    {++doctypeCnt_;}
 <DOCTYPE>[^<>\r\n]*             {/* eat */}
-<DOCTYPE>{nl}                   {++lineNo_;}
+<DOCTYPE>{nl}                   {NewLn();}
 <DOCTYPE>">"                    {
                                     if(--doctypeCnt_ <= 0)
                                         BEGIN(OUTSIDE);
@@ -260,14 +272,14 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 <CONTENT,OUTSIDE>"<?xml"        {stateCaller_ = YY_START; BEGIN(RESERVED);}
 <RESERVED>{xmlreserved}         {/* eat */}
-<RESERVED>("?")*{nl}            {++lineNo_;}
+<RESERVED>("?")*{nl}            {NewLn();}
 <RESERVED>("?")*"?>"            {BEGIN(stateCaller_);}
 
 
     /* Content */
 
 <OUTSIDE>{ws}                   {}
-<OUTSIDE>{nl}                   {++lineNo_;}
+<OUTSIDE>{nl}                   {NewLn();}
 <CONTENT>{data}	                {
                                     // return DATA only in data mode, otherwise ignore
                                     if(dataMode_)
@@ -281,7 +293,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     }
                                 }
 <CONTENT>{nl}	                {
-                                    ++lineNo_;
+                                    NewLn();
                                     // return DATA only in data mode, otherwise ignore
                                     if(dataMode_)
                                         return skipMode_ ? Token(DATA, 1) : Token(DATA, "\n", 1);
@@ -328,20 +340,43 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
     /* Markup */
 
 <MARKUP>{ws}                    {}
-<MARKUP>{nl}                    {++lineNo_;}
+<MARKUP>{nl}                    {NewLn();}
 <MARKUP>"="                     {return EQ;}
-<MARKUP>{name}	                {return Token(NAME, yytext);}
-<MARKUP>{attrvalue}             {
+<MARKUP>{name}	                {attrHasValue_ = false; return Token(NAME, yytext);}
+<MARKUP>"\""                    {BEGIN(MARKUP1);}
+<MARKUP>"'"                     {BEGIN(MARKUP2);}
+<MARKUP1>{attrvalue1}           {
+                                    attrHasValue_ = true;
                                     if(skipMode_)
                                         return Token(VALUE);
-                                    yytext[yyleng-1] = '\0';
                                     std::vector<char> buf;
-                                    Decode(yytext+1, &buf, true, true);
+                                    Decode(yytext, &buf, true, true);
                                     return Token(VALUE, &buf[0]);
                                 }
-<MARKUP>{nl}                    {
-                                    ++lineNo_;
+<MARKUP2>{attrvalue2}           {
+                                    attrHasValue_ = true;
+                                    if(skipMode_)
+                                        return Token(VALUE);
+                                    std::vector<char> buf;
+                                    Decode(yytext, &buf, true, true);
+                                    return Token(VALUE, &buf[0]);
+                                }
+<MARKUP1,MARKUP2>{nl}           {
+                                    attrHasValue_ = true;
+                                    NewLn();
                                     return skipMode_ ? Token(VALUE) : Token(VALUE, "\n");
+                                }
+<MARKUP1>"\""                   {
+                                    BEGIN(MARKUP);
+                                    if(!attrHasValue_)
+                                        return Token(VALUE);
+                                    attrHasValue_ = false;
+                                }
+<MARKUP2>"'"                    {
+                                    BEGIN(MARKUP);
+                                    if(!attrHasValue_)
+                                        return Token(VALUE);
+                                    attrHasValue_ = false;
                                 }
 <MARKUP>"/>"                    {
                                     if(!tagStack_.size())
