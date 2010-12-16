@@ -141,7 +141,7 @@ static Fb2ToEpub::LexScanner::Token yyterminate()
 {
     return Fb2ToEpub::LexScanner::STOP;
 }
-/*#define YY_USER_ACTION printf("line: %d state: %d len: %d \"%s\"\n", lineNo_, (YY_START), yyleng, yytext);*/
+//#define YY_USER_ACTION printf("line: %d state: %d len: %d \"%s\"\n", lineNo_, (YY_START), yyleng, yytext);
 #define YY_DECL	 Fb2ToEpub::LexScanner::Token Fb2ToEpub::ScannerImpl::ScanToken()
 
 %}
@@ -171,18 +171,13 @@ stagstart       "<"{name}
 etagstart       "</"{name}
 attrvalue       \"([^<&"]|{reference})*\"|\'([^<&']|{reference})*\'
 
-
-/*
- * Unused but kept for possible future references
- * (and BTW some are not correct)
- */
-comment         "<!--"([^-]|"-"[^-])*"-->"
-cdatablock      "<![CDATA["([^\]]|"]"[^\]]|"]]"[^>])*"]]>"
-xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
+comment         ([^-\r\n]|"-"[^-\r\n])*
+cdatablock      ([^\]\r\n]|"]"[^\]\r\n]|"]]""]"*[^>\]\r\n])*
+xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 
 /*
- * The X0-4 modes are used for XML header parsing.
+ * The X<n>, X<n>_WS modes are used for XML header parsing.
  * The OUTSIDE mode is used outside XML top-level element.
  * The MARKUP mode is used inside markup.
  * The CONTENT mode is used for the content of elements, i.e.,
@@ -191,7 +186,7 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
  * The COMMENT, CDB, RESERVED modes are used to ignore comment, CDATA block, XML reserved stuff
  */
 
-%s X0 X1 X2 X3 X4
+%s X0 X1 X2 X3 X4 X0_WS X3_WS X4_WS
 %s OUTSIDE MARKUP CONTENT DOCTYPE
 %s COMMENT CDB RESERVED
 
@@ -200,28 +195,34 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
 
     /* XML declaration */
 
-<INITIAL>"<?xml"                {BEGIN(X0); return XMLDECL;}
+<INITIAL>"<?xml"                {BEGIN(X0_WS); return XMLDECL;}
+<X0_WS>{ws}                     {BEGIN(X0);}
+<X0_WS>{nl}                     {++lineNo_; BEGIN(X0);}
 <X0>"version"                   {BEGIN(X1);}
 <X1>"="                         {BEGIN(X2);}
 <X2>{vervalue}                  {
-                                    BEGIN(X3);
+                                    BEGIN(X3_WS);
                                     yytext[yyleng-1] = '\0';
                                     return Token(VERSION, yytext+1);
                                 }
+<X3_WS>{ws}                     {BEGIN(X3);}
+<X3_WS>{nl}                     {++lineNo_; BEGIN(X3);}
 <X3>"encoding"                  {return ENCODING;}
 <X3>"="                         {return EQ;}
 <X3>{encvalue}                  {
-                                    BEGIN(X4);
+                                    BEGIN(X4_WS);
                                     yytext[yyleng-1] = '\0';
                                     return Token(VALUE, yytext+1);
                                 }
+<X4_WS>{ws}                     {BEGIN(X4);}
+<X4_WS>{nl}                     {++lineNo_; BEGIN(X4);}
 <X3,X4>"standalone"             {BEGIN(X4); return STANDALONE;}
 <X4>"="                         {return EQ;}
 <X4>{sdvalue}                   {
                                     yytext[yyleng-1] = '\0';
                                     return Token(VALUE, yytext+1);
                                 }
-<X4>"?>"                        {BEGIN(OUTSIDE); return CLOSE;}
+<X3_WS,X3,X4_WS,X4>"?>"         {BEGIN(OUTSIDE); return CLOSE;}
 <X0,X1,X2,X3,X4>{ws}            {}
 <X0,X1,X2,X3,X4>{nl}            {++lineNo_;}
 <X0,X1,X2,X3,X4>.               {Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
@@ -230,41 +231,37 @@ xmlreserved     "<?xml"([^\?]|"?"[^>])*("?")?"?>"
     /* Skip comment */
 
 <CONTENT,OUTSIDE>"<!--"         {stateCaller_ = YY_START; BEGIN(COMMENT);}
-<COMMENT>"-->"                  {BEGIN(stateCaller_);}
-<COMMENT>[^-\r\n]*              {/* eat */}
-<COMMENT>"-"[^-\r\n]*           {/* eat */}
+<COMMENT>{comment}              {/* eat */}
 <COMMENT>"-"?{nl}               {++lineNo_;}
+<COMMENT>"-->"                  {BEGIN(stateCaller_);}
 
 
     /* Skip CDATA block */
 
 <CONTENT,OUTSIDE>"<![CDATA["    {stateCaller_ = YY_START; BEGIN(CDB);}
-<CDB>"]"*"]]>"                  {BEGIN(stateCaller_);}
-<CDB>[^\]\r\n]*                 {/* eat */}
-<CDB>("]"[^\]\r\n])*            {/* eat */}
-<CDB>("]]""]"*[^>\]\r\n])*      {/* eat */}
-<CDB>"]"*{nl}                   {++lineNo_;}
+<CDB>{cdatablock}               {/* eat */}
+<CDB>("]")*{nl}                 {++lineNo_;}
+<CDB>("]")*"]]>"                {BEGIN(stateCaller_);}
 
 
     /* Skip DOCTYPE */
 
 <OUTSIDE>"<!DOCTYPE"            {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 <DOCTYPE>"<"                    {++doctypeCnt_;}
+<DOCTYPE>[^<>\r\n]*             {/* eat */}
+<DOCTYPE>{nl}                   {++lineNo_;}
 <DOCTYPE>">"                    {
                                     if(--doctypeCnt_ <= 0)
                                         BEGIN(OUTSIDE);
                                 }
-<DOCTYPE>[^<>\r\n]*             {/* eat */}
-<DOCTYPE>{nl}                   {++lineNo_;}
 
 
     /* Skip reserved xml element */
 
 <CONTENT,OUTSIDE>"<?xml"        {stateCaller_ = YY_START; BEGIN(RESERVED);}
+<RESERVED>{xmlreserved}         {/* eat */}
+<RESERVED>("?")*{nl}            {++lineNo_;}
 <RESERVED>("?")*"?>"            {BEGIN(stateCaller_);}
-<RESERVED>[^\?\r\n]*            {/* eat */}
-<RESERVED>("?"*[^>\?\r\n])*     {/* eat */}
-<RESERVED>"?"*{nl}              {++lineNo_;}
 
 
     /* Content */
