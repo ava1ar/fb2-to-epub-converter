@@ -55,12 +55,13 @@ void LexScanner::SkipRestOfElementContent()
     SetScannerSkipMode skipMode(this);
     for(;;)
     {
-        switch(GetToken().type_)
+        Token t = GetToken();
+        switch(t.type_)
         {
         case DATA:
             continue;
         case START:
-            UngetToken(Token(START));
+            UngetToken(t);
             SkipElement();
             continue;
         case END:
