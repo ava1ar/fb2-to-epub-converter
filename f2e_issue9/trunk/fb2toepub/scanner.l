@@ -167,7 +167,7 @@ encvalue        \"{encname}\"|\'{encname}\'
 sdname          "yes"|"no"
 sdvalue         \"{sdname}\"|\'{sdname}\'
 
-chardata        ([^<&\r\n\]]|"]"[^<&\r\n\]]|"]]"[^<&>\r\n])*("]"|"]]")?
+chardata        ([^<&\]\r\n]|"]"[^<&\]\r\n]|"]]""]"*[^<&>\]\r\n])*"]"*
 letter          [A-Za-z]
 digit           [0-9]
 namestart       ({letter}|"_"|":")
@@ -176,7 +176,6 @@ name            {namestart}{namechar}*
 entityref       &{name};
 charref         ("&#"[0-9]+;)|("&#x"[0-9a-fA-F]+;)
 reference       {entityref}|{charref}
-data            {chardata}?({reference}{chardata}?)*
 
 stagstart       "<"{name}
 etagstart       "</"{name}
@@ -192,14 +191,14 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
  * The X<n>, X<n>_WS modes are used for XML header parsing.
  * The OUTSIDE mode is used outside XML top-level element.
  * The MARKUP, MARKUP1 and MARKUP2 modes are used inside markup.
- * The CONTENT mode is used for the content of elements, i.e.,
+ * The D<n> modes are used for the content of elements, i.e.,
  * between the ">" and "<" of element tags.
  * The DOCTYPE mode is used to skip DOCTYPE definition.
  * The COMMENT, CDB, RESERVED modes are used to ignore comment, CDATA block, XML reserved stuff
  */
 
 %s X0 X1 X2 X3 X4 X0_WS X3_WS X4_WS
-%s OUTSIDE MARKUP MARKUP1 MARKUP2 CONTENT DOCTYPE
+%s OUTSIDE MARKUP MARKUP1 MARKUP2 D1 D2 DOCTYPE
 %s COMMENT CDB RESERVED
 
 
@@ -242,7 +241,8 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
     /* Skip comment */
 
-<CONTENT,OUTSIDE>"<!--"         {stateCaller_ = YY_START; BEGIN(COMMENT);}
+<D1,D2>"<!--"                   {stateCaller_ = D1; BEGIN(COMMENT);}
+<OUTSIDE>"<!--"                 {stateCaller_ = OUTSIDE; BEGIN(COMMENT);}
 <COMMENT>{comment}              {/* eat */}
 <COMMENT>"-"?{nl}               {NewLn();}
 <COMMENT>"-->"                  {BEGIN(stateCaller_);}
@@ -250,7 +250,8 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
     /* Skip CDATA block */
 
-<CONTENT,OUTSIDE>"<![CDATA["    {stateCaller_ = YY_START; BEGIN(CDB);}
+<D1,D2>"<![CDATA["              {stateCaller_ = D1; BEGIN(CDB);}
+<OUTSIDE>"<![CDATA["            {stateCaller_ = OUTSIDE; BEGIN(CDB);}
 <CDB>{cdatablock}               {/* eat */}
 <CDB>("]")*{nl}                 {NewLn();}
 <CDB>("]")*"]]>"                {BEGIN(stateCaller_);}
@@ -270,7 +271,8 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
     /* Skip reserved xml element */
 
-<CONTENT,OUTSIDE>"<?xml"        {stateCaller_ = YY_START; BEGIN(RESERVED);}
+<D1,D2>"<?xml"                  {stateCaller_ = D1; BEGIN(RESERVED);}
+<OUTSIDE>"<?xml"                {stateCaller_ = OUTSIDE; BEGIN(RESERVED);}
 <RESERVED>{xmlreserved}         {/* eat */}
 <RESERVED>("?")*{nl}            {NewLn();}
 <RESERVED>("?")*"?>"            {BEGIN(stateCaller_);}
@@ -280,31 +282,30 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 <OUTSIDE>{ws}                   {}
 <OUTSIDE>{nl}                   {NewLn();}
-<CONTENT>{data}	                {
-                                    // return DATA only in data mode, otherwise ignore
+<D1>{chardata}                  {
+                                    // this is why we created D2: don't allow data after data
+                                    BEGIN(D2);
                                     if(dataMode_)
-                                    {
-                                        if(skipMode_)
-                                            return Token(DATA, yyleng);
-                                        //std::vector<char> buf;
-                                        //Decode(yytext, &buf, false, false);
-                                        //return Token(DATA, &buf[0]);
-                                        return Token(DATA, yytext, yyleng);
-                                    }
+                                        return skipMode_ ? Token(DATA, yyleng) : Token(DATA, yytext, yyleng);
                                 }
-<CONTENT>{nl}	                {
+<D1,D2>{reference}              {
+                                    BEGIN(D1);
+                                    if(dataMode_)
+                                        return skipMode_ ? Token(DATA, yyleng) : Token(DATA, yytext, yyleng);
+                                }
+<D1,D2>{nl}	                    {
                                     NewLn();
-                                    // return DATA only in data mode, otherwise ignore
+                                    BEGIN(D1);
                                     if(dataMode_)
                                         return skipMode_ ? Token(DATA, 1) : Token(DATA, "\n", 1);
                                 }
-<CONTENT,OUTSIDE>{stagstart}    {
+<D1,D2,OUTSIDE>{stagstart}      {
                                     char *tagName = &yytext[1];
                                     tagStack_.push_back(tagName);
                                     BEGIN(MARKUP);
                                     return Token(START, tagName);
                                 }
-<CONTENT>{etagstart}            {
+<D1,D2>{etagstart}              {
                                     char *tagName = &yytext[2];
                                     if(!tagStack_.size())
                                         Error("tag stack is empty #0");
@@ -314,13 +315,17 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     BEGIN(MARKUP);
                                     return Token(END, tagName);
                                 }
-<CONTENT,OUTSIDE>"<!"           {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
+<D1,D2,OUTSIDE>"<!"             {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
+
+
+    /* Garbage */
+
 <OUTSIDE>.                      {/* ignore outside garbage */}
-<CONTENT>.                      {
+<D1,D2>.                        {
                                     // error character - try to process
+                                    BEGIN(D1);
                                     if(dataMode_)
                                     {
-                                        //Fb2ToEpub::Error("char outside elements"); yyterminate();
                                         const char *p;
                                         switch(yytext[0])
                                         {
@@ -382,11 +387,11 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     if(!tagStack_.size())
                                         Error("tag stack is empty #1");
                                     tagStack_.pop_back();
-                                    BEGIN(tagStack_.size() ? CONTENT : OUTSIDE);
+                                    BEGIN(tagStack_.size() ? D1 : OUTSIDE);
                                     return SLASHCLOSE;
                                 }
 <MARKUP>">"                     {
-                                    BEGIN(tagStack_.size() ? CONTENT : OUTSIDE);
+                                    BEGIN(tagStack_.size() ? D1 : OUTSIDE);
                                     return CLOSE;
                                 }
 
