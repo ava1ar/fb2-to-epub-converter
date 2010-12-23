@@ -31,6 +31,13 @@
 
 namespace Fb2ToEpub
 {
+    static const LexScanner::Token  lt      (LexScanner::DATA, "&lt;", 4),
+                                    gt      (LexScanner::DATA, "&gt;", 4),
+                                    amp     (LexScanner::DATA, "&amp;", 5),
+                                    apos    (LexScanner::DATA, "&apos;", 6),
+                                    quot    (LexScanner::DATA, "&quot;", 6),
+                                    unknown (LexScanner::DATA, "?", 1);
+
     //-----------------------------------------------------------------------
     class ScannerImpl : public Fb2ToEpub::LexScanner, public yyFlexLexer, Noncopyable
     {
@@ -151,7 +158,7 @@ static Fb2ToEpub::LexScanner::Token yyterminate()
                             loc_.fstLn_ = loc_.lstLn_; \
                             loc_.fstCol_ = loc_.lstCol_; \
                             loc_.lstCol_ += yyleng; \
-                            /*printf("line: %d state: %d len: %d \"%s\"\n", loc_.fstLn_, (YY_START), yyleng, yytext);*/ \
+                            /*printf("line: %d state: %d act: %d len: %d \"%s\"\n", loc_.fstLn_, (YY_START), yy_act, yyleng, yytext);*/ \
                         }
 #define YY_DECL	 Fb2ToEpub::LexScanner::Token Fb2ToEpub::ScannerImpl::ScanToken()
 
@@ -167,7 +174,7 @@ encvalue        \"{encname}\"|\'{encname}\'
 sdname          "yes"|"no"
 sdvalue         \"{sdname}\"|\'{sdname}\'
 
-chardata        ([^<&\]\r\n]|"]"[^<&\]\r\n]|"]]""]"*[^<&>\]\r\n])*"]"*
+chardata        [^<&>"'\]\r\n]*
 letter          [A-Za-z]
 digit           [0-9]
 namestart       ({letter}|"_"|":")
@@ -176,6 +183,7 @@ name            {namestart}{namechar}*
 entityref       &{name};
 charref         ("&#"[0-9]+;)|("&#x"[0-9a-fA-F]+;)
 reference       {entityref}|{charref}
+data            {chardata}?({reference}{chardata}?)*
 
 stagstart       "<"{name}
 etagstart       "</"{name}
@@ -282,22 +290,41 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
 <OUTSIDE>{ws}                   {}
 <OUTSIDE>{nl}                   {NewLn();}
-<D1>{chardata}                  {
-                                    // this is why we created D2: don't allow data after data
-                                    BEGIN(D2);
-                                    if(dataMode_)
-                                        return skipMode_ ? Token(DATA, yyleng) : Token(DATA, yytext, yyleng);
-                                }
-<D1,D2>{reference}              {
+<D1,D2>{data}                   {
                                     BEGIN(D1);
                                     if(dataMode_)
-                                        return skipMode_ ? Token(DATA, yyleng) : Token(DATA, yytext, yyleng);
+                                        return  skipMode_ ?
+                                                Token(DATA, yyleng) :
+                                                Token(DATA, yytext, yyleng);
                                 }
 <D1,D2>{nl}	                    {
                                     NewLn();
                                     BEGIN(D1);
                                     if(dataMode_)
-                                        return skipMode_ ? Token(DATA, 1) : Token(DATA, "\n", 1);
+                                        return  skipMode_ ?
+                                                Token(DATA, 1) :
+                                                Token(DATA, "\n", 1);
+                                }
+<D1,D2>"]"*                     {
+                                    BEGIN(yyleng >= 2 ? D2 : D1);   // if number of "]" >= 2, disable ">"
+                                    if(dataMode_)
+                                        return  skipMode_ ?
+                                                Token(DATA, yyleng) :
+                                                Token(DATA, yytext, yyleng);
+                                }
+<D1>">"                         {
+                                    if(dataMode_)
+                                        return gt;
+                                }
+<D1,D2>"'"                      {
+                                    BEGIN(D1);
+                                    if(dataMode_)
+                                        return apos;
+                                }
+<D1,D2>"\""                     {
+                                    BEGIN(D1);
+                                    if(dataMode_)
+                                        return quot;
                                 }
 <D1,D2,OUTSIDE>{stagstart}      {
                                     char *tagName = &yytext[1];
@@ -325,20 +352,15 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                     // error character - try to process
                                     BEGIN(D1);
                                     if(dataMode_)
-                                    {
-                                        const char *p;
                                         switch(yytext[0])
                                         {
-                                        case '<':   p = "&lt;"; break;
-                                        case '>':   p = "&gt;"; break;
-                                        case '&':   p = "&amp;"; break;
-                                        case '\'':  p = "&apos;"; break;
-                                        case '"':   p = "&quot;"; break;
-                                        default:    p = "?"; break;
+                                        case '<':   return lt;
+                                        case '>':   return gt;
+                                        case '&':   return amp;
+                                        case '\'':  return apos;
+                                        case '"':   return quot;
+                                        default:    return unknown;
                                         }
-                                        size_t len = strlen(p);
-                                        return skipMode_ ? Token(DATA, len) : Token(DATA, p, len);
-                                    }
                                 }
 
 

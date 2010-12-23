@@ -275,28 +275,31 @@ static void ConvertToUtf8(unsigned long x, std::vector<char> *buf)
 }
 
 //-----------------------------------------------------------------------
-static const char* DecodeDecimal(const char *s, std::vector<char> *buf)
+static const bool DecodeDecimal(const char **s, std::vector<char> *buf)
 {
+    const char *pc = *s;
     unsigned long x = 0;
-    char c = *s++;
+    char c = *pc++;
     do
     {
         if(c < '0' || c > '9')
-            Error("bad decimal entity");
+            return false;
 
         x = x*10 + (c - '0');
-        c = *s++;
+        c = *pc++;
     }
     while(c != ';');
     ConvertToUtf8(x, buf);
-    return s;
+    *s = pc;
+    return true;
 }
 
 //-----------------------------------------------------------------------
-static const char* DecodeHex(const char *s, std::vector<char> *buf)
+static const bool DecodeHex(const char **s, std::vector<char> *buf)
 {
+    const char *pc = *s;
     unsigned long x = 0;
-    char c = *s++;
+    char c = *pc++;
     do
     {
         if(c >= '0' && c <= '9')
@@ -306,13 +309,14 @@ static const char* DecodeHex(const char *s, std::vector<char> *buf)
         else if(c >= 'A' && c <= 'F')
             x = x*16 + (c + 10 - 'A');
         else
-            Error("bad hexadecimal entity");
+            return false;
 
-        c = *s++;
+        c = *pc++;
     }
     while(c != ';');
     ConvertToUtf8(x, buf);
-    return s;
+    *s = pc;
+    return true;
 }
 
 //-----------------------------------------------------------------------
@@ -331,6 +335,13 @@ static bool DecodeEntity(const char **s, const char *etext, char val, std::vecto
         if(*pc++ != c)
             return false;
     }
+}
+
+//-----------------------------------------------------------------------
+static void UnknownEntity(const char **s, std::vector<char> *buf)
+{
+    static const char amp[] = "&amp;";
+    buf->insert(buf->end(), amp, amp + strlen(amp));
 }
 
 //-----------------------------------------------------------------------
@@ -360,28 +371,38 @@ void LexScanner::Decode(const char *s, std::vector<char> *buf, bool decodeEntiti
 
         case '&':
             if(!decodeEntities)
-            {
                 buf->push_back('&');
-                continue;
-            }
-
-            if(*s == '#')
+            else
             {
-                if(*++s != 'x')
-                    s = DecodeDecimal(s, buf);
+                const char *sOld = s;
+                if(*s == '#')
+                {
+                    if(*++s != 'x')
+                    {
+                        if(DecodeDecimal(&s, buf))
+                            continue;
+                    }
+                    else
+                    {
+                        ++s;
+                        if(DecodeHex(&s, buf))
+                            continue;
+                    }
+                }
                 else
-                    s = DecodeHex(++s, buf);
-                continue;
-            }
+                {
+                    if (DecodeEntity(&s, "lt;", '<', buf) ||
+                        DecodeEntity(&s, "gt;", '>', buf) ||
+                        DecodeEntity(&s, "amp;", '&', buf) ||
+                        DecodeEntity(&s, "apos;", '\'', buf) ||
+                        DecodeEntity(&s, "quot;", '"', buf))
+                    {
+                        continue;
+                    }
+                }
 
-            if (!DecodeEntity(&s, "lt;", '<', buf) &&
-                !DecodeEntity(&s, "gt;", '>', buf) &&
-                !DecodeEntity(&s, "amp;", '&', buf) &&
-                !DecodeEntity(&s, "apos;", '\'', buf) &&
-                !DecodeEntity(&s, "quot;", '"', buf))
-            {
-                // unknown entity
-                buf->push_back(c);
+                s = sOld;
+                UnknownEntity(&s, buf);
             }
             continue;
         }
