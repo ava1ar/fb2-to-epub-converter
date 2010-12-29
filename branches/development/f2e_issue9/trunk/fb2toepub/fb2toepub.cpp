@@ -40,7 +40,7 @@ using namespace Fb2ToEpub;
 
 //-----------------------------------------------------------------------
 const char name[]       = "FB2 to EPUB format converter";
-const char version[]    = "1.0";
+const char version[]    = FB2TOEPUB_VERSION_STRING;
 
 //-----------------------------------------------------------------------
 static void Logo()
