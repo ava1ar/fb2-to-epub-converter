@@ -212,7 +212,7 @@ void ConverterInfo::author()
     else if(s_->IsNextElement("nickname"))
         author = s_->SimpleTextElement("nickname");
     else
-        Error("<first-name> or <nickname> expected");
+        s_->Error("<first-name> or <nickname> expected");
 
     authors_.push_back(author);
     s_->SkipRestOfElementContent();

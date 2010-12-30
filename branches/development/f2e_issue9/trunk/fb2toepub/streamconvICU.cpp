@@ -52,7 +52,7 @@ public:
         UErrorCode err = U_ZERO_ERROR;
         uc_ = ucnv_open(name, &err);
         if(U_FAILURE(err))
-            Error("ucnv_open error");
+            ExternalError("ucnv_open error");
     }
     ~ConverterToUnicodeUCI()
     {
@@ -89,7 +89,7 @@ public:
         UErrorCode err = U_ZERO_ERROR;
         uc_ = ucnv_open(name, &err);
         if(U_FAILURE(err))
-            Error("ucnv_open error");
+            ExternalError("ucnv_open error");
     }
     ~ConverterFromUnicodeICU()
     {
@@ -144,6 +144,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -172,13 +173,13 @@ size_t InConvStmICU::Fill() const
     iend_ += stm_->Read(iend_, ibuf_ + sizeof(ibuf_) - iend_);
     bool eof = stm_->IsEOF();
     if(iend_ == ibuf_ && !eof)
-        Error("InConvStmICU: internal error");
+        InternalError(__FILE__, __LINE__, "InConvStmICU error");
 
     // convert data
     const char  *pi = ibuf_;
     UErrorCode err = conv_->Convert(&oend_, oend_ + sizeof(obuf_), &pi, iend_, eof);
     if(U_FAILURE(err) && err != U_BUFFER_OVERFLOW_ERROR)
-        Error("ucnv: conversion error");
+        IOError(UIFileName(), "ucnv: conversion error");
 
     // fix input data and pointers
     size_t inleft  = iend_ - pi;
@@ -193,7 +194,7 @@ size_t InConvStmICU::Fill() const
 char InConvStmICU::GetChar()
 {
     if(ocur_ == oend_ && !Fill())
-        Error("conv: EOF");
+        IOError(UIFileName(), "conv: EOF");
     return *ocur_++;
 }
 
@@ -222,7 +223,7 @@ size_t InConvStmICU::Read(void *buffer, size_t max_cnt)
 void InConvStmICU::UngetChar(char c)
 {
     if(ocur_ == obuf_)
-        Error("conv: can't unget");
+        IOError(UIFileName(), "conv: can't unget");
     --ocur_;
 }
 

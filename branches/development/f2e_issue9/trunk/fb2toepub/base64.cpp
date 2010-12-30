@@ -21,13 +21,14 @@
 #include "hdr.h"
 
 #include "base64.h"
+#include "error.h"
 
 typedef unsigned int BufType;
 
 namespace Fb2ToEpub
 {
 
-    void FB2TOEPUB_DECL DecodeBase64(const char *data, OutStmI *pout)
+    bool FB2TOEPUB_DECL DecodeBase64(const char *data, OutStmI *pout)
     {
         // table[' '] = table['\t] = table['\r'] = table['\n']  = 0xfd (whitespaces)
         // table['=']                                           = 0xfe (end of encoded stream)
@@ -61,7 +62,7 @@ namespace Fb2ToEpub
             {
                 if(p > buf)
                     pout->Write(buf, p - buf);
-                return;
+                return true;
             }
 #if defined (_DEBUG)
             unsigned char c = *udata++;
@@ -75,13 +76,13 @@ namespace Fb2ToEpub
                     continue;
                 if(p > buf)
                     pout->Write(buf, p - buf);
-                return;
+                return true;
             }
             BufType obuf = (t << 18);
 
             while((t = table[*udata++]) >= 0xfd)
                 if(t != 0xfd)
-                    Error("base64 error");
+                    return false;
 
             *p++ = (static_cast<char>((obuf += (t << 12)) >> 16));
 #if defined (_DEBUG)
@@ -91,12 +92,12 @@ namespace Fb2ToEpub
 #endif
                 switch(t)
                 {
-                default:    Error("base64 error"); break;
+                default:    return false;
                 case 0xfd:  continue;   // whitespace
                 case 0xfe:              // '='
                     if(p > buf)
                         pout->Write(buf, p - buf);
-                    return;
+                    return true;
                 }
 
             *p++ = (static_cast<char>((obuf += (t << 6)) >> 8));
@@ -107,12 +108,12 @@ namespace Fb2ToEpub
 #endif
                 switch(t)
                 {
-                default:    Error("base64 error"); break;
+                default:    return false;
                 case 0xfd:  continue;   // whitespace
                 case 0xfe:              // '='
                     if(p > buf)
                         pout->Write(buf, p - buf);
-                    return;
+                    return true;
                 }
 
             *p++ = (static_cast<char>(obuf + t));

@@ -94,10 +94,11 @@ namespace Fb2ToEpub
         };
 
         virtual ~LexScanner() {}
-        virtual Token GetToken()                = 0;
+        virtual const Token& GetToken() = 0;
         virtual void UngetToken(const Token &t) = 0;
         virtual bool SetSkipMode(bool newMode) = 0;
         virtual bool SetDataMode(bool newMode) = 0;
+        virtual void Error(const String &what) = 0;
 
         // helpers
         Token LookAhead()

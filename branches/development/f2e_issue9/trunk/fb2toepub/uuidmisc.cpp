@@ -21,6 +21,7 @@
 #include "hdr.h"
 
 #include "uuidmisc.h"
+#include "error.h"
 #include <ctype.h>
 #include <vector>
 #include <time.h>
@@ -96,7 +97,7 @@ void MakeAdobeKey(const String &uuid, unsigned char *adobeKey)
 {
 #if defined(_DEBUG)
     if(!IsValidUUID(uuid))
-        Error("uuid internal error");
+        InternalError(__FILE__, __LINE__, "uuid error");
 #endif
 
     const char *p = uuid.c_str();

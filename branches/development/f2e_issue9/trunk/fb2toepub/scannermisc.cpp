@@ -90,7 +90,7 @@ void LexScanner::SkipElement()
     {
     case SLASHCLOSE:    return;
     case CLOSE:         break;
-    default:                        Error("'close' of stag expected");
+    default:            Error("'close' of stag expected");
     }
 
     // skip element content
@@ -188,7 +188,7 @@ bool LexScanner::BeginElement(const String &element, AttrMap *attrmap)
     {
         std::ostringstream ss;
         ss << "element <" << element << "> expected";
-        Error(ss.str().c_str());
+        Error(ss.str());
     }
 
     if(attrmap)
@@ -206,7 +206,7 @@ bool LexScanner::BeginElement(const String &element, AttrMap *attrmap)
         {
             std::ostringstream ss;
             ss << "element <" << element << "> expected";
-            Error(ss.str().c_str());
+            Error(ss.str());
         }
         return false;
     }
@@ -219,7 +219,7 @@ void LexScanner::BeginNotEmptyElement(const String &element, AttrMap *attrmap)
     {
         std::ostringstream ss;
         ss << "element <" << element << "> can't be empty";
-        Error(ss.str().c_str());
+        Error(ss.str());
     }
 }
 

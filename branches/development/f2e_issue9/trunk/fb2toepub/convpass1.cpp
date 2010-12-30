@@ -210,7 +210,7 @@ void ConverterPass1::ParseTextAndEndElement(const String &element, String *plain
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <" << element + ">";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </a>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -239,20 +239,20 @@ void ConverterPass1::FictionBook()
             if(!cit->first.compare(xmlns))
                 has_emptyfb = true;
             else if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                Error("bad FictionBook namespace definition");
+                s_->Error("bad FictionBook namespace definition");
             has_fb = true;
         }
         else if(!cit->second.compare(xlID))
         {
             if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                Error("bad xlink namespace definition");
+                s_->Error("bad xlink namespace definition");
             xlns_.insert(cit->first.substr(xmlns_len+1));
         }
     }
     if(!has_fb)
-        Error("missing FictionBook namespace definition");
+        s_->Error("missing FictionBook namespace definition");
     if(!has_emptyfb)
-        Error("non-empty FictionBook namespace not implemented");
+        s_->Error("non-empty FictionBook namespace not implemented");
 
     //<stylesheet>
     s_->SkipAll("stylesheet");
@@ -323,7 +323,7 @@ void ConverterPass1::a(String *plainText)
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <a>";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -361,7 +361,7 @@ void ConverterPass1::annotation(bool startUnit)
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <annotation>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
     }
@@ -432,7 +432,7 @@ void ConverterPass1::cite()
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <cite>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </subtitle>, </empty-line>, </poem>, </table>
     }
@@ -515,7 +515,7 @@ void ConverterPass1::epigraph()
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <epigraph>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </empty-line>
     }
@@ -678,7 +678,7 @@ void ConverterPass1::section(int parent)
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <section>";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
 
@@ -842,7 +842,7 @@ void ConverterPass1::title(String *plainText, bool startUnit)
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <title>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
     }
 
