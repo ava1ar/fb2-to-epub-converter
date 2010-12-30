@@ -55,7 +55,8 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		translit.cpp \
 		uuidmisc.cpp \
 		mangling.cpp \
-		types.cpp
+		types.cpp \
+		error.cpp
 
 COBJ=$(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC)))))
 

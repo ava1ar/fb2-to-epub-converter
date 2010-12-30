@@ -22,6 +22,7 @@
 #define FB2TOEPUB__SCANNER_H
 
 #include "stream.h"
+#include "error.h"
 #include <string>
 #include <map>
 #include <vector>
@@ -59,12 +60,7 @@ namespace Fb2ToEpub
             END
         };
 
-        struct Loc
-        {
-            int fstLn_, lstLn_, fstCol_, lstCol_;
-            Loc()                                               : fstLn_(1), lstLn_(1), fstCol_(1), lstCol_(1) {}
-            Loc(int fstLn, int lstLn, int fstCol, int lstCol)   : fstLn_(fstLn), lstLn_(lstLn), fstCol_(fstCol), lstCol_(lstCol) {}
-        };
+        typedef ParserException::Loc Loc;
 
         struct Token
         {

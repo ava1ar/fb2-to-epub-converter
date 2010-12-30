@@ -275,6 +275,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\error.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\fb2toepub.cpp"
 				>
 			</File>
@@ -399,6 +403,10 @@
 			</File>
 			<File
 				RelativePath=".\converter.h"
+				>
+			</File>
+			<File
+				RelativePath=".\error.h"
 				>
 			</File>
 			<File
