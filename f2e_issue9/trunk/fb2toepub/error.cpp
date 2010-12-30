@@ -26,13 +26,23 @@
 namespace Fb2ToEpub
 {
 
+//-----------------------------------------------------------------------
+static String GetFName(const String file)
+{
+    String::size_type pos = file.find_last_of("\\/:");
+    if(pos != String::npos)
+        return file.substr(pos+1);
+    else
+        return file;
+}
+
 
 //-----------------------------------------------------------------------
 // Internal error exception implementation
 class InternalExceptionImpl : public ExceptionImpl<InternalException>
 {
 public:
-    InternalExceptionImpl(const std::string &file, int line, const std::string &what)
+    InternalExceptionImpl(const String &file, int line, const String &what)
                             : file_(file), line_(line)
     {
         std::ostringstream txt;
@@ -41,14 +51,14 @@ public:
     }
 
     //virtuals
-    const std::string&  File() const    {return file_;}
-    int                 Line() const    {return line_;}
+    const String&   File() const    {return file_;}
+    int             Line() const    {return line_;}
 
 private:
-    std::string     file_;
-    int             line_;
+    String  file_;
+    int     line_;
 };
-void InternalException::Raise(const std::string &file, int line, const std::string &what)
+void InternalException::Raise(const String &file, int line, const String &what)
 {
     throw InternalExceptionImpl(file, line, what);
 }
@@ -56,12 +66,36 @@ void InternalException::Raise(const std::string &file, int line, const std::stri
 
 //-----------------------------------------------------------------------
 // External error exception implementation
-void ExternalException::Raise(const std::string &what) {throw ExceptionImpl<ExternalException>(what);}
+void ExternalException::Raise(const String &what)
+{
+    throw ExceptionImpl<ExternalException>(what);
+}
 
 
 //-----------------------------------------------------------------------
 // IO error exception implementation
-void IOException::Raise(const std::string &what) {throw ExceptionImpl<IOException>(what);}
+//-----------------------------------------------------------------------
+// Internal error exception implementation
+class IOExceptionImpl : public ExceptionImpl<IOException>
+{
+public:
+    IOExceptionImpl(const String &file, const String &what) : file_(file)
+    {
+        std::ostringstream txt;
+        txt << GetFName(file) << ": IO error: " << what;
+        Init(txt.str());
+    }
+
+    //virtuals
+    const String& File() const {return file_;}
+
+private:
+    String  file_;
+};
+void IOException::Raise(const String &file, const String &what)
+{
+    throw IOExceptionImpl(file, what);
+}
 
 
 //-----------------------------------------------------------------------
@@ -69,11 +103,11 @@ void IOException::Raise(const std::string &what) {throw ExceptionImpl<IOExceptio
 class ParserExceptionImpl : public ExceptionImpl<ParserException>
 {
 public:
-    ParserExceptionImpl(const std::string &file, const Loc &loc, const std::string &what)
+    ParserExceptionImpl(const String &file, const Loc &loc, const String &what)
                         : file_(file), loc_(loc)
     {
         std::ostringstream txt;
-        txt << file;
+        txt << GetFName(file_);
         txt << "(" << loc.fstLn_ << "," << loc.fstCol_;
         txt << "-" << loc.lstLn_ << "," << loc.lstCol_;
         txt << ") : parser error: " << what;
@@ -81,14 +115,14 @@ public:
     }
 
     //virtuals
-    const std::string&  File() const        {return file_;}
-    const Loc&          Location() const    {return loc_;}
+    const String&   File() const        {return file_;}
+    const Loc&      Location() const    {return loc_;}
 
 private:
-    std::string     file_;
-    Loc             loc_;
+    String  file_;
+    Loc     loc_;
 };
-void ParserException::Raise(const std::string &file, const Loc &loc, const std::string &what)
+void ParserException::Raise(const String &file, const Loc &loc, const String &what)
 {
     throw ParserExceptionImpl(file, loc, what);
 }

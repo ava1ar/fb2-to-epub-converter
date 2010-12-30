@@ -104,9 +104,9 @@ static int Info(const String &in)
     {
         return PrintInfo(in);
     }
-    catch(const String &s)
+    catch(const Exception &ex)
     {
-        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", ex.What().c_str(), errno, strerror(errno));
         return 1;
     }
     catch(...)
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
     {
 #if FB2TOEPUB_DONT_OVERWRITE
         if(!overwrite && FileExists(out))   
-            Error((String("output file ") + out + " exists").c_str());
+            ExternalError((String("output file ") + out + " exists"));
 #endif
 
         // create input stream
@@ -234,9 +234,9 @@ int main(int argc, char **argv)
 
         return Convert(pin, css, fonts, mfonts, xlitConv, pout);
     }
-    catch(const String &s)
+    catch(const Exception &ex)
     {
-        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", ex.What().c_str(), errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;

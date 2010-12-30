@@ -26,7 +26,7 @@
 namespace Fb2ToEpub
 {
 
-    void FB2TOEPUB_DECL DecodeBase64(const char *data, OutStmI *pout);
+    bool FB2TOEPUB_DECL DecodeBase64(const char *data, OutStmI *pout);
 
 };  //namespace Fb2ToEpub
 

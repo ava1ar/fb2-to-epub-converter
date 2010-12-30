@@ -22,6 +22,7 @@
 
 #include <vector>
 #include "stream.h"
+#include "error.h"
 
 namespace Fb2ToEpub
 {
@@ -32,6 +33,7 @@ namespace Fb2ToEpub
 class InFileStm : public InStm, Noncopyable
 {
     FILE *f_;       // file
+    String name_;   // file name
     mutable int c_; // last buffered character
 
 public:
@@ -44,13 +46,14 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const;
 };
 
 //-----------------------------------------------------------------------
-InFileStm::InFileStm(const char *name) : f_(::fopen(name, "rb")), c_(EOF)
+InFileStm::InFileStm(const char *name) : f_(::fopen(name, "rb")), name_(name), c_(EOF)
 {
     if(!f_)
-        Error("can't open src");
+        IOError(name_, "can't open src file");
 }
 
 //-----------------------------------------------------------------------
@@ -63,7 +66,7 @@ bool InFileStm::IsEOF() const
 char InFileStm::GetChar()
 {
     if(IsEOF())
-        Error("src: fgetc EOF or read error");
+        IOError(name_, "fgetc EOF or read error");
 
     char cret = static_cast<char>(c_);
     c_ = EOF;
@@ -90,7 +93,7 @@ size_t InFileStm::Read(void *buffer, size_t max_cnt)
 
     cnt += ::fread(cb, 1, max_cnt - cnt, f_);
     if(cnt != max_cnt && ::ferror(f_))
-        Error("src: fread error");
+        IOError(name_, "fread error");
 
     return cnt;
 }
@@ -99,7 +102,7 @@ size_t InFileStm::Read(void *buffer, size_t max_cnt)
 void InFileStm::UngetChar(char c)
 {
     if(c_ != EOF && ::ungetc(c_, f_) == EOF)
-        Error("src: ungetc error");
+        IOError(name_, "ungetc error");
     c_ = static_cast<unsigned char>(c);
 }
 
@@ -108,6 +111,11 @@ void InFileStm::Rewind()
 {
     rewind(f_);
     c_ = EOF;
+}
+
+String InFileStm::UIFileName() const
+{
+    return name_;
 }
 
 //-----------------------------------------------------------------------
@@ -123,6 +131,7 @@ Ptr<InStm> CreateInFileStm(const char *name)
 class OutFileStm : public OutStm, Noncopyable
 {
     FILE *f_;
+    String name_;
 public:
     explicit OutFileStm(const char *name);
     ~OutFileStm() {fclose(f_);}
@@ -133,24 +142,24 @@ public:
 };
 
 //-----------------------------------------------------------------------
-OutFileStm::OutFileStm(const char *name) : f_(::fopen(name, "wb"))
+OutFileStm::OutFileStm(const char *name) : f_(::fopen(name, "wb")), name_(name)
 {
     if(!f_)
-        Error("Can't open dst");
+        IOError(name_, "can't open dst file");
 }
 
 //-----------------------------------------------------------------------
 void OutFileStm::PutChar(char c)
 {
     if(EOF == fputc(c, f_))
-        Error("dst: fputc error");
+        IOError(name_, "dst: fputc error");
 }
 
 //-----------------------------------------------------------------------
 void OutFileStm::Write(const void *p, size_t cnt)
 {
     if(fwrite(p, 1, cnt, f_) != cnt)
-        Error("dst: fwrite error");
+        IOError(name_, "dst: fwrite error");
 }
 
 //-----------------------------------------------------------------------
@@ -160,6 +169,7 @@ Ptr<OutStm> CreateOutFileStm(const char *name)
 }
 
 
+/*
 //-----------------------------------------------------------------------
 // MEMORY INPUT STREAM
 //-----------------------------------------------------------------------
@@ -178,6 +188,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return "memory stream";}
 };
 
 //-----------------------------------------------------------------------
@@ -192,7 +203,7 @@ char MemInStm::GetChar()
     if(c_ == EOF)
     {
         if(p_ >= pend_)
-            Error("memory stream: end reached");
+            IOError("memory stream", "end reached");
         return *p_++;
     }
     else
@@ -225,7 +236,7 @@ size_t MemInStm::Read(void *buffer, size_t max_cnt)
     if(to_copy > static_cast<size_t>(pend_ - p_))
         to_copy = pend_ - p_;
     if(!(cnt += to_copy))
-        Error("memory stream: end reached");
+        IOError("memory stream", "end reached");
 
     memcpy(cb, p_, to_copy);
     p_ += to_copy;
@@ -236,7 +247,7 @@ size_t MemInStm::Read(void *buffer, size_t max_cnt)
 void MemInStm::UngetChar(char c)
 {
     if(c_ != EOF)
-        Error("memory stream: ungetc error");
+        IOError("memory stream", "ungetc error");
     c_ = static_cast<unsigned char>(c);
 }
 
@@ -252,8 +263,10 @@ Ptr<InStm> FB2TOEPUB_DECL CreateInMemStm(const void *p, std::size_t size)
 {
     return new MemInStm(reinterpret_cast<const char*>(p), size);
 }
+*/
 
 
+/*
 //-----------------------------------------------------------------------
 // INPUT STREAM WRAPPER WITH INFINITE UNGET
 //-----------------------------------------------------------------------
@@ -271,6 +284,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -333,6 +347,7 @@ Ptr<InStm> CreateInfUngetStm(InStm *stm)
 {
     return new InInfUngetStm(stm);
 }
+*/
 
 
 //-----------------------------------------------------------------------

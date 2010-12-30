@@ -148,13 +148,6 @@ inline String Concat(const String &s1, const String &divider, const String &s2)
 
 
 //-----------------------------------------------------------------------
-inline void Error(const char *s)
-{
-    throw String(s);
-}
-
-
-//-----------------------------------------------------------------------
 typedef std::vector<String> strvector;
 
 //-----------------------------------------------------------------------

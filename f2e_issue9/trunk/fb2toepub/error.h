@@ -23,6 +23,7 @@
 
 #include <string>
 #include <stdarg.h>
+#include "types.h"
 
 namespace Fb2ToEpub
 {
@@ -32,7 +33,7 @@ namespace Fb2ToEpub
     struct Exception
     {
         virtual ~Exception() {}
-        virtual const std::string&  What() const = 0;
+        virtual const String&  What() const = 0;
     };
 
 
@@ -40,18 +41,18 @@ namespace Fb2ToEpub
     // Internal error exception
     struct InternalException : Exception
     {
-        virtual const std::string&  File() const = 0;
-        virtual int                 Line() const = 0;
+        virtual const String&   File() const = 0;
+        virtual int             Line() const = 0;
 
-        static void Raise(const std::string &file, int line, const std::string &what);
+        static void Raise(const String &file, int line, const String &what);
     };
 
 
     //-----------------------------------------------------------------------
-    // External error exception
+    // Generic external error exception
     struct ExternalException : Exception
     {
-        static void Raise(const std::string &what);
+        static void Raise(const String &what);
     };
 
 
@@ -59,7 +60,9 @@ namespace Fb2ToEpub
     // IO error exception
     struct IOException : ExternalException
     {
-        static void Raise(const std::string &what);
+        virtual const String& File() const = 0;
+
+        static void Raise(const String &file, const String &what);
     };
 
 
@@ -74,10 +77,10 @@ namespace Fb2ToEpub
             Loc(int fstLn, int lstLn, int fstCol, int lstCol)   : fstLn_(fstLn), lstLn_(lstLn), fstCol_(fstCol), lstCol_(lstCol) {}
         };
 
-        virtual const std::string&  File() const        = 0;
-        virtual const Loc&          Location() const    = 0;
+        virtual const String&   File() const        = 0;
+        virtual const Loc&      Location() const    = 0;
 
-        static void Raise(const std::string &file, const Loc &loc, const std::string &what);
+        static void Raise(const String &file, const Loc &loc, const String &what);
     };
 
 
@@ -88,18 +91,29 @@ namespace Fb2ToEpub
     template <class T> class ExceptionImpl : public T
     {
     public:
-        ExceptionImpl(const std::string &what)  : what_(what) {}
+        ExceptionImpl(const String &what)   : what_(what) {}
 
         //virtual
-        const std::string&  What() const        {return what_;}
+        const String& What() const          {return what_;}
 
     protected:
-        ExceptionImpl()                         {}
-        void Init(const std::string &what)      {what_ = what;}
+        ExceptionImpl()                     {}
+        void Init(const String &what)       {what_ = what;}
 
     private:
-        std::string what_;
+        String what_;
     };
+
+
+    //-----------------------------------------------------------------------
+    inline void ExternalError(const String &what)
+        {ExternalException::Raise(what);}
+    inline void InternalError(const String &file, int line, const String &what)
+        {InternalException::Raise(file, line, what);}
+    inline void IOError(const String &file, const String &what)
+        {IOException::Raise(file, what);}
+    inline void ParserError(const String &file, const ParserException::Loc &loc, const String &what)
+        {ParserException::Raise(file, loc, what);}
 
 
 

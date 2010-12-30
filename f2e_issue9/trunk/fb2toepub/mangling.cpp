@@ -21,6 +21,7 @@
 #include "hdr.h"
 
 #include "mangling.h"
+#include "error.h"
 #include "zlib.h"
 
 namespace Fb2ToEpub
@@ -58,6 +59,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -84,7 +86,7 @@ void InDeflateStm::DeflateInit()
     df_.opaque  = Z_NULL;
     int ret = ::deflateInit2(&df_, Z_BEST_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);     // some magic numbers
     if (ret != Z_OK)
-        Error("InDeflateStm: deflateInit2 error");
+        IOError(UIFileName(), "InDeflateStm: deflateInit2 error");
 }
 
 //-----------------------------------------------------------------------
@@ -111,7 +113,7 @@ size_t InDeflateStm::Fill() const
 
         int ret = ::deflate(&df_, flush);
         if(ret == Z_STREAM_ERROR)
-            Error("InDeflateStm: stream error");
+            IOError(UIFileName(), "InDeflateStm: stream error");
 
         // fix input data and pointers
         iend_ = ibuf_ + df_.avail_in;
@@ -130,7 +132,7 @@ size_t InDeflateStm::Fill() const
 char InDeflateStm::GetChar()
 {
     if(ocur_ == oend_ && !Fill())
-        Error("InDeflateStm: EOF");
+        IOError(UIFileName(), "InDeflateStm: EOF");
     return *ocur_++;
 }
 
@@ -159,7 +161,7 @@ size_t InDeflateStm::Read(void *buffer, size_t max_cnt)
 void InDeflateStm::UngetChar(char c)
 {
     if(ocur_ == obuf_)
-        Error("InDeflateStm: can't unget");
+        IOError(UIFileName(), "InDeflateStm: can't unget");
     --ocur_;
 }
 
@@ -192,8 +194,9 @@ public:
     bool        IsEOF() const                       {return stm_->IsEOF();}
     char        GetChar();
     size_t      Read(void *buffer, size_t max_cnt);
-    void        UngetChar(char c)                   {Error("InManglingStm: unget not implemented");}
+    void        UngetChar(char c)                   {IOError(UIFileName(), "InManglingStm: unget not implemented");}
     void        Rewind()                            {stm_->Rewind(); keyPos_ = pos_ = 0;}
+    String      UIFileName() const                  {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------

@@ -747,7 +747,7 @@ namespace Fb2ToEpub
         Loc                         loc_;
         int                         stateCaller_;
         bool                        attrHasValue_;
-        Token                       last_;      // for debug purposes
+        Token                       last_;
 
         Token ScanToken();
 
@@ -777,6 +777,18 @@ namespace Fb2ToEpub
             loc_.lstCol_ = 1;
         }
 
+        void OnError(const Loc &loc, const String &what)
+        {
+            ParserError(stm_->UIFileName(), loc, what);
+        }
+
+    protected:
+        //virtual
+        void LexerError(const char* msg)
+        {
+            ExternalError(msg);
+        }
+
     public:
         explicit ScannerImpl(InStm *stm)
                             :   stm_            (stm),
@@ -792,17 +804,14 @@ namespace Fb2ToEpub
 
         //-----------------------------------------------------------------------
         //virtual
-        Token GetToken()
+        const Token& GetToken()
         {
             while(tokenStack_.size())
             {
                 Token t = tokenStack_.back();
                 tokenStack_.pop_back();
                 if(t.type_ != DATA || dataMode_)
-#if defined(_DEBUG)
-                    last_ = t;
-#endif
-                    return t;
+                    return last_ = t;
             }
 
             Token t = ScanToken();
@@ -810,10 +819,7 @@ namespace Fb2ToEpub
             if(t.type_ == DATA || t.type_ == VALUE)
                 ScanAndConcatenateTo(&t);
 
-#if defined(_DEBUG)
-            last_ = t;
-#endif
-            return t;
+            return last_ = t;
         }
         
         //-----------------------------------------------------------------------
@@ -839,6 +845,13 @@ namespace Fb2ToEpub
             bool old = dataMode_;
             dataMode_ = newMode;
             return old;
+        }
+
+        //-----------------------------------------------------------------------
+        //virtual
+        void Error(const String &what)
+        {
+            OnError(last_.loc_, what);
         }
 
         //-----------------------------------------------------------------------
@@ -871,7 +884,7 @@ static Fb2ToEpub::LexScanner::Token yyterminate()
 
 
 
-#line 875 "scanner.cpp"
+#line 888 "scanner.cpp"
 
 #define INITIAL 0
 #define X0 1
@@ -989,12 +1002,12 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 213 "scanner.l"
+#line 226 "scanner.l"
 
 
     /* XML declaration */
 
-#line 998 "scanner.cpp"
+#line 1011 "scanner.cpp"
 
 	if ( !(yy_init) )
 		{
@@ -1075,33 +1088,33 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 217 "scanner.l"
+#line 230 "scanner.l"
 {BEGIN(X0_WS); return Token(XMLDECL);}
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 218 "scanner.l"
+#line 231 "scanner.l"
 {BEGIN(X0);}
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 219 "scanner.l"
+#line 232 "scanner.l"
 {NewLn(); BEGIN(X0);}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 220 "scanner.l"
+#line 233 "scanner.l"
 {BEGIN(X1);}
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 221 "scanner.l"
+#line 234 "scanner.l"
 {BEGIN(X2);}
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 222 "scanner.l"
+#line 235 "scanner.l"
 {
                                     BEGIN(X3_WS);
                                     yytext[yyleng-1] = '\0';
@@ -1110,28 +1123,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 227 "scanner.l"
+#line 240 "scanner.l"
 {BEGIN(X3);}
 	YY_BREAK
 case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
-#line 228 "scanner.l"
+#line 241 "scanner.l"
 {NewLn(); BEGIN(X3);}
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 229 "scanner.l"
+#line 242 "scanner.l"
 {return ENCODING;}
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 230 "scanner.l"
+#line 243 "scanner.l"
 {return EQ;}
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 231 "scanner.l"
+#line 244 "scanner.l"
 {
                                     BEGIN(X4_WS);
                                     yytext[yyleng-1] = '\0';
@@ -1140,28 +1153,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 236 "scanner.l"
+#line 249 "scanner.l"
 {BEGIN(X4);}
 	YY_BREAK
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 237 "scanner.l"
+#line 250 "scanner.l"
 {NewLn(); BEGIN(X4);}
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 238 "scanner.l"
+#line 251 "scanner.l"
 {BEGIN(X4); return STANDALONE;}
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 239 "scanner.l"
+#line 252 "scanner.l"
 {return EQ;}
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 240 "scanner.l"
+#line 253 "scanner.l"
 {
                                     yytext[yyleng-1] = '\0';
                                     return Token(VALUE, yytext+1);
@@ -1169,104 +1182,104 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 244 "scanner.l"
+#line 257 "scanner.l"
 {BEGIN(OUTSIDE); return CLOSE;}
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 245 "scanner.l"
+#line 258 "scanner.l"
 {}
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 246 "scanner.l"
+#line 259 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 247 "scanner.l"
-{Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
+#line 260 "scanner.l"
+{OnError(loc_, "xml declaration: unexpected character"); yyterminate();}
 	YY_BREAK
 /* Skip comment */
 case 21:
 YY_RULE_SETUP
-#line 252 "scanner.l"
+#line 265 "scanner.l"
 {stateCaller_ = D1; BEGIN(COMMENT);}
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 253 "scanner.l"
+#line 266 "scanner.l"
 {stateCaller_ = OUTSIDE; BEGIN(COMMENT);}
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 254 "scanner.l"
+#line 267 "scanner.l"
 {/* eat */}
 	YY_BREAK
 case 24:
 /* rule 24 can match eol */
 YY_RULE_SETUP
-#line 255 "scanner.l"
+#line 268 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 256 "scanner.l"
+#line 269 "scanner.l"
 {BEGIN(stateCaller_);}
 	YY_BREAK
 /* Skip CDATA block */
 case 26:
 YY_RULE_SETUP
-#line 261 "scanner.l"
+#line 274 "scanner.l"
 {stateCaller_ = D1; BEGIN(CDB);}
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 262 "scanner.l"
+#line 275 "scanner.l"
 {stateCaller_ = OUTSIDE; BEGIN(CDB);}
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 263 "scanner.l"
+#line 276 "scanner.l"
 {/* eat */}
 	YY_BREAK
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 264 "scanner.l"
+#line 277 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 265 "scanner.l"
+#line 278 "scanner.l"
 {BEGIN(stateCaller_);}
 	YY_BREAK
 /* Skip DOCTYPE */
 case 31:
 YY_RULE_SETUP
-#line 270 "scanner.l"
+#line 283 "scanner.l"
 {doctypeCnt_ = 1; BEGIN(DOCTYPE);}
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 271 "scanner.l"
+#line 284 "scanner.l"
 {++doctypeCnt_;}
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 272 "scanner.l"
+#line 285 "scanner.l"
 {/* eat */}
 	YY_BREAK
 case 34:
 /* rule 34 can match eol */
 YY_RULE_SETUP
-#line 273 "scanner.l"
+#line 286 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 274 "scanner.l"
+#line 287 "scanner.l"
 {
                                     if(--doctypeCnt_ <= 0)
                                         BEGIN(OUTSIDE);
@@ -1275,45 +1288,45 @@ YY_RULE_SETUP
 /* Skip reserved xml element */
 case 36:
 YY_RULE_SETUP
-#line 282 "scanner.l"
+#line 295 "scanner.l"
 {stateCaller_ = D1; BEGIN(RESERVED);}
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 283 "scanner.l"
+#line 296 "scanner.l"
 {stateCaller_ = OUTSIDE; BEGIN(RESERVED);}
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 284 "scanner.l"
+#line 297 "scanner.l"
 {/* eat */}
 	YY_BREAK
 case 39:
 /* rule 39 can match eol */
 YY_RULE_SETUP
-#line 285 "scanner.l"
+#line 298 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 286 "scanner.l"
+#line 299 "scanner.l"
 {BEGIN(stateCaller_);}
 	YY_BREAK
 /* Content */
 case 41:
 YY_RULE_SETUP
-#line 291 "scanner.l"
+#line 304 "scanner.l"
 {}
 	YY_BREAK
 case 42:
 /* rule 42 can match eol */
 YY_RULE_SETUP
-#line 292 "scanner.l"
+#line 305 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 293 "scanner.l"
+#line 306 "scanner.l"
 {
                                     BEGIN(D1);
                                     if(dataMode_)
@@ -1325,7 +1338,7 @@ YY_RULE_SETUP
 case 44:
 /* rule 44 can match eol */
 YY_RULE_SETUP
-#line 300 "scanner.l"
+#line 313 "scanner.l"
 {
                                     NewLn();
                                     BEGIN(D1);
@@ -1337,7 +1350,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 308 "scanner.l"
+#line 321 "scanner.l"
 {
                                     BEGIN(yyleng >= 2 ? D2 : D1);   // if number of "]" >= 2, disable ">"
                                     if(dataMode_)
@@ -1348,7 +1361,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 315 "scanner.l"
+#line 328 "scanner.l"
 {
                                     if(dataMode_)
                                         return gt;
@@ -1356,7 +1369,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 319 "scanner.l"
+#line 332 "scanner.l"
 {
                                     BEGIN(D1);
                                     if(dataMode_)
@@ -1365,7 +1378,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 324 "scanner.l"
+#line 337 "scanner.l"
 {
                                     BEGIN(D1);
                                     if(dataMode_)
@@ -1374,7 +1387,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 329 "scanner.l"
+#line 342 "scanner.l"
 {
                                     char *tagName = &yytext[1];
                                     tagStack_.push_back(tagName);
@@ -1384,13 +1397,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 335 "scanner.l"
+#line 348 "scanner.l"
 {
                                     char *tagName = &yytext[2];
                                     if(!tagStack_.size())
-                                        Error("tag stack is empty #0");
+                                        OnError(loc_, "tag stack is empty #0");
                                     if(tagStack_.back().compare(tagName))
-                                        Error("tag mismatch");
+                                        OnError(loc_, "tag mismatch");
                                     tagStack_.pop_back();
                                     BEGIN(MARKUP);
                                     return Token(END, tagName);
@@ -1398,18 +1411,18 @@ YY_RULE_SETUP
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 345 "scanner.l"
-{Fb2ToEpub::Error("not implemented 1"); yyterminate();}
+#line 358 "scanner.l"
+{OnError(loc_, "not implemented"); yyterminate();}
 	YY_BREAK
 /* Garbage */
 case 52:
 YY_RULE_SETUP
-#line 350 "scanner.l"
+#line 363 "scanner.l"
 {/* ignore outside garbage */}
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 351 "scanner.l"
+#line 364 "scanner.l"
 {
                                     // error character - try to process
                                     BEGIN(D1);
@@ -1428,38 +1441,38 @@ YY_RULE_SETUP
 /* Markup */
 case 54:
 YY_RULE_SETUP
-#line 369 "scanner.l"
+#line 382 "scanner.l"
 {}
 	YY_BREAK
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 370 "scanner.l"
+#line 383 "scanner.l"
 {NewLn();}
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 371 "scanner.l"
+#line 384 "scanner.l"
 {return EQ;}
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 372 "scanner.l"
+#line 385 "scanner.l"
 {attrHasValue_ = false; return Token(NAME, yytext);}
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 373 "scanner.l"
+#line 386 "scanner.l"
 {BEGIN(MARKUP1);}
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 374 "scanner.l"
+#line 387 "scanner.l"
 {BEGIN(MARKUP2);}
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 375 "scanner.l"
+#line 388 "scanner.l"
 {
                                     attrHasValue_ = true;
                                     if(skipMode_)
@@ -1471,7 +1484,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 383 "scanner.l"
+#line 396 "scanner.l"
 {
                                     attrHasValue_ = true;
                                     if(skipMode_)
@@ -1484,7 +1497,7 @@ YY_RULE_SETUP
 case 62:
 /* rule 62 can match eol */
 YY_RULE_SETUP
-#line 391 "scanner.l"
+#line 404 "scanner.l"
 {
                                     attrHasValue_ = true;
                                     NewLn();
@@ -1493,7 +1506,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 396 "scanner.l"
+#line 409 "scanner.l"
 {
                                     BEGIN(MARKUP);
                                     if(!attrHasValue_)
@@ -1503,7 +1516,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 402 "scanner.l"
+#line 415 "scanner.l"
 {
                                     BEGIN(MARKUP);
                                     if(!attrHasValue_)
@@ -1513,10 +1526,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 408 "scanner.l"
+#line 421 "scanner.l"
 {
                                     if(!tagStack_.size())
-                                        Error("tag stack is empty #1");
+                                        OnError(loc_, "tag stack is empty #1");
                                     tagStack_.pop_back();
                                     BEGIN(tagStack_.size() ? D1 : OUTSIDE);
                                     return SLASHCLOSE;
@@ -1524,7 +1537,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 415 "scanner.l"
+#line 428 "scanner.l"
 {
                                     BEGIN(tagStack_.size() ? D1 : OUTSIDE);
                                     return CLOSE;
@@ -1534,15 +1547,15 @@ YY_RULE_SETUP
 case 67:
 /* rule 67 can match eol */
 YY_RULE_SETUP
-#line 423 "scanner.l"
-{Fb2ToEpub::Error("default: unrecognized char"); yyterminate();}
+#line 436 "scanner.l"
+{OnError(loc_, "default: unrecognized char"); yyterminate();}
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 425 "scanner.l"
+#line 438 "scanner.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1546 "scanner.cpp"
+#line 1559 "scanner.cpp"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(X0):
 case YY_STATE_EOF(X1):
@@ -2459,7 +2472,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 425 "scanner.l"
+#line 438 "scanner.l"
 
 
 

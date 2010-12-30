@@ -50,7 +50,7 @@ namespace Fb2ToEpub
         Loc                         loc_;
         int                         stateCaller_;
         bool                        attrHasValue_;
-        Token                       last_;      // for debug purposes
+        Token                       last_;
 
         Token ScanToken();
 
@@ -80,6 +80,18 @@ namespace Fb2ToEpub
             loc_.lstCol_ = 1;
         }
 
+        void OnError(const Loc &loc, const String &what)
+        {
+            ParserError(stm_->UIFileName(), loc, what);
+        }
+
+    protected:
+        //virtual
+        void LexerError(const char* msg)
+        {
+            ExternalError(msg);
+        }
+
     public:
         explicit ScannerImpl(InStm *stm)
                             :   stm_            (stm),
@@ -95,17 +107,14 @@ namespace Fb2ToEpub
 
         //-----------------------------------------------------------------------
         //virtual
-        Token GetToken()
+        const Token& GetToken()
         {
             while(tokenStack_.size())
             {
                 Token t = tokenStack_.back();
                 tokenStack_.pop_back();
                 if(t.type_ != DATA || dataMode_)
-#if defined(_DEBUG)
-                    last_ = t;
-#endif
-                    return t;
+                    return last_ = t;
             }
 
             Token t = ScanToken();
@@ -113,10 +122,7 @@ namespace Fb2ToEpub
             if(t.type_ == DATA || t.type_ == VALUE)
                 ScanAndConcatenateTo(&t);
 
-#if defined(_DEBUG)
-            last_ = t;
-#endif
-            return t;
+            return last_ = t;
         }
         
         //-----------------------------------------------------------------------
@@ -142,6 +148,13 @@ namespace Fb2ToEpub
             bool old = dataMode_;
             dataMode_ = newMode;
             return old;
+        }
+
+        //-----------------------------------------------------------------------
+        //virtual
+        void Error(const String &what)
+        {
+            OnError(last_.loc_, what);
         }
 
         //-----------------------------------------------------------------------
@@ -244,7 +257,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 <X3_WS,X3,X4_WS,X4>"?>"         {BEGIN(OUTSIDE); return CLOSE;}
 <X0,X1,X2,X3,X4>{ws}            {}
 <X0,X1,X2,X3,X4>{nl}            {NewLn();}
-<X0,X1,X2,X3,X4>.               {Fb2ToEpub::Error("xml declaration: unexpected character"); yyterminate();}
+<X0,X1,X2,X3,X4>.               {OnError(loc_, "xml declaration: unexpected character"); yyterminate();}
 
 
     /* Skip comment */
@@ -335,14 +348,14 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 <D1,D2>{etagstart}              {
                                     char *tagName = &yytext[2];
                                     if(!tagStack_.size())
-                                        Error("tag stack is empty #0");
+                                        OnError(loc_, "tag stack is empty #0");
                                     if(tagStack_.back().compare(tagName))
-                                        Error("tag mismatch");
+                                        OnError(loc_, "tag mismatch");
                                     tagStack_.pop_back();
                                     BEGIN(MARKUP);
                                     return Token(END, tagName);
                                 }
-<D1,D2,OUTSIDE>"<!"             {Fb2ToEpub::Error("not implemented 1"); yyterminate();}
+<D1,D2,OUTSIDE>"<!"             {OnError(loc_, "not implemented"); yyterminate();}
 
 
     /* Garbage */
@@ -407,7 +420,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
                                 }
 <MARKUP>"/>"                    {
                                     if(!tagStack_.size())
-                                        Error("tag stack is empty #1");
+                                        OnError(loc_, "tag stack is empty #1");
                                     tagStack_.pop_back();
                                     BEGIN(tagStack_.size() ? D1 : OUTSIDE);
                                     return SLASHCLOSE;
@@ -420,7 +433,7 @@ xmlreserved     ([^\?\r\n]|"?"*[^>\?\r\n])*
 
     /* Default */
 
-.|{nl}                          {Fb2ToEpub::Error("default: unrecognized char"); yyterminate();}
+.|{nl}                          {OnError(loc_, "default: unrecognized char"); yyterminate();}
 
 %%
 
