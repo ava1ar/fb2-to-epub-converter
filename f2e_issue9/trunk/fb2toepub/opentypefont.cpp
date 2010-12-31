@@ -18,7 +18,8 @@
 //
 
 // The code in this file was partialy written using source code
-// of "epub-tools" utility. You can find sources of epub-tools unility here:
+// of "epub-tools" utility. You can find sources of epub-tools unility
+// on the utility home page:
 // http://code.google.com/p/epub-tools/
 // Below is the original copyright notice of epub-tools.
 
