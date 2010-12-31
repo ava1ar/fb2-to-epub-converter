@@ -1,0 +1,3 @@
+The following packages need to be installed before Fb2toepub converter is installed:
+1) flex
+2) zlib
