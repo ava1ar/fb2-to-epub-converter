@@ -55,12 +55,13 @@ void LexScanner::SkipRestOfElementContent()
     SetScannerSkipMode skipMode(this);
     for(;;)
     {
-        switch(GetToken().type_)
+        Token t = GetToken();
+        switch(t.type_)
         {
         case DATA:
             continue;
         case START:
-            UngetToken(Token(START));
+            UngetToken(t);
             SkipElement();
             continue;
         case END:
@@ -89,7 +90,7 @@ void LexScanner::SkipElement()
     {
     case SLASHCLOSE:    return;
     case CLOSE:         break;
-    default:                        Error("'close' of stag expected");
+    default:            Error("'close' of stag expected");
     }
 
     // skip element content
@@ -123,36 +124,23 @@ void LexScanner::SkipAll(const String &element)
 void LexScanner::SkipXMLDeclaration ()
 {
     // skip version
-    if (GetToken() != Token(XMLDECL) ||
-        GetToken() != Token('"') ||
-        GetToken().type_ != VERSION ||
-        GetToken() != Token('"'))
-    {
+    if (GetToken() != Token(XMLDECL) || GetToken().type_ != VERSION)
         Error("xmldecl parsing error");
-    }
     
     // skip initial encoding (the stream is already converted to UTF-8)
     Token t = GetToken();
     if  (t == Token(ENCODING))
     {
-        if (GetToken() != Token('"') ||
-            GetToken().type_ != VALUE ||
-            GetToken() != Token('"'))
-        {
+        if (GetToken().type_ != EQ || GetToken().type_ != VALUE)
             Error("xmldecl 'encoding' parsing error");
-        }
         t = GetToken();
     }
 
     // skip standalone
     if  (t == Token(STANDALONE))
     {
-        if (GetToken() != Token('"') ||
-            GetToken().type_ != VALUE ||
-            GetToken() != Token('"'))
-        {
+        if (GetToken().type_ != EQ || GetToken().type_ != VALUE)
             Error("xmldecl 'standalone' parsing error");
-        }
         t = GetToken();
     }
 
@@ -200,7 +188,7 @@ bool LexScanner::BeginElement(const String &element, AttrMap *attrmap)
     {
         std::ostringstream ss;
         ss << "element <" << element << "> expected";
-        Error(ss.str().c_str());
+        Error(ss.str());
     }
 
     if(attrmap)
@@ -218,7 +206,7 @@ bool LexScanner::BeginElement(const String &element, AttrMap *attrmap)
         {
             std::ostringstream ss;
             ss << "element <" << element << "> expected";
-            Error(ss.str().c_str());
+            Error(ss.str());
         }
         return false;
     }
@@ -231,7 +219,7 @@ void LexScanner::BeginNotEmptyElement(const String &element, AttrMap *attrmap)
     {
         std::ostringstream ss;
         ss << "element <" << element << "> can't be empty";
-        Error(ss.str().c_str());
+        Error(ss.str());
     }
 }
 
@@ -287,28 +275,31 @@ static void ConvertToUtf8(unsigned long x, std::vector<char> *buf)
 }
 
 //-----------------------------------------------------------------------
-static const char* DecodeDecimal(const char *s, std::vector<char> *buf)
+static const bool DecodeDecimal(const char **s, std::vector<char> *buf)
 {
+    const char *pc = *s;
     unsigned long x = 0;
-    char c = *s++;
+    char c = *pc++;
     do
     {
         if(c < '0' || c > '9')
-            Error("bad decimal entity");
+            return false;
 
         x = x*10 + (c - '0');
-        c = *s++;
+        c = *pc++;
     }
     while(c != ';');
     ConvertToUtf8(x, buf);
-    return s;
+    *s = pc;
+    return true;
 }
 
 //-----------------------------------------------------------------------
-static const char* DecodeHex(const char *s, std::vector<char> *buf)
+static const bool DecodeHex(const char **s, std::vector<char> *buf)
 {
+    const char *pc = *s;
     unsigned long x = 0;
-    char c = *s++;
+    char c = *pc++;
     do
     {
         if(c >= '0' && c <= '9')
@@ -318,13 +309,14 @@ static const char* DecodeHex(const char *s, std::vector<char> *buf)
         else if(c >= 'A' && c <= 'F')
             x = x*16 + (c + 10 - 'A');
         else
-            Error("bad hexadecimal entity");
+            return false;
 
-        c = *s++;
+        c = *pc++;
     }
     while(c != ';');
     ConvertToUtf8(x, buf);
-    return s;
+    *s = pc;
+    return true;
 }
 
 //-----------------------------------------------------------------------
@@ -343,6 +335,13 @@ static bool DecodeEntity(const char **s, const char *etext, char val, std::vecto
         if(*pc++ != c)
             return false;
     }
+}
+
+//-----------------------------------------------------------------------
+static void UnknownEntity(const char **s, std::vector<char> *buf)
+{
+    static const char amp[] = "&amp;";
+    buf->insert(buf->end(), amp, amp + strlen(amp));
 }
 
 //-----------------------------------------------------------------------
@@ -372,28 +371,38 @@ void LexScanner::Decode(const char *s, std::vector<char> *buf, bool decodeEntiti
 
         case '&':
             if(!decodeEntities)
-            {
                 buf->push_back('&');
-                continue;
-            }
-
-            if(*s == '#')
+            else
             {
-                if(*++s != 'x')
-                    s = DecodeDecimal(s, buf);
+                const char *sOld = s;
+                if(*s == '#')
+                {
+                    if(*++s != 'x')
+                    {
+                        if(DecodeDecimal(&s, buf))
+                            continue;
+                    }
+                    else
+                    {
+                        ++s;
+                        if(DecodeHex(&s, buf))
+                            continue;
+                    }
+                }
                 else
-                    s = DecodeHex(++s, buf);
-                continue;
-            }
+                {
+                    if (DecodeEntity(&s, "lt;", '<', buf) ||
+                        DecodeEntity(&s, "gt;", '>', buf) ||
+                        DecodeEntity(&s, "amp;", '&', buf) ||
+                        DecodeEntity(&s, "apos;", '\'', buf) ||
+                        DecodeEntity(&s, "quot;", '"', buf))
+                    {
+                        continue;
+                    }
+                }
 
-            if (!DecodeEntity(&s, "lt;", '<', buf) &&
-                !DecodeEntity(&s, "gt;", '>', buf) &&
-                !DecodeEntity(&s, "amp;", '&', buf) &&
-                !DecodeEntity(&s, "apos;", '\'', buf) &&
-                !DecodeEntity(&s, "quot;", '"', buf))
-            {
-                // unknown entity
-                buf->push_back(c);
+                s = sOld;
+                UnknownEntity(&s, buf);
             }
             continue;
         }

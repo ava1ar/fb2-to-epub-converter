@@ -21,6 +21,7 @@
 #include "hdr.h"
 
 #include "uuidmisc.h"
+#include "error.h"
 #include <ctype.h>
 #include <vector>
 #include <time.h>
@@ -65,7 +66,10 @@ inline void AddRandomHex(std::vector<char> *buf, int cnt)
 //-----------------------------------------------------------------------
 String GenerateUUID()
 {
-    srand(static_cast<unsigned int>(time(NULL)));
+    if(IsTestMode())
+        srand(0);   // make predictable
+    else
+        srand(static_cast<unsigned int>(time(NULL)^2718281828UL));
     std::vector<char> buf;
 
     AddRandomHex(&buf, 8);
@@ -96,7 +100,7 @@ void MakeAdobeKey(const String &uuid, unsigned char *adobeKey)
 {
 #if defined(_DEBUG)
     if(!IsValidUUID(uuid))
-        Error("uuid internal error");
+        InternalError(__FILE__, __LINE__, "uuid error");
 #endif
 
     const char *p = uuid.c_str();

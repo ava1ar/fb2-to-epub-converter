@@ -40,7 +40,7 @@ using namespace Fb2ToEpub;
 
 //-----------------------------------------------------------------------
 const char name[]       = "FB2 to EPUB format converter";
-const char version[]    = "1.0";
+const char version[]    = FB2TOEPUB_VERSION_STRING;
 
 //-----------------------------------------------------------------------
 static void Logo()
@@ -104,9 +104,9 @@ static int Info(const String &in)
     {
         return PrintInfo(in);
     }
-    catch(const String &s)
+    catch(const Exception &ex)
     {
-        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", ex.What().c_str(), errno, strerror(errno));
         return 1;
     }
     catch(...)
@@ -176,6 +176,12 @@ int main(int argc, char **argv)
                 return ErrorExit("transliteration file redefinition");
             xlit = argv[i++];
         }
+        else if(!strcmp(argv[i], "--autotest"))
+        {
+            // undocumented: mode for automatic testing
+            SetTestMode(TEST_MODE_ON);
+            ++i;
+        }
 #if FB2TOEPUB_DONT_OVERWRITE
         else if(!strcmp(argv[i], "--overwrite"))
         {
@@ -217,7 +223,7 @@ int main(int argc, char **argv)
     {
 #if FB2TOEPUB_DONT_OVERWRITE
         if(!overwrite && FileExists(out))   
-            Error((String("output file ") + out + " exists").c_str());
+            ExternalError((String("output file ") + out + " exists"));
 #endif
 
         // create input stream
@@ -234,9 +240,9 @@ int main(int argc, char **argv)
 
         return Convert(pin, css, fonts, mfonts, xlitConv, pout);
     }
-    catch(const String &s)
+    catch(const Exception &ex)
     {
-        fprintf(stderr, "%s\n[%d]%s\n", s.c_str(), errno, strerror(errno));
+        fprintf(stderr, "%s\n[%d]%s\n", ex.What().c_str(), errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;

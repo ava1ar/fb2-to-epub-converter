@@ -40,6 +40,7 @@ public:
     virtual size_t      Read(void *buffer, size_t max_cnt)  = 0;
     virtual void        UngetChar(char c)                   = 0;
     virtual void        Rewind()                            = 0;
+    virtual String      UIFileName() const                  = 0;
 
     // helper
     unsigned char GetUChar()
@@ -99,12 +100,12 @@ Ptr<OutStm> FB2TOEPUB_DECL  CreateOutFileStm(const char *name);
 //-----------------------------------------------------------------------
 // INPUT STREAM FROM MEMORY
 //-----------------------------------------------------------------------
-Ptr<InStm> FB2TOEPUB_DECL   CreateInMemStm(const void *p, std::size_t size);
+//Ptr<InStm> FB2TOEPUB_DECL   CreateInMemStm(const void *p, std::size_t size);
 
 //-----------------------------------------------------------------------
 // INPUT STREAM WRAPPER WITH INFINITE UNGET
 //-----------------------------------------------------------------------
-Ptr<InStm> FB2TOEPUB_DECL   CreateInfUngetStm(InStm *stm);
+//Ptr<InStm> FB2TOEPUB_DECL   CreateInfUngetStm(InStm *stm);
 
 
 };  //namespace Fb2ToEpub

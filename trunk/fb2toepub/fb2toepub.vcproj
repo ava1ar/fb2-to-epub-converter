@@ -275,6 +275,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\error.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\fb2toepub.cpp"
 				>
 			</File>
@@ -293,6 +297,10 @@
 						PreprocessorDefinitions="ZLIB_WINAPI"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\opentypefont.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\scandir.cpp"
@@ -402,6 +410,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\error.h"
+				>
+			</File>
+			<File
 				RelativePath=".\fb2toepubconv.h"
 				>
 			</File>
@@ -411,6 +423,10 @@
 			</File>
 			<File
 				RelativePath=".\mangling.h"
+				>
+			</File>
+			<File
+				RelativePath=".\opentypefont.h"
 				>
 			</File>
 			<File
