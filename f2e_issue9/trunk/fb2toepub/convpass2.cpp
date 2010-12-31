@@ -26,6 +26,7 @@
 #include "base64.h"
 #include "uuidmisc.h"
 #include "mangling.h"
+#include "opentypefont.h"
 //#include <streambuf>
 #include <sstream>
 #include <vector>
@@ -741,6 +742,10 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
 {
     ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
     for(; cit < cit_end; ++cit)
+        if(!IsFontEmbedAllowed(cit->ospath_))
+            FontError(cit->ospath_, "embedding not allowed");
+
+    for(cit = fontfiles.begin(); cit < cit_end; ++cit)
     {
         // mangle (mangling == deflating + XORing), then store without compression
         Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);

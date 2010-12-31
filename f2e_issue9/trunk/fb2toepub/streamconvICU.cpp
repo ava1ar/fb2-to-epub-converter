@@ -160,7 +160,7 @@ InConvStmICU::InConvStmICU(InStm *stm, ConvBaseICU *conv)
 //-----------------------------------------------------------------------
 bool InConvStmICU::IsEOF() const
 {
-    return (ocur_ == oend_) && (stm_->IsEOF() || !Fill());
+    return (ocur_ == oend_) && !Fill();
 }
 
 //-----------------------------------------------------------------------

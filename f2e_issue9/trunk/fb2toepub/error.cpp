@@ -74,8 +74,6 @@ void ExternalException::Raise(const String &what)
 
 //-----------------------------------------------------------------------
 // IO error exception implementation
-//-----------------------------------------------------------------------
-// Internal error exception implementation
 class IOExceptionImpl : public ExceptionImpl<IOException>
 {
 public:
@@ -126,5 +124,30 @@ void ParserException::Raise(const String &file, const Loc &loc, const String &wh
 {
     throw ParserExceptionImpl(file, loc, what);
 }
+
+
+//-----------------------------------------------------------------------
+// Font error exception implementation
+class FontExceptionImpl : public ExceptionImpl<FontException>
+{
+public:
+    FontExceptionImpl(const String &file, const String &what) : file_(file)
+    {
+        std::ostringstream txt;
+        txt << "font error, " << GetFName(file) << " : " << what;
+        Init(txt.str());
+    }
+
+    //virtuals
+    const String& File() const {return file_;}
+
+private:
+    String  file_;
+};
+void FontException::Raise(const String &file, const String &what)
+{
+    throw FontExceptionImpl(file, what);
+}
+
 
 };  //namespace Fb2ToEpub
