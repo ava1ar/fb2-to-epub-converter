@@ -299,6 +299,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\opentypefont.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\scandir.cpp"
 				>
 			</File>
@@ -419,6 +423,10 @@
 			</File>
 			<File
 				RelativePath=".\mangling.h"
+				>
+			</File>
+			<File
+				RelativePath=".\opentypefont.h"
 				>
 			</File>
 			<File

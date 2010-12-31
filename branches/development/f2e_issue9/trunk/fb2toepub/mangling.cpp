@@ -92,7 +92,7 @@ void InDeflateStm::DeflateInit()
 //-----------------------------------------------------------------------
 bool InDeflateStm::IsEOF() const
 {
-    return (ocur_ == oend_) && (stm_->IsEOF() || !Fill());
+    return (ocur_ == oend_) && !Fill();
 }
 
 //-----------------------------------------------------------------------

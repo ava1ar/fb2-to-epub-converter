@@ -84,6 +84,16 @@ namespace Fb2ToEpub
     };
 
 
+    //-----------------------------------------------------------------------
+    // font error exception
+    struct FontException : ExternalException
+    {
+        virtual const String& File() const = 0;
+
+        static void Raise(const String &file, const String &what);
+    };
+
+
 
     //-----------------------------------------------------------------------
     // Useful helper: exception implementation template
@@ -114,6 +124,8 @@ namespace Fb2ToEpub
         {IOException::Raise(file, what);}
     inline void ParserError(const String &file, const ParserException::Loc &loc, const String &what)
         {ParserException::Raise(file, loc, what);}
+    inline void FontError(const String &file, const String &what)
+        {FontException::Raise(file, what);}
 
 
 
