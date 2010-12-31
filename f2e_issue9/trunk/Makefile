@@ -55,6 +55,7 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		translit.cpp \
 		uuidmisc.cpp \
 		mangling.cpp \
+		opentypefont.cpp \
 		types.cpp \
 		error.cpp
 
