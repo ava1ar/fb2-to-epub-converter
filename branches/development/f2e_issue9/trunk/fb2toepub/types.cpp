@@ -23,4 +23,11 @@
 namespace Fb2ToEpub
 {
 
+//-----------------------------------------------------------------------
+// test mode stuff (to make output file predictable for automatic testing)
+static unsigned int testModeFlags = 0;
+void FB2TOEPUB_DECL SetTestMode(unsigned int flags) {testModeFlags = flags;}
+unsigned int FB2TOEPUB_DECL IsTestMode()            {return testModeFlags;}
+
+
 };  //namespace Fb2ToEpub

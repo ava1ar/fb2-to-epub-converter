@@ -176,6 +176,12 @@ int main(int argc, char **argv)
                 return ErrorExit("transliteration file redefinition");
             xlit = argv[i++];
         }
+        else if(!strcmp(argv[i], "--autotest"))
+        {
+            // undocumented: mode for automatic testing
+            SetTestMode(TEST_MODE_ON);
+            ++i;
+        }
 #if FB2TOEPUB_DONT_OVERWRITE
         else if(!strcmp(argv[i], "--overwrite"))
         {

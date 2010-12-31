@@ -226,18 +226,29 @@ void ZipStm::BeginFile(const char *name, bool compress)
     else if(ZIP_OK != ::zipCloseFileInZip(zf_))
         IOError(name_, "zipCloseFileInZip error");
 
-    time_t ltime;
-    time(&ltime);
-    tm *filedate = localtime(&ltime);
-
     ::zip_fileinfo zi;
+    if(IsTestMode())
+    {
+        zi.tmz_date.tm_sec  = 0;
+        zi.tmz_date.tm_min  = 0;
+        zi.tmz_date.tm_hour = 9;
+        zi.tmz_date.tm_mday = 20;
+        zi.tmz_date.tm_mon  = 10;
+        zi.tmz_date.tm_year = 2003;
+    }
+    else
+    {
+        time_t ltime;
+        time(&ltime);
+        tm *filedate = localtime(&ltime);
 
-    zi.tmz_date.tm_sec  = filedate->tm_sec;
-    zi.tmz_date.tm_min  = filedate->tm_min;
-    zi.tmz_date.tm_hour = filedate->tm_hour;
-    zi.tmz_date.tm_mday = filedate->tm_mday;
-    zi.tmz_date.tm_mon  = filedate->tm_mon ;
-    zi.tmz_date.tm_year = filedate->tm_year;
+        zi.tmz_date.tm_sec  = filedate->tm_sec;
+        zi.tmz_date.tm_min  = filedate->tm_min;
+        zi.tmz_date.tm_hour = filedate->tm_hour;
+        zi.tmz_date.tm_mday = filedate->tm_mday;
+        zi.tmz_date.tm_mon  = filedate->tm_mon;
+        zi.tmz_date.tm_year = filedate->tm_year;
+    }
     zi.dosDate          = 0;
     zi.internal_fa      = 0;
     zi.external_fa      = 0;

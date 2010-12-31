@@ -151,6 +151,12 @@ inline String Concat(const String &s1, const String &divider, const String &s2)
 typedef std::vector<String> strvector;
 
 //-----------------------------------------------------------------------
+// test mode stuff (to make output file predictable for automatic testing)
+const unsigned int TEST_MODE_ON = 1;
+void FB2TOEPUB_DECL SetTestMode(unsigned int flags);
+unsigned int FB2TOEPUB_DECL IsTestMode();
+
+//-----------------------------------------------------------------------
 
 #if 0
 //-----------------------------------------------------------------------
