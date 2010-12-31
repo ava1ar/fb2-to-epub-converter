@@ -22,6 +22,7 @@
 #define FB2TOEPUB__SCANNER_H
 
 #include "stream.h"
+#include "error.h"
 #include <string>
 #include <map>
 #include <vector>
@@ -59,12 +60,15 @@ namespace Fb2ToEpub
             END
         };
 
+        typedef ParserException::Loc Loc;
+
         struct Token
         {
             TokenType   type_;
             char        c_;
             String      s_;
             std::size_t size_;  // approximate size of DATA section (valid in skip mode)
+            Loc         loc_;
 
             Token(TokenType type, std::size_t size = 0)                         : type_(type), size_(size) {}
             Token(char c)                                                       : type_(CHAR), c_(c) {}
@@ -90,10 +94,11 @@ namespace Fb2ToEpub
         };
 
         virtual ~LexScanner() {}
-        virtual Token GetToken()                = 0;
+        virtual const Token& GetToken() = 0;
         virtual void UngetToken(const Token &t) = 0;
         virtual bool SetSkipMode(bool newMode) = 0;
         virtual bool SetDataMode(bool newMode) = 0;
+        virtual void Error(const String &what) = 0;
 
         // helpers
         Token LookAhead()

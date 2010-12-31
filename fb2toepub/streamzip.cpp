@@ -20,6 +20,7 @@
 
 #include "hdr.h"
 #include "streamzip.h"
+#include "error.h"
 #include "minizip/unzip.h"
 #include "minizip/zip.h"
 
@@ -59,15 +60,16 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return name_;}
 };
 
 //-----------------------------------------------------------------------
 UnzipStm::UnzipStm(const char *name) : uf_(::unzOpen(name)), c_(EOF), name_(name)
 {
     if(!uf_)
-        Error("unzOpen error");
+        IOError(name_, "unzOpen error");
     if(UNZ_OK != ::unzOpenCurrentFile(uf_))
-        Error("unzOpenCurrentFile error");
+        IOError(name_, "unzOpenCurrentFile error");
 }
 
 //-----------------------------------------------------------------------
@@ -90,7 +92,7 @@ char UnzipStm::GetChar()
     {
         char c;
         if(::unzReadCurrentFile(uf_, &c, 1) != 1)
-            Error("unzReadCurrentFile EOF or read error");
+            IOError(name_, "unzReadCurrentFile EOF or read error");
         return c;
     }
     else
@@ -121,7 +123,7 @@ size_t UnzipStm::Read(void *buffer, size_t max_cnt)
 
     int cnt_read = ::unzReadCurrentFile(uf_, cb, max_cnt - cnt);
     if(cnt_read < 0)
-        Error("unzReadCurrentFile read error");
+        IOError(name_, "unzReadCurrentFile read error");
 
     return cnt + static_cast<size_t>(cnt_read);
 }
@@ -130,7 +132,7 @@ size_t UnzipStm::Read(void *buffer, size_t max_cnt)
 void UnzipStm::UngetChar(char c)
 {
     if(c_ != EOF)
-        Error("zip: unget char error");
+        IOError(name_, "zip: unget char error");
     c_ = static_cast<unsigned char>(c);
 }
 
@@ -143,9 +145,9 @@ void UnzipStm::Rewind()
     ::unzClose(uf_);
     uf_ = ::unzOpen(name_.c_str());
     if(!uf_)
-        Error("unzOpen error");
+        IOError(name_, "unzOpen error");
     if(UNZ_OK != ::unzOpenCurrentFile(uf_))
-        Error("unzOpenCurrentFile error");
+        IOError(name_, "unzOpenCurrentFile error");
 }
 
 //-----------------------------------------------------------------------
@@ -170,6 +172,7 @@ Ptr<InStm> CreateUnpackStm(const char *name)
 class ZipStm : public OutPackStm, Noncopyable
 {
     ::zipFile   zf_;
+    String      name_;
     bool        file_open;
     
 public:
@@ -183,10 +186,10 @@ public:
 };
 
 //-----------------------------------------------------------------------
-ZipStm::ZipStm(const char *name) : zf_(::zipOpen(name, APPEND_STATUS_CREATE)), file_open(false)
+ZipStm::ZipStm(const char *name) : zf_(::zipOpen(name, APPEND_STATUS_CREATE)), name_(name), file_open(false)
 {
     if(!zf_)
-        Error("zipOpen error");
+        IOError(name_, "zipOpen error");
 }
 
 //-----------------------------------------------------------------------
@@ -201,18 +204,18 @@ ZipStm::~ZipStm()
 void ZipStm::PutChar(char c)
 {
     if(!file_open)
-        Error("zip: file not added to zip");
+        IOError(name_, "zip: file not added to zip");
     if(::zipWriteInFileInZip(zf_, &c, 1) < 0)
-        Error("zipWriteInFileInZip error");
+        IOError(name_, "zipWriteInFileInZip error");
 }
 
 //-----------------------------------------------------------------------
 void ZipStm::Write (const void *p, size_t cnt)
 {
     if(!file_open)
-        Error("zip: file not added to zip");
+        IOError(name_, "zip: file not added to zip");
     if(::zipWriteInFileInZip(zf_, p, cnt) < 0)
-        Error("zipWriteInFileInZip error");
+        IOError(name_, "zipWriteInFileInZip error");
 }
 
 //-----------------------------------------------------------------------
@@ -221,20 +224,31 @@ void ZipStm::BeginFile(const char *name, bool compress)
     if(!file_open)
         file_open = true;
     else if(ZIP_OK != ::zipCloseFileInZip(zf_))
-        Error("zipCloseFileInZip error");
-
-    time_t ltime;
-    time(&ltime);
-    tm *filedate = localtime(&ltime);
+        IOError(name_, "zipCloseFileInZip error");
 
     ::zip_fileinfo zi;
+    if(IsTestMode())
+    {
+        zi.tmz_date.tm_sec  = 0;
+        zi.tmz_date.tm_min  = 0;
+        zi.tmz_date.tm_hour = 9;
+        zi.tmz_date.tm_mday = 20;
+        zi.tmz_date.tm_mon  = 10;
+        zi.tmz_date.tm_year = 2003;
+    }
+    else
+    {
+        time_t ltime;
+        time(&ltime);
+        tm *filedate = localtime(&ltime);
 
-    zi.tmz_date.tm_sec  = filedate->tm_sec;
-    zi.tmz_date.tm_min  = filedate->tm_min;
-    zi.tmz_date.tm_hour = filedate->tm_hour;
-    zi.tmz_date.tm_mday = filedate->tm_mday;
-    zi.tmz_date.tm_mon  = filedate->tm_mon ;
-    zi.tmz_date.tm_year = filedate->tm_year;
+        zi.tmz_date.tm_sec  = filedate->tm_sec;
+        zi.tmz_date.tm_min  = filedate->tm_min;
+        zi.tmz_date.tm_hour = filedate->tm_hour;
+        zi.tmz_date.tm_mday = filedate->tm_mday;
+        zi.tmz_date.tm_mon  = filedate->tm_mon;
+        zi.tmz_date.tm_year = filedate->tm_year;
+    }
     zi.dosDate          = 0;
     zi.internal_fa      = 0;
     zi.external_fa      = 0;
@@ -243,7 +257,7 @@ void ZipStm::BeginFile(const char *name, bool compress)
                                         compress ? Z_DEFLATED : 0,
                                         compress ? Z_BEST_COMPRESSION : Z_NO_COMPRESSION))
     {
-        Error("zipOpenNewFileInZip error");
+        IOError(name_, "zipOpenNewFileInZip error");
     }
 }
 

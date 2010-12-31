@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <ctype.h>
 #include "streamconv.h"
+#include "error.h"
 #include "tiniconv/tiniconv.h"
 
 
@@ -56,7 +57,7 @@ ConvTini::ConvTini(const char* tocode, const char* fromcode, bool translit, bool
 {
     int ret = ::tiniconv_init(EncToCharset(fromcode), EncToCharset(tocode), TINICONV_OPTION_IGNORE_OUT_ILSEQ, &ctx_);
     if(ret != TINICONV_INIT_OK)
-        Error("tiniconv_init error");
+        ExternalError("tiniconv_init error");
 }
 
 //-----------------------------------------------------------------------
@@ -224,6 +225,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -258,7 +260,7 @@ size_t InConvStmTini::Fill() const
     const char  *pi = ibuf_;
     size_t outleft = sizeof(obuf_);
     if(!conv_.Convert(&pi, &inleft, &oend_, &outleft))
-        Error("iconv: invalid codesymbol");
+        IOError(UIFileName(), "tiniconv: invalid codesymbol");
 
     // fix input data and pointers
     iend_ = ibuf_ + inleft;
@@ -272,7 +274,7 @@ size_t InConvStmTini::Fill() const
 char InConvStmTini::GetChar()
 {
     if(ocur_ == oend_ && !Fill())
-        Error("conv: EOF");
+        IOError(UIFileName(), "tiniconv: EOF");
     return *ocur_++;
 }
 
@@ -301,7 +303,7 @@ size_t InConvStmTini::Read(void *buffer, size_t max_cnt)
 void InConvStmTini::UngetChar(char c)
 {
     if(ocur_ == obuf_)
-        Error("conv: can't unget");
+        IOError(UIFileName(), "tiniconv: can't unget");
     --ocur_;
 }
 

@@ -67,13 +67,13 @@ ConvLibiconv::ConvLibiconv(const char* tocode, const char* fromcode, bool transl
                                 : cd_(::iconv_open(tocode, fromcode))
 {
     if((::iconv_t)-1 == cd_)
-        Error("iconv_open error");
+        ExternalException("iconv_open error");
 #ifdef ICONV_SET_TRANSLITERATE
     if(translit)
     {
         int one = 1;
         if(0 != ::iconvctl(cd_, ICONV_SET_TRANSLITERATE, &one))
-            Error("iconvctl error");
+            ExternalException("iconvctl error");
     }
 #endif
 #ifdef ICONV_SET_DISCARD_ILSEQ
@@ -81,7 +81,7 @@ ConvLibiconv::ConvLibiconv(const char* tocode, const char* fromcode, bool transl
     {
         int one = 1;
         if(0 != ::iconvctl(cd_, ICONV_SET_DISCARD_ILSEQ, &one))
-            Error("iconvctl error");
+            ExternalException("iconvctl error");
     }
 #endif
 }
@@ -122,6 +122,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt);
     void        UngetChar(char c);
     void        Rewind();
+    String      UIFileName() const {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -156,7 +157,7 @@ size_t InLibiconvStm::Fill() const
     const char  *pi = ibuf_;
     size_t outleft = sizeof(obuf_);
     if((size_t)-1 == conv_.Convert(&pi, &inleft, &oend_, &outleft) && errno == EILSEQ)
-        Error("iconv: invalid codesymbol");
+        IOError(UIFileName(), "iconv: invalid codesymbol");
 
     // fix input data and pointers
     iend_ = ibuf_ + inleft;
@@ -170,7 +171,7 @@ size_t InLibiconvStm::Fill() const
 char InLibiconvStm::GetChar()
 {
     if(ocur_ == oend_ && !Fill())
-        Error("conv: EOF");
+        IOError(UIFileName(), "conv: EOF");
     return *ocur_++;
 }
 
@@ -199,7 +200,7 @@ size_t InLibiconvStm::Read(void *buffer, size_t max_cnt)
 void InLibiconvStm::UngetChar(char c)
 {
     if(ocur_ == obuf_)
-        Error("conv: can't unget");
+        IOError(UIFileName(), "conv: can't unget");
     --ocur_;
 }
 

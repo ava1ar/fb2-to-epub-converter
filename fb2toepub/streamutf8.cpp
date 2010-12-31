@@ -57,7 +57,7 @@ static const char* RoughEncoding(InStm *stm)
         break;
     }
 
-    Error("bad XML or unknown encoding");
+    IOError(stm->UIFileName(), "bad XML or unknown encoding");
     return NULL;
 }
 
@@ -78,6 +78,7 @@ public:
     size_t      Read(void *buffer, size_t max_cnt)  {return stm_->Read(buffer, max_cnt);}
     void        UngetChar(char c)                   {return stm_->UngetChar(c);}
     void        Rewind();
+    String      UIFileName() const                  {return stm_->UIFileName();}
 };
 
 //-----------------------------------------------------------------------
@@ -91,7 +92,7 @@ InStmUtf8::InStmUtf8(InStm *stm, const char *fromcode)
     if(!has_bom_)
         stm_->UngetUChar(uc);
     else if(stm_->GetUChar() != 0xBB || stm_->GetUChar() != 0xBF)
-        Error("internal: bad UTF-8 BOM");
+        InternalError(__FILE__, __LINE__, "bad UTF-8 BOM");
 }
 
 //-----------------------------------------------------------------------
@@ -113,11 +114,9 @@ static String ParseEncoding(InStm *stm)
 
     // skip version
     if (scanner->GetToken() != LexScanner::Token(LexScanner::XMLDECL) ||
-        scanner->GetToken() != LexScanner::Token('"') ||
-        scanner->GetToken().type_ != LexScanner::VERSION ||
-        scanner->GetToken() != LexScanner::Token('"'))
+        scanner->GetToken().type_ != LexScanner::VERSION)
     {
-        Error("encoding parsing error 1");
+        scanner->Error("XML version error");
     }
 
     // check if next is encoding
@@ -125,14 +124,14 @@ static String ParseEncoding(InStm *stm)
     if(t != LexScanner::Token(LexScanner::ENCODING))
         return "UTF-8";
 
-    // skip '"'
-    if (scanner->GetToken() != LexScanner::Token('"'))
-        Error("encoding parsing error 2");
+    // skip '='
+    if (scanner->GetToken().type_ != LexScanner::EQ)
+        scanner->Error("XML header: '=' expected");
 
     // next should be string value
     t = scanner->GetToken();
     if(t.type_ != LexScanner::VALUE)
-        Error("encoding parsing error 3");
+        scanner->Error("XML header: 'value' expected");
     return t.s_;
 }
 

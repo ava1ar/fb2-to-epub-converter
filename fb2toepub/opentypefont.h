@@ -18,15 +18,15 @@
 //
 
 
-#ifndef FB2TOEPUB__BASE64_H
-#define FB2TOEPUB__BASE64_H
+#ifndef FB2TOEPUB__OPENTYPEFONT_H
+#define FB2TOEPUB__OPENTYPEFONT_H
 
-#include "stream.h"
+#include "types.h"
 
 namespace Fb2ToEpub
 {
 
-    bool FB2TOEPUB_DECL DecodeBase64(const char *data, OutStmI *pout);
+    bool FB2TOEPUB_DECL IsFontEmbedAllowed(const String &fontpath);
 
 };  //namespace Fb2ToEpub
 

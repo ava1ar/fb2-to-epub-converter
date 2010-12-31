@@ -26,6 +26,7 @@
 #include "base64.h"
 #include "uuidmisc.h"
 #include "mangling.h"
+#include "opentypefont.h"
 //#include <streambuf>
 #include <sstream>
 #include <vector>
@@ -336,7 +337,7 @@ void ConverterPass2::AdjustUnitSizes()
             continue;
 #if defined(_DEBUG)
         if(unit.parent_ > i)
-            Error("internal error - wrong unit order");
+            InternalError(__FILE__, __LINE__, "wrong unit order");
 #endif
         units_[unit.parent_].size_ += unit.size_;
     }
@@ -381,7 +382,7 @@ int ConverterPass2::CalcLevelToSplit()
         {
 #if defined(_DEBUG)
             if(it->level_ >= tocLevels_)
-                Error("internal error: incorrect level");
+                InternalError(__FILE__, __LINE__, "incorrect level");
 #endif
             if(maxLevelSize[it->level_] < it->size_)
                 maxLevelSize[it->level_] = it->size_;
@@ -515,7 +516,7 @@ void ConverterPass2::BuildReferenceMaps(std::set<String> *noteRefIds)
                 RefidInfoMap::iterator it = refidToUnit_.lower_bound(newId);
 #if defined(_DEBUG)
                 if(it != refidToUnit_end && it->first == id)
-                    Error("internal error: duplicate reference id");
+                    InternalError(__FILE__, __LINE__, "duplicate reference id");
 #endif
                 refidToUnit_.insert(it, RefidInfoMap::value_type(newId, &*cit));
             }
@@ -624,7 +625,7 @@ void ConverterPass2::StartUnit(Unit::Type unitType, AttrMap *attrmap)
         case Unit::NOTES:       pout_->WriteStr("<div class=\"body_notes\">"); break;
         case Unit::COMMENTS:    pout_->WriteStr("<div class=\"body_comments\">"); break;
         case Unit::BODY_NONE:   break;
-        default:                Error("StartUnit internal error");
+        default:                InternalError(__FILE__, __LINE__, "StartUnit error");
         }
     }
     if(unit.type_ == Unit::SECTION)
@@ -741,6 +742,10 @@ void ConverterPass2::AddFontFiles(const ExtFileVector &fontfiles)
 {
     ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
     for(; cit < cit_end; ++cit)
+        if(!IsFontEmbedAllowed(cit->ospath_))
+            FontError(cit->ospath_, "embedding not allowed");
+
+    for(cit = fontfiles.begin(); cit < cit_end; ++cit)
     {
         // mangle (mangling == deflating + XORing), then store without compression
         Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
@@ -980,7 +985,7 @@ const String* ConverterPass2::AddId(const AttrMap &attrmap)
     // remap it to our new id
     id = refidToNew_[id];
     if(id.empty())
-        Error("AddId internal error");
+        InternalError(__FILE__, __LINE__, "AddId error");
 
     pout_->WriteFmt(" id=\"%s\"", EncodeStr(id).c_str());
     return &cit->second;
@@ -1028,7 +1033,7 @@ void ConverterPass2::ParseTextAndEndElement (const String &element)
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <" << element + ">";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </a>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -1070,20 +1075,20 @@ void ConverterPass2::FictionBook()
             if(!cit->first.compare(xmlns))
                 has_emptyfb = true;
             else if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                Error("bad FictionBook namespace definition");
+                s_->Error("bad FictionBook namespace definition");
             has_fb = true;
         }
         else if(!cit->second.compare(xlID))
         {
             if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                Error("bad xlink namespace definition");
+                s_->Error("bad xlink namespace definition");
             xlns_.insert(cit->first.substr(xmlns_len+1));
         }
     }
     if(!has_fb)
-        Error("missing FictionBook namespace definition");
+        s_->Error("missing FictionBook namespace definition");
     if(!has_emptyfb)
-        Error("non-empty FictionBook namespace not implemented");
+        s_->Error("non-empty FictionBook namespace not implemented");
 
     //<stylesheet>
     s_->SkipAll("stylesheet");
@@ -1128,7 +1133,7 @@ void ConverterPass2::a()
 
     String id = Findhref(attrmap);
     if(id.empty())
-        Error("<a> should have href attribute");
+        s_->Error("<a> should have href attribute");
 
     bool anchorSet = false;
     if(id[0] != '#')
@@ -1150,7 +1155,7 @@ void ConverterPass2::a()
         // remap it to our new id
         id = refidToNew_[id];
         if(id.empty())
-            Error("a() internal error");
+            InternalError(__FILE__, __LINE__, "a() error");
 
         String anchorid = noteidToAnchorId_[id];
         if(!anchorid.empty() && AddAnchorid(anchorid))
@@ -1210,7 +1215,7 @@ void ConverterPass2::a()
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <a>";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -1255,7 +1260,7 @@ void ConverterPass2::annotation(bool startUnit)
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <annotation>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
     }
@@ -1282,7 +1287,7 @@ void ConverterPass2::author()
     else if(s_->IsNextElement("nickname"))
         author = s_->SimpleTextElement("nickname");
     else
-        Error("<first-name> or <nickname> expected");
+        s_->Error("<first-name> or <nickname> expected");
 
     authors_.push_back(author);
     s_->SkipRestOfElementContent();
@@ -1298,7 +1303,7 @@ void ConverterPass2::binary()
     Binary b(attrmap["id"], attrmap["content-type"]);
     //if(b.file_.empty() || (b.type_ != "image/jpeg" && b.type_ != "image/png"))
     if(b.file_.empty() || b.type_.empty())
-        Error("invalid <binary> attributes");
+        s_->Error("invalid <binary> attributes");
     b.file_ = String("bin/") + b.file_;
     binaries_.push_back(b);
 
@@ -1313,10 +1318,11 @@ void ConverterPass2::binary()
         SetScannerDataMode setDataMode(s_);
         LexScanner::Token t = s_->GetToken();
         if(t.type_ != LexScanner::DATA)
-            Error("<binary> data expected");
+            s_->Error("<binary> data expected");
 
         pout_->BeginFile((String("OPS/") + b.file_).c_str(), false);
-        DecodeBase64(t.s_.c_str(), pout_);
+        if(!DecodeBase64(t.s_.c_str(), pout_))
+            s_->Error("base64 error");
     }
 
     s_->EndElement();
@@ -1402,7 +1408,7 @@ void ConverterPass2::cite()
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <cite>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </subtitle>, </empty-line>, </poem>, </table>
     }
@@ -1606,7 +1612,7 @@ void ConverterPass2::epigraph()
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <epigraph>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </empty-line>
     }
@@ -1677,7 +1683,7 @@ void ConverterPass2::image(bool fb2_inline, bool html_inline, bool scale)
         if(!fb2_inline)
         {
             if(html_inline)
-                Error("<image> internal error");
+                InternalError(__FILE__, __LINE__, "<image> error");
             AttrMap::const_iterator cit = attrmap.find("title");
             if(cit != attrmap.end())
                 pout_->WriteFmt("<p>%s</p>\n", EncodeStr(cit->second).c_str());
@@ -1896,7 +1902,7 @@ void ConverterPass2::section()
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <section>";
-                Error(ss.str().c_str());
+                s_->Error(ss.str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
 
@@ -2122,7 +2128,7 @@ void ConverterPass2::title(bool startUnit, const String &anchorid)
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <title>";
-            Error(ss.str().c_str());
+            s_->Error(ss.str());
         }
     }
     if(!anchorid.empty())
