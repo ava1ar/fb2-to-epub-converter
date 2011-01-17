@@ -700,7 +700,7 @@ static yyconst flex_int16_t yy_chk[896] =
 #define YY_RESTORE_YY_MORE_OFFSET
 #line 1 "scanner.l"
 /*
-    Copyright (C) 2010 Alexey Bobkov
+    Copyright (C) 2010, 2011 Alexey Bobkov
 
     This file is part of Fb2toepub converter.
 

@@ -279,6 +279,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\fb2parser.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\fb2toepub.cpp"
 				>
 			</File>
@@ -411,6 +415,10 @@
 			</File>
 			<File
 				RelativePath=".\error.h"
+				>
+			</File>
+			<File
+				RelativePath=".\fb2parser.h"
 				>
 			</File>
 			<File

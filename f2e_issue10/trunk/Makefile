@@ -1,5 +1,5 @@
 #
-#  Copyright (C) 2010 Alexey Bobkov
+#  Copyright (C) 2010, 2011 Alexey Bobkov
 #
 #  This file is part of Fb2toepub converter.
 #
