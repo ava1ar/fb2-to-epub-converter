@@ -28,54 +28,188 @@
 namespace Fb2ToEpub
 {
 
+static const String ename[E_COUNT] =
+{
+    "FictionBook",
+    "a",
+    "annotation",
+    "author",
+    "binary",
+    "body",
+    "book-name",
+    "book-title",
+    "cite",
+    "city",
+    "code",
+    "coverpage",
+    "custom-info",
+    "date",
+    "description",
+    "document-info",
+    "email",
+    "emphasis",
+    "empty-line",
+    "epigraph",
+    "first-name",
+    "genre",
+    "history",
+    "home-page",
+    "id",
+    "isbn",
+    "image",
+    "keywords",
+    "lang",
+    "last-name",
+    "middle-name",
+    "nickname",
+    "output-document-class",
+    "output",
+    "p",
+    "part",
+    "poem",
+    "program-used",
+    "publish-info",
+    "publisher",
+    "section",
+    "sequence",
+    "src-lang",
+    "src-ocr",
+    "src-title-info",
+    "src-url",
+    "stanza",
+    "strikethrough",
+    "strong",
+    "style",
+    "stylesheet",
+    "sub",
+    "subtitle",
+    "sup",
+    "table",
+    "td",
+    "text-author",
+    "th",
+    "title",
+    "title-info",
+    "tr",
+    "translator",
+    "v",
+    "version",
+    "year"
+};
+
 typedef std::vector<Ptr<ElementHandler> > HandlerVector;
 
+//-----------------------------------------------------------------------
+// Helper classes to parse stag and etag of element
+class Element : Noncopyable
+{
+    Ptr<LexScanner> s_;
+    bool            notempty_, notproc_;
+public:
+    Element(ElementType type, LexScanner *s, AttrMap *attrmap = NULL)
+        : s_(s), notempty_(s->BeginElement(ename[type], attrmap)), notproc_(true) {}
+    ~Element()
+        {if(notempty_ && notproc_) s_->EndElement();}
+
+    bool NotEmpty() const   {return notempty_;}
+    void SetProcessed()     {notproc_ = false;}
+};
+//-----------------------------------------------------------------------
+class NotEmptyElement : Noncopyable
+{
+    Ptr<LexScanner> s_;
+    bool            notproc_;
+public:
+    NotEmptyElement(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
+        {s_->BeginNotEmptyElement(ename[type], attrmap);}
+    ~NotEmptyElement()
+        {if(notproc_) s_->EndElement();}
+
+    void SetProcessed()     {notproc_ = false;}
+};
+//-----------------------------------------------------------------------
+class NotEmptyElementSkipRest : Noncopyable
+{
+    Ptr<LexScanner> s_;
+    bool            notproc_;
+public:
+    NotEmptyElementSkipRest(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
+        {s_->BeginNotEmptyElement(ename[type], attrmap);}
+    ~NotEmptyElementSkipRest()
+        {if(notproc_) s_->SkipRestOfElementContent();}
+
+    void SetProcessed()     {notproc_ = false;}
+};
 
 //-----------------------------------------------------------------------
-class AutoHandler
+// Helper class to automatically call element handler methods
+class AutoHandler : Noncopyable
 {
-    ElementHandler *h_;
+    ElementType                 type_;
+    Ptr<ElementHandler>         h_;
+    bool                        process_;
 public:
-    AutoHandler(const HandlerVector &handlers, ElementType type, const AttrMap *attrmap = NULL)
+    AutoHandler(ElementType type, const HandlerVector &hv, LexScanner *s, AttrMap *attrmap = NULL)
+        : type_(type), h_(hv[type]), process_(h_->Start(type, s, attrmap)) {}
+    ~AutoHandler()
+        {h_->End(type_);}
+
+    bool ToProcess() const              {return process_;}
+    void Contents(const String &data)   {h_->Contents(type_, data);}
+};
+
+//-----------------------------------------------------------------------
+// And combination of above helper classes
+template<class ET>
+class AutoHandlerFor : Noncopyable
+{
+    ET          e_;
+    AutoHandler h_;
+public:
+    AutoHandlerFor(ElementType type, const HandlerVector &hv, LexScanner *s, AttrMap *attrmap = NULL)
+        : e_(type, s, attrmap), h_(type, hv, s, attrmap)
     {
-        size_t idx = type;
-#if defined(_DEBUG)
-        if(idx >= handlers.size())
-        {
-            std::ostringstream ss;
-            ss << "Bad index " << idx;
-            InternalError(__FILE__, __LINE__, ss.str());
-        }
-        if(!handlers[idx])
-        {
-            std::ostringstream ss;
-            ss << "Element " << idx << " not registered";
-            InternalError(__FILE__, __LINE__, ss.str());
-        }
-#endif
-        h_ = handlers[idx];
-        h_->Start(attrmap);
+        if(!h_.ToProcess())
+            e_.SetProcessed();
     }
 
-    ~AutoHandler()                      {h_->End();}
-    void Contents(const String &data)   {h_->Contents(data);}
+    bool NotEmpty() const               {return e_.NotEmpty();}
+    bool ToProcess() const              {return h_.ToProcess();}
+    void Contents(const String &data)   {h_.Contents(data);}
 };
 
 
+
+//-----------------------------------------------------------------------
+// Dummy handler is used if custom handler is not registered
+class DummyElementHandler : public ElementHandler
+{
+public:
+    //virtuals
+    bool    Start   (ElementType type, LexScanner *s, const AttrMap *attrmap)   {return true;}
+    void    Contents(ElementType type, const String &data)                      {}
+    void    End     (ElementType type)                                          {}
+};
+
+
+
+//-----------------------------------------------------------------------
+// Parser itself
 //-----------------------------------------------------------------------
 class Fb2ParserImpl : public Fb2Parser, Noncopyable
 {
 public:
-    Fb2ParserImpl(LexScanner *scanner) : s_(scanner) {}
+    Fb2ParserImpl(LexScanner *scanner) : s_(scanner), hv_(E_COUNT, dummy_) {}
 
     //virtuals
     void Register(ElementType type, ElementHandler *h);
     void Parse();
 
 private:
-    Ptr<LexScanner>     s_;
-    HandlerVector       handlers_;
-    std::set<String>    xlns_;  // xlink namespaces
+    Ptr<LexScanner>             s_;
+    HandlerVector               hv_;
+    std::set<String>            xlns_;  // xlink namespaces
+    static Ptr<ElementHandler>  dummy_;
 
     // FictionBook elements
     void FictionBook            ();
@@ -92,7 +226,7 @@ private:
     //void coverpage              ();
     //void custom_info            ();
     //void date                   ();
-    //void description            ();
+    void description            ();
     //void document_info          ();
     //void email                  ();
     //void emphasis               ();
@@ -147,6 +281,9 @@ private:
 
 
 //-----------------------------------------------------------------------
+Ptr<ElementHandler> Fb2ParserImpl::dummy_ = new DummyElementHandler();
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::Register(ElementType type, ElementHandler *h)
 {
     size_t idx = type;
@@ -158,9 +295,7 @@ void Fb2ParserImpl::Register(ElementType type, ElementHandler *h)
         InternalError(__FILE__, __LINE__, ss.str());
     }
 #endif
-    if(handlers_.size() < idx+1)
-        handlers_.resize(idx+1);
-    handlers_[idx] = h;
+    hv_[idx] = h;
 }
 
 //-----------------------------------------------------------------------
@@ -173,7 +308,7 @@ void Fb2ParserImpl::Parse()
 void Fb2ParserImpl::FictionBook()
 {
     AttrMap attrmap;
-    s_->BeginNotEmptyElement("FictionBook", &attrmap);
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_FICTIONBOOK, hv_, s_, &attrmap);
 
     // namespaces
     AttrMap::const_iterator cit = attrmap.begin(), cit_end = attrmap.end();
@@ -204,11 +339,8 @@ void Fb2ParserImpl::FictionBook()
     if(!has_emptyfb)
         s_->Error("non-empty FictionBook namespace not implemented");
 
+    if(h.ToProcess())
     {
-        AutoHandler h(handlers_, E_FICTIONBOOK);
-
-        /*
-
         //<stylesheet>
         s_->SkipAll("stylesheet");
         //</stylesheet>
@@ -217,6 +349,7 @@ void Fb2ParserImpl::FictionBook()
         description();
         //</description>
 
+        /*
         //<body>
         body();
         if(s_->IsNextElement("body"))
@@ -229,11 +362,8 @@ void Fb2ParserImpl::FictionBook()
         while(s_->IsNextElement("binary"))
             binary();
         //</binary>
-
         */
     }
-
-    s_->SkipRestOfElementContent(); // skip rest of <FictionBook>
 }
 
 /*
@@ -243,7 +373,9 @@ void Fb2ParserImpl::a()
     AttrMap attrmap;
     bool notempty = s_->BeginElement("a", &attrmap);
 
-    handlers_[E_A]->Beging(attrmap);
+    AutoHandler h(hdls_, E_A, &attrmap);
+    if(!notempty)
+        return;
 
     SetScannerDataMode setDataMode(s_);
     for(;;)
@@ -252,14 +384,11 @@ void Fb2ParserImpl::a()
         switch(t.type_)
         {
         default:
-            handlers_[E_A]->
-
             s_->EndElement();
             return;
 
         case LexScanner::DATA:
-            sectionSize_ += t.size_;
-            pout_->WriteStr(s_->GetToken().s_.c_str());
+            h.Contents(t.s_);
             continue;
 
         case LexScanner::START:
@@ -297,18 +426,10 @@ void Fb2ParserImpl::annotation(bool startUnit)
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("annotation", &attrmap);
-    if(startUnit)
-        StartUnit(Unit::ANNOTATION);
 
-    pout_->WriteStr("<div class=\"annotation\"");
-    AddId(attrmap);
-    CopyXmlLang(attrmap);
+    AutoHandler h(hdls_, E_ANNOTATION, &attrmap);
     if(!notempty)
-    {
-        pout_->WriteStr("/>");
         return;
-    }
-    pout_->WriteStr(">");
 
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
@@ -334,7 +455,6 @@ void Fb2ParserImpl::annotation(bool startUnit)
         //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
     }
 
-    pout_->WriteStr("</div>\n");
     s_->EndElement();
 }
 
@@ -342,23 +462,7 @@ void Fb2ParserImpl::annotation(bool startUnit)
 void Fb2ParserImpl::author()
 {
     s_->BeginNotEmptyElement("author");
-
-    String author;
-    if(s_->IsNextElement("first-name"))
-    {
-        author = s_->SimpleTextElement("first-name");
-
-        if(s_->IsNextElement("middle-name"))
-            author = Concat(author, " ", s_->SimpleTextElement("middle-name"));
-
-        author = Concat(author, " ", s_->SimpleTextElement("last-name"));
-    }
-    else if(s_->IsNextElement("nickname"))
-        author = s_->SimpleTextElement("nickname");
-    else
-        s_->Error("<first-name> or <nickname> expected");
-
-    authors_.push_back(author);
+    AutoHandler h(hdls_, E_AUTHOR);
     s_->SkipRestOfElementContent();
 }
 
@@ -367,33 +471,7 @@ void Fb2ParserImpl::binary()
 {
     AttrMap attrmap;
     s_->BeginNotEmptyElement("binary", &attrmap);
-
-    // store binary attributes
-    Binary b(attrmap["id"], attrmap["content-type"]);
-    //if(b.file_.empty() || (b.type_ != "image/jpeg" && b.type_ != "image/png"))
-    if(b.file_.empty() || b.type_.empty())
-        s_->Error("invalid <binary> attributes");
-    b.file_ = String("bin/") + b.file_;
-    binaries_.push_back(b);
-
-    // If it is a cover page image file, remember binary index.
-    // It is necessary to add cover image description to metadata
-    // section of content.opf
-    if(b.file_ == coverFile_ && coverBinIdx_ < 0)
-        coverBinIdx_ = binaries_.size()-1;
-
-    // store binary file
-    {
-        SetScannerDataMode setDataMode(s_);
-        LexScanner::Token t = s_->GetToken();
-        if(t.type_ != LexScanner::DATA)
-            s_->Error("<binary> data expected");
-
-        pout_->BeginFile((String("OPS/") + b.file_).c_str(), false);
-        if(!DecodeBase64(t.s_.c_str(), pout_))
-            s_->Error("base64 error");
-    }
-
+    AutoHandler h(hdls_, E_BINARY, &attrmap);
     s_->EndElement();
 }
 
@@ -403,15 +481,11 @@ void Fb2ParserImpl::body()
     AttrMap attrmap;
     s_->BeginNotEmptyElement("body", &attrmap);
 
-    // set body language
-    SetLanguage l(&bodyXmlLang_, attrmap);
+    AutoHandler h(hdls_, E_BODY, &attrmap);
 
     //<image>
     if(s_->IsNextElement("image"))
-    {
-        StartUnit(Unit::IMAGE);
-        image(false, false, true);
-    }
+        image();
     //</image>
 
     //<title>
@@ -431,8 +505,6 @@ void Fb2ParserImpl::body()
         //</section>
     }
     while(s_->IsNextElement("section"));
-
-    EndUnit();
 
     s_->SkipRestOfElementContent(); // skip rest of <body>
 }
@@ -571,32 +643,36 @@ String Fb2ParserImpl::date__epub()
     s_->EndElement();
     return IsDateCorrect(text) ? text : String("");
 }
+*/
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::description()
 {
-    s_->BeginNotEmptyElement("description");
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_DESCRIPTION, hv_, s_);
+    if(h.ToProcess())
+    {
+        /*
+        //<title-info>
+        title_info();
+        //</title-info>
 
-    //<title-info>
-    title_info();
-    //</title-info>
+        //<src-title-info>
+        s_->SkipIfElement("src-title-info");
+        //</src-title-info>
 
-    //<src-title-info>
-    s_->SkipIfElement("src-title-info");
-    //</src-title-info>
+        //<document-info>
+        document_info();
+        //</document-info>
 
-    //<document-info>
-    document_info();
-    //</document-info>
-
-    //<publish-info>
-    if(s_->IsNextElement("publish-info"))
-        publish_info();
-    //</publish-info>
-
-    s_->SkipRestOfElementContent(); // skip rest of <description>
+        //<publish-info>
+        if(s_->IsNextElement("publish-info"))
+            publish_info();
+        //</publish-info>
+        */
+    }
 }
 
+/*
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::document_info()
 {

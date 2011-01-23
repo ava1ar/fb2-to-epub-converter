@@ -104,10 +104,9 @@ namespace Fb2ToEpub
     class ElementHandler : public Object
     {
     public:
-        virtual void    Start(const AttrMap *attrmap)   = 0;
-        virtual void    Contents(const String &data)    = 0;
-        virtual void    End()                           = 0;
-        virtual void    Error(const String &what)       = 0;
+        virtual bool    Start   (ElementType type, LexScanner *s, const AttrMap *attrmap)   = 0;
+        virtual void    Contents(ElementType type, const String &data)                      = 0;
+        virtual void    End     (ElementType type)                                          = 0;
     };
 
     //-----------------------------------------------------------------------
