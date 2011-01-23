@@ -104,41 +104,47 @@ typedef std::vector<Ptr<ElementHandler> > HandlerVector;
 class Element : Noncopyable
 {
     Ptr<LexScanner> s_;
-    bool            notempty_, notproc_;
+    bool            notempty_;
 public:
-    Element(ElementType type, LexScanner *s, AttrMap *attrmap = NULL)
-        : s_(s), notempty_(s->BeginElement(ename[type], attrmap)), notproc_(true) {}
+    Element(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
+        {notempty_ = s_->BeginElement(ename[type], attrmap);}
     ~Element()
-        {if(notempty_ && notproc_) s_->EndElement();}
+        {if(notempty_) s_->EndElement();}
 
     bool NotEmpty() const   {return notempty_;}
-    void SetProcessed()     {notproc_ = false;}
+};
+//-----------------------------------------------------------------------
+class ElementSkipRest : Noncopyable
+{
+    Ptr<LexScanner> s_;
+    bool            notempty_;
+public:
+    ElementSkipRest(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
+        {notempty_ = s_->BeginElement(ename[type], attrmap);}
+    ~ElementSkipRest()
+        {if(notempty_) s_->SkipRestOfElementContent();}
+
+    bool NotEmpty() const   {return notempty_;}
 };
 //-----------------------------------------------------------------------
 class NotEmptyElement : Noncopyable
 {
     Ptr<LexScanner> s_;
-    bool            notproc_;
 public:
     NotEmptyElement(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
         {s_->BeginNotEmptyElement(ename[type], attrmap);}
     ~NotEmptyElement()
-        {if(notproc_) s_->EndElement();}
-
-    void SetProcessed()     {notproc_ = false;}
+        {s_->EndElement();}
 };
 //-----------------------------------------------------------------------
 class NotEmptyElementSkipRest : Noncopyable
 {
     Ptr<LexScanner> s_;
-    bool            notproc_;
 public:
     NotEmptyElementSkipRest(ElementType type, LexScanner *s, AttrMap *attrmap = NULL) : s_(s)
         {s_->BeginNotEmptyElement(ename[type], attrmap);}
     ~NotEmptyElementSkipRest()
-        {if(notproc_) s_->SkipRestOfElementContent();}
-
-    void SetProcessed()     {notproc_ = false;}
+        {s_->SkipRestOfElementContent();}
 };
 
 //-----------------------------------------------------------------------
@@ -147,14 +153,16 @@ class AutoHandler : Noncopyable
 {
     ElementType                 type_;
     Ptr<ElementHandler>         h_;
-    bool                        process_;
 public:
-    AutoHandler(ElementType type, const HandlerVector &hv, LexScanner *s, AttrMap *attrmap = NULL)
-        : type_(type), h_(hv[type]), process_(h_->Start(type, s, attrmap)) {}
+    AutoHandler(ElementType type, const HandlerVector &hv, AttrMap *attrmap = NULL) : type_(type), h_(hv[type])
+    {
+        h_->Start(type, attrmap);
+    }
     ~AutoHandler()
-        {h_->End(type_);}
+    {
+        h_->End(type_);
+    }
 
-    bool ToProcess() const              {return process_;}
     void Contents(const String &data)   {h_->Contents(type_, data);}
 };
 
@@ -167,14 +175,9 @@ class AutoHandlerFor : Noncopyable
     AutoHandler h_;
 public:
     AutoHandlerFor(ElementType type, const HandlerVector &hv, LexScanner *s, AttrMap *attrmap = NULL)
-        : e_(type, s, attrmap), h_(type, hv, s, attrmap)
-    {
-        if(!h_.ToProcess())
-            e_.SetProcessed();
-    }
+        : e_(type, s, attrmap), h_(type, hv, attrmap) {}
 
     bool NotEmpty() const               {return e_.NotEmpty();}
-    bool ToProcess() const              {return h_.ToProcess();}
     void Contents(const String &data)   {h_.Contents(data);}
 };
 
@@ -186,9 +189,9 @@ class DummyElementHandler : public ElementHandler
 {
 public:
     //virtuals
-    bool    Start   (ElementType type, LexScanner *s, const AttrMap *attrmap)   {return true;}
-    void    Contents(ElementType type, const String &data)                      {}
-    void    End     (ElementType type)                                          {}
+    void    Start   (ElementType type, const AttrMap *attrmap)  {}
+    void    Contents(ElementType type, const String &data)      {}
+    void    End     (ElementType type)                          {}
 };
 
 
@@ -211,70 +214,76 @@ private:
     std::set<String>            xlns_;  // xlink namespaces
     static Ptr<ElementHandler>  dummy_;
 
+    void ParseText              (ElementType type, AttrMap *attrmap);
+    void ParseTextAttr          (ElementType type);
+    void ParseTextNoAttr        (ElementType type);
+    void SimpleTextAttr         (ElementType type);
+    void SimpleTextNoAttr       (ElementType type);
+
     // FictionBook elements
     void FictionBook            ();
-    //void a                      ();
-    //void annotation             ();
-    //void author                 ();
-    //void binary                 ();
-    //void body                   ();
+    void a                      ();
+    void annotation             ();
+    void author                 ();
+    void binary                 ();
+    void body                   ();
     //void book_name              ();
-    //void book_title             ();
-    //void cite                   ();
+    void book_title             ();
+    void cite                   ();
     //void city                   ();
-    //void code                   ();
-    //void coverpage              ();
+    void code                   ();
+    void coverpage              ();
     //void custom_info            ();
-    //void date                   ();
+    void date                   ();
     void description            ();
-    //void document_info          ();
+    void document_info          ();
     //void email                  ();
-    //void emphasis               ();
-    //void empty_line             ();
-    //void epigraph               ();
-    //void first_name             ();
+    void emphasis               ();
+    void empty_line             ();
+    void epigraph               ();
+    void first_name             ();
     //void genre                  ();
     //void history                ();
     //void home_page              ();
-    //void id                     ();
-    //void image                  ();
-    //void isbn                   ();
+    void id                     ();
+    void image                  ();
+    void isbn                   ();
     //void keywords               ();
-    //void lang                   ();
-    //void last_name              ();
-    //void middle_name            ();
-    //void nickname               ();
+    void lang                   ();
+    void last_name              ();
+    void middle_name            ();
+    void nickname               ();
     //void output_document_class  ();
     //void output                 ();
-    //void p                      ();
+    void p                      ();
     //void part                   ();
-    //void poem                   ();
+    void poem                   ();
     //void program_used           ();
-    //void publish_info           ();
+    void publish_info           ();
     //void publisher              ();
-    //void section                ();
+    void section                ();
     //void sequence               ();
     //void src_lang               ();
     //void src_ocr                ();
     //void src_title_info         ();
     //void src_url                ();
-    //void stanza                 ();
-    //void strikethrough          ();
-    //void strong                 ();
-    //void style                  ();
+    void stanza                 ();
+    void strikethrough          ();
+    void strong                 ();
+    void style                  ();
     //void stylesheet             ();
-    //void sub                    ();
-    //void subtitle               ();
-    //void sup                    ();
-    //void table                  ();
-    //void td                     ();
-    //void text_author            ();
-    //void th                     ();
-    //void title                  ();
-    //void title_info             ();
-    //void tr                     ();
+    void sub                    ();
+    void subtitle               ();
+    void sup                    ();
+    void table                  ();
+    void td                     ();
+    void text_author            ();
+    void th                     ();
+    void title                  ();
+    void title_info             ();
+    void tr                     ();
     //void translator             ();
-    //void v                      ();
+    void v                      ();
     //void version                ();
     //void year                   ();
 };
@@ -302,6 +311,96 @@ void Fb2ParserImpl::Register(ElementType type, ElementHandler *h)
 void Fb2ParserImpl::Parse()
 {
     FictionBook();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::ParseText(ElementType type, AttrMap *attrmap)
+{
+    AutoHandlerFor<Element> h(type, hv_, s_, attrmap);
+    if(!h.NotEmpty())
+        return;
+
+    SetScannerDataMode setDataMode(s_);
+    for(;;)
+    {
+        LexScanner::Token t = s_->LookAhead();
+        switch(t.type_)
+        {
+        default:
+            return;
+
+        case LexScanner::DATA:
+            h.Contents(s_->GetToken().s_);
+            continue;
+
+        case LexScanner::START:
+            //<strong>, <emphasis>, <stile>, <a>, <strikethrough>, <sub>, <sup>, <code>, <image>
+            if(!t.s_.compare("strong"))
+                strong();
+            else if(!t.s_.compare("emphasis"))
+                emphasis();
+            else if(!t.s_.compare("style"))
+                style();
+            else if(!t.s_.compare("a"))
+                a();
+            else if(!t.s_.compare("strikethrough"))
+                strikethrough();
+            else if(!t.s_.compare("sub"))
+                sub();
+            else if(!t.s_.compare("sup"))
+                sup();
+            else if(!t.s_.compare("code"))
+                code();
+            else if(!t.s_.compare("image"))
+                image();
+            else
+            {
+                std::ostringstream ss;
+                ss << "<" << t.s_ << "> unexpected in <" << ename[type] + ">";
+                s_->Error(ss.str());
+            }
+            continue;
+            //</strong>, </emphasis>, </stile>, </a>, </strikethrough>, </sub>, </sup>, </code>, </image>
+        }
+    }
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::ParseTextAttr(ElementType type)
+{
+    AttrMap attrmap;
+    ParseText(type, &attrmap);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::ParseTextNoAttr(ElementType type)
+{
+    ParseText(type, NULL);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::SimpleTextAttr(ElementType type)
+{
+    AttrMap attrmap;
+    AutoHandlerFor<Element> h(type, hv_, s_, &attrmap);
+    if(h.NotEmpty())
+    {
+        SetScannerDataMode setDataMode(s_);
+        if(s_->LookAhead().type_ == LexScanner::DATA)
+            h.Contents(s_->GetToken().s_);
+    }
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::SimpleTextNoAttr(ElementType type)
+{
+    AutoHandlerFor<Element> h(type, hv_, s_);
+    if(h.NotEmpty())
+    {
+        SetScannerDataMode setDataMode(s_);
+        if(s_->LookAhead().type_ == LexScanner::DATA)
+            h.Contents(s_->GetToken().s_);
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -339,42 +438,34 @@ void Fb2ParserImpl::FictionBook()
     if(!has_emptyfb)
         s_->Error("non-empty FictionBook namespace not implemented");
 
-    if(h.ToProcess())
-    {
-        //<stylesheet>
-        s_->SkipAll("stylesheet");
-        //</stylesheet>
+    //<stylesheet>
+    s_->SkipAll("stylesheet");
+    //</stylesheet>
 
-        //<description>
-        description();
-        //</description>
+    //<description>
+    description();
+    //</description>
 
-        /*
-        //<body>
+    //<body>
+    body();
+    if(s_->IsNextElement("body"))
         body();
-        if(s_->IsNextElement("body"))
-            body();
-        if(s_->IsNextElement("body"))
-            body();
-        //</body>
+    if(s_->IsNextElement("body"))
+        body();
+    //</body>
 
-        //<binary>
-        while(s_->IsNextElement("binary"))
-            binary();
-        //</binary>
-        */
-    }
+    //<binary>
+    while(s_->IsNextElement("binary"))
+        binary();
+    //</binary>
 }
 
-/*
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::a()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("a", &attrmap);
-
-    AutoHandler h(hdls_, E_A, &attrmap);
-    if(!notempty)
+    AutoHandlerFor<Element> h(E_A, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
 
     SetScannerDataMode setDataMode(s_);
@@ -384,11 +475,10 @@ void Fb2ParserImpl::a()
         switch(t.type_)
         {
         default:
-            s_->EndElement();
             return;
 
         case LexScanner::DATA:
-            h.Contents(t.s_);
+            h.Contents(s_->GetToken().s_);
             continue;
 
         case LexScanner::START:
@@ -408,7 +498,7 @@ void Fb2ParserImpl::a()
             else if(!t.s_.compare("code"))
                 code();
             else if(!t.s_.compare("image"))
-                image(true, true, false);
+                image();
             else
             {
                 std::ostringstream ss;
@@ -422,13 +512,11 @@ void Fb2ParserImpl::a()
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::annotation(bool startUnit)
+void Fb2ParserImpl::annotation()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("annotation", &attrmap);
-
-    AutoHandler h(hdls_, E_ANNOTATION, &attrmap);
-    if(!notempty)
+    AutoHandlerFor<Element> h(E_ANNOTATION, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
 
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
@@ -454,34 +542,49 @@ void Fb2ParserImpl::annotation(bool startUnit)
         }
         //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
     }
-
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::author()
 {
-    s_->BeginNotEmptyElement("author");
-    AutoHandler h(hdls_, E_AUTHOR);
-    s_->SkipRestOfElementContent();
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_AUTHOR, hv_, s_);
+    if(s_->IsNextElement("first-name"))
+    {
+        //<first-name>
+        first_name();
+        //</first-name>
+
+        //<middle-name>
+        if(s_->IsNextElement("middle-name"))
+            middle_name();
+        //<middle-name>
+
+        //<last-name>
+        last_name();
+        //</last-name>
+    }
+    else if(s_->IsNextElement("nickname"))
+    {
+        //<nickname>
+        nickname();
+        //</nickname>
+    }
+    else
+        s_->Error("<first-name> or <nickname> expected");
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::binary()
 {
     AttrMap attrmap;
-    s_->BeginNotEmptyElement("binary", &attrmap);
-    AutoHandler h(hdls_, E_BINARY, &attrmap);
-    s_->EndElement();
+    AutoHandlerFor<NotEmptyElement> h(E_BINARY, hv_, s_, &attrmap);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::body()
 {
     AttrMap attrmap;
-    s_->BeginNotEmptyElement("body", &attrmap);
-
-    AutoHandler h(hdls_, E_BODY, &attrmap);
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_BODY, hv_, s_, &attrmap);
 
     //<image>
     if(s_->IsNextElement("image"))
@@ -490,7 +593,7 @@ void Fb2ParserImpl::body()
 
     //<title>
     if(s_->IsNextElement("title"))
-        title(true);
+        title();
     //</title>
 
     //<epigraph>
@@ -505,30 +608,19 @@ void Fb2ParserImpl::body()
         //</section>
     }
     while(s_->IsNextElement("section"));
-
-    s_->SkipRestOfElementContent(); // skip rest of <body>
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::book_title()
 {
-    title_ = s_->SimpleTextElement("book-title");
+    SimpleTextNoAttr(E_BOOK_TITLE);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::cite()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("cite", &attrmap);
-    pout_->WriteStr("<div class=\"citation\"");
-    AddId(attrmap);
-    CopyXmlLang(attrmap);
-    if(!notempty)
-    {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_CITE, hv_, s_, &attrmap);
 
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
@@ -558,125 +650,56 @@ void Fb2ParserImpl::cite()
     while(s_->IsNextElement("text-author"))
         text_author();
     //</text-author>
-
-    s_->EndElement();
-    pout_->WriteStr("</div>\n");
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::code()
 {
-    if(s_->BeginElement("code"))
-    {
-        pout_->WriteStr("<code class=\"e_code\">");
-        ParseTextAndEndElement("code");
-        pout_->WriteStr("</code>");
-    }
+    ParseTextNoAttr(E_CODE);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::coverpage()
 {
-    s_->BeginNotEmptyElement("coverpage");
-    StartUnit(Unit::COVERPAGE);
+    AutoHandlerFor<NotEmptyElement> h(E_COVERPAGE, hv_, s_);
     do
-    {
-        pout_->WriteStr("<div class=\"coverpage\">");
-        image(true, false, true);
-        pout_->WriteStr("</div>");
-    }
+        image();
     while(s_->IsNextElement("image"));
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::date()
 {
-    AttrMap attrmap;
-    if(s_->BeginElement("date"), &attrmap)
-    {
-        SetScannerDataMode setDataMode(s_);
-        if(s_->LookAhead().type_ == LexScanner::DATA)
-        {
-            pout_->WriteFmt("<p class=\"date\"");
-            CopyXmlLang(attrmap);
-            pout_->WriteFmt(">%s</p>\n", s_->GetToken().s_.c_str());
-        }
-        s_->EndElement();
-    }
+    SimpleTextAttr(E_DATE);
 }
-
-//-----------------------------------------------------------------------
-static bool IsDateCorrect(const String &s)
-{
-    // date format should be YYYY[-MM[-DD]]
-    // (but we don't check if year, month or day value is valid!)
-    if(s.length() < 4 || !isdigit(s[0]) || !isdigit(s[1]) || !isdigit(s[2]) || !isdigit(s[3]))
-        return false;
-    if(s.length() > 4 && (s.length() < 7 || s[4] != '-' || !isdigit(s[5]) || !isdigit(s[6])))
-        return false;
-    if(s.length() > 7 && (s.length() != 10 || s[7] != '-' || !isdigit(s[8]) || !isdigit(s[9])))
-        return false;
-    return true;
-}
-
-//-----------------------------------------------------------------------
-String Fb2ParserImpl::date__epub()
-{
-    AttrMap attrmap;
-    bool notempty = s_->BeginElement("date", &attrmap);
-
-    String text = attrmap["value"];
-    if(IsDateCorrect(text))
-    {
-        if(notempty)
-            s_->EndElement();
-        return text;
-    }
-
-    if(!notempty)
-        return "";
-
-    SetScannerDataMode setDataMode(s_);
-    if(s_->LookAhead().type_ == LexScanner::DATA)
-        text = s_->GetToken().s_;
-    s_->EndElement();
-    return IsDateCorrect(text) ? text : String("");
-}
-*/
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::description()
 {
     AutoHandlerFor<NotEmptyElementSkipRest> h(E_DESCRIPTION, hv_, s_);
-    if(h.ToProcess())
-    {
-        /*
-        //<title-info>
-        title_info();
-        //</title-info>
 
-        //<src-title-info>
-        s_->SkipIfElement("src-title-info");
-        //</src-title-info>
+    //<title-info>
+    title_info();
+    //</title-info>
 
-        //<document-info>
-        document_info();
-        //</document-info>
+    //<src-title-info>
+    s_->SkipIfElement("src-title-info");
+    //</src-title-info>
 
-        //<publish-info>
-        if(s_->IsNextElement("publish-info"))
-            publish_info();
-        //</publish-info>
-        */
-    }
+    //<document-info>
+    document_info();
+    //</document-info>
+
+    //<publish-info>
+    if(s_->IsNextElement("publish-info"))
+        publish_info();
+    //</publish-info>
 }
 
-/*
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::document_info()
 {
-    s_->BeginNotEmptyElement("document-info");
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_DOCUMENT_INFO, hv_, s_);
 
     //<author>
     s_->CheckAndSkipElement("author");
@@ -702,43 +725,27 @@ void Fb2ParserImpl::document_info()
     //<id>
     id();
     //<id>
-
-    s_->SkipRestOfElementContent(); // skip rest of <document-info>
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::emphasis()
 {
-    if(s_->BeginElement("emphasis"))
-    {
-        pout_->WriteStr("<em class=\"emphasis\">");
-        ParseTextAndEndElement("emphasis");
-        pout_->WriteStr("</em>");
-    }
+    ParseTextNoAttr(E_EMPHASIS);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::empty_line()
 {
-    bool notempty = s_->BeginElement("empty-line");
-    pout_->WriteStr("<p class=\"empty-line\"> </p>\n");
-    if(notempty)
-        s_->EndElement();
+    AutoHandlerFor<Element> h(E_EMPTY_LINE, hv_, s_);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::epigraph()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("epigraph", &attrmap);
-    pout_->WriteStr("<div class=\"epigraph\"");
-    AddId(attrmap);
-    if(!notempty)
-    {
-        pout_->WriteStr("/>");
+    AutoHandlerFor<Element> h(E_EPIGRAPH, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
-    }
-    pout_->WriteStr(">");
 
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
@@ -766,135 +773,73 @@ void Fb2ParserImpl::epigraph()
     while(s_->IsNextElement("text-author"))
         text_author();
     //</text-author>
+}
 
-    s_->EndElement();
-    pout_->WriteStr("</div>\n");
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::first_name()
+{
+    SimpleTextNoAttr(E_FIRST_NAME);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::id()
 {
-    static const String uuidpfx = "urn:uuid:";
-
-    String id = s_->SimpleTextElement("id"), uuid = id;
-    if(!uuid.compare(0, uuidpfx.length(), uuidpfx))
-        uuid = uuid.substr(uuidpfx.length());
-    if(!IsValidUUID(uuid))
-    {
-        id1_ = id;
-        uuid = GenerateUUID();
-    }
-
-    id_ = uuidpfx + uuid;
-    MakeAdobeKey(uuid, adobeKey_);
+    SimpleTextNoAttr(E_ID);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::image(bool fb2_inline, bool html_inline, bool scale)
+void Fb2ParserImpl::image()
 {
-    AttrMap attrmap;
-    bool notempty = s_->BeginElement("image", &attrmap);
-
-    // get file href
-    String href = Findhref(attrmap), alt = attrmap["alt"];
-    if(!href.empty())
-    {
-        if(href[0] == '#')
-        {
-            // internal reference
-            href = String("bin/") + href.substr(1);
-
-            // remember name of the cover page image file
-            if(units_[unitIdx_].type_ == Unit::COVERPAGE && coverFile_.empty())
-                coverFile_ = href;
-        }
-
-        bool has_id = !fb2_inline && attrmap.find("id") != attrmap.end();
-        if(has_id)
-        {
-            pout_->WriteStr("<div");
-            AddId(attrmap);
-            pout_->WriteStr(">");
-        }
-
-        String group = html_inline ? "span" : "div";
-
-        pout_->WriteFmt("<%s class=\"image\">", group.c_str());
-        if(scale)
-            pout_->WriteFmt("<img style=\"height: 100%%;\" alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
-        else
-            pout_->WriteFmt("<img alt=\"%s\" src=\"%s\"/>", EncodeStr(alt).c_str(), EncodeStr(href).c_str());
-
-        if(!fb2_inline)
-        {
-            if(html_inline)
-                InternalError(__FILE__, __LINE__, "<image> error");
-            AttrMap::const_iterator cit = attrmap.find("title");
-            if(cit != attrmap.end())
-                pout_->WriteFmt("<p>%s</p>\n", EncodeStr(cit->second).c_str());
-        }
-        pout_->WriteFmt("</%s>", group.c_str());
-
-        if(has_id)
-            pout_->WriteStr("</div>\n");
-    }
-    if(!notempty)
-        return;
     ClrScannerDataMode clrDataMode(s_);
-    s_->EndElement();
+    AttrMap attrmap;
+    AutoHandlerFor<Element> h(E_IMAGE, hv_, s_, &attrmap);
 }
 
 //-----------------------------------------------------------------------
-String Fb2ParserImpl::isbn()
+void Fb2ParserImpl::isbn()
 {
-    if(!s_->BeginElement("isbn"))
-        return "";
+    SimpleTextNoAttr(E_ISBN);
+}
 
-    String text;
-    SetScannerDataMode setDataMode(s_);
-    if(s_->LookAhead().type_ == LexScanner::DATA)
-        text = s_->GetToken().s_;
-    s_->EndElement();
-    return text;
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::last_name()
+{
+    SimpleTextNoAttr(E_LAST_NAME);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::middle_name()
+{
+    SimpleTextNoAttr(E_MIDDLE_NAME);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::nickname()
+{
+    SimpleTextNoAttr(E_NICKNAME);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::lang()
 {
-    lang_ = s_->SimpleTextElement("lang");
+    SimpleTextNoAttr(E_LANG);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::p(const char *pelement, const char *cls)
+void Fb2ParserImpl::p()
 {
-    AttrMap attrmap;
-    if(s_->BeginElement("p", &attrmap))
-    {
-        pout_->WriteFmt("<%s", pelement);
-        if(cls)
-            pout_->WriteFmt(" class=\"%s\"", cls);
-        AddId(attrmap);
-        CopyXmlLang(attrmap);
-        pout_->WriteStr(">");
-
-        ParseTextAndEndElement("p");
-        pout_->WriteFmt("</%s>\n", pelement);
-    }
+    ParseTextAttr(E_P);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::poem()
 {
     AttrMap attrmap;
-    s_->BeginNotEmptyElement("poem", &attrmap);
-    pout_->WriteStr("<div class=\"poem\"");
-    AddId(attrmap);
-    CopyXmlLang(attrmap);
-    pout_->WriteStr(">");
+    AutoHandlerFor<NotEmptyElement> h(E_POEM, hv_, s_, &attrmap);
 
     //<title>
     if(s_->IsNextElement("title"))
-        title(false);
+        title();
     //</title>
 
     //<epigraph>
@@ -917,15 +862,13 @@ void Fb2ParserImpl::poem()
     if(s_->IsNextElement("date"))
         date();
     //</data>
-
-    pout_->WriteStr("</div>\n");
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::publish_info()
 {
-    if(!s_->BeginElement("publish-info"))
+    AutoHandlerFor<ElementSkipRest> h(E_PUBLISH_INFO, hv_, s_);
+    if(!h.NotEmpty())
         return;
 
     //<book-name>
@@ -946,41 +889,21 @@ void Fb2ParserImpl::publish_info()
 
     //<isbn>
     if(s_->IsNextElement("isbn"))
-        isbn_ = isbn();
+        isbn();
     //</isbn>
-
-    s_->SkipRestOfElementContent(); // skip rest of <publish-info>
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::section()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("section", &attrmap);
-
-    // set section language
-    SetLanguage l(&sectXmlLang_, attrmap);
-
-    sectionSize_ = 0;
-    StartUnit(Unit::SECTION, &attrmap);
-
-    if(!notempty)
+    AutoHandlerFor<Element> h(E_SECTION, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
 
     //<title>
     if(s_->IsNextElement("title"))
-    {
-        // add anchor ref
-        String id = units_[unitIdx_].noteRefId_;
-        if(!id.empty())
-        {
-            id = noteidToAnchorId_[refidToNew_[id]];
-            if(!id.empty())
-                id = refidToUnit_[id]->file_ + ".xhtml#" + id;
-        }
-
-        title(false, id);
-    }
+        title();
     //</title>
 
     //<epigraph>
@@ -990,7 +913,7 @@ void Fb2ParserImpl::section()
 
     //<image>
     if(s_->IsNextElement("image"))
-        image(false, false, false);
+        image();
     //</image>
 
     //<annotation>
@@ -1014,35 +937,17 @@ void Fb2ParserImpl::section()
             if(!t.s_.compare("p"))
                 p();
             else if(!t.s_.compare("image"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE1);
-                image(false, false, false);
-            }
+                image();
             else if(!t.s_.compare("poem"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 poem();
-            }
             else if(!t.s_.compare("subtitle"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE0);
                 subtitle();
-            }
             else if(!t.s_.compare("cite"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 cite();
-            }
             else if(!t.s_.compare("empty-line"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE2);
                 empty_line();
-            }
             else if(!t.s_.compare("table"))
-            {
-                SwitchUnitIfSizeAbove(UNIT_SIZE1);
                 table();
-            }
             else
             {
                 std::ostringstream ss;
@@ -1050,23 +955,18 @@ void Fb2ParserImpl::section()
                 s_->Error(ss.str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
-
-            SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
         }
     }
-
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::stanza()
 {
-    s_->BeginNotEmptyElement("stanza");
-    pout_->WriteStr("<div class=\"stanza\">");
+    AutoHandlerFor<NotEmptyElement> h(E_STANZA, hv_, s_);
 
     //<title>
     if(s_->IsNextElement("title"))
-        title(false);
+        title();
     //</title>
 
     //<subtitle>
@@ -1075,92 +975,56 @@ void Fb2ParserImpl::stanza()
     //</subtitle>
 
     do
+    {
+        //<v>
         v();
+        //</v>
+    }
     while(s_->IsNextElement("v"));
-
-    pout_->WriteStr("</div>\n");
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::strikethrough()
 {
-    if(s_->BeginElement("strikethrough"))
-    {
-        pout_->WriteStr("<del class=\"strikethrough\">");
-        ParseTextAndEndElement("strikethrough");
-        pout_->WriteStr("</del>");
-    }
+    ParseTextNoAttr(E_STRIKETHROUGH);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::strong()
 {
-    if(s_->BeginElement("strong"))
-    {
-        pout_->WriteStr("<strong class=\"e_strong\">");
-        ParseTextAndEndElement("strong");
-        pout_->WriteStr("</strong>");
-    }
+    ParseTextNoAttr(E_STRONG);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::style()
 {
-    // ignore style
-    if(s_->BeginElement("style"))
-        ParseTextAndEndElement("strong");
+    ParseTextNoAttr(E_STYLE);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::sub()
 {
-    if(s_->BeginElement("sub"))
-    {
-        pout_->WriteStr("<sub class=\"e_sub\">");
-        ParseTextAndEndElement("sub");
-        pout_->WriteStr("</sub>");
-    }
+    ParseTextNoAttr(E_SUB);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::subtitle()
 {
-    AttrMap attrmap;
-    if(s_->BeginElement("subtitle", &attrmap))
-    {
-        pout_->WriteStr("<h2 class=\"e_h2\"");
-        AddId(attrmap);
-        CopyXmlLang(attrmap);
-        pout_->WriteStr(">");
-
-        ParseTextAndEndElement("subtitle");
-        pout_->WriteStr("</h2>\n");
-    }
+    ParseTextAttr(E_SUBTITLE);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::sup()
 {
-    if(s_->BeginElement("sup"))
-    {
-        pout_->WriteStr("<sup class=\"e_sup\">");
-        ParseTextAndEndElement("sup");
-        pout_->WriteStr("</sup>");
-    }
+    ParseTextNoAttr(E_SUP);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::table()
 {
     AttrMap attrmap;
-    s_->BeginNotEmptyElement("table", &attrmap);
-    pout_->WriteFmt("<table");
-    AddId(attrmap);
+    AutoHandlerFor<NotEmptyElement> h(E_TABLE, hv_, s_, &attrmap);
 
-    CopyAttribute("style", attrmap);
-
-    pout_->WriteStr(">");
     do
     {
         //<tr>
@@ -1168,99 +1032,40 @@ void Fb2ParserImpl::table()
         //</tr>
     }
     while(s_->IsNextElement("tr"));
-    pout_->WriteFmt("</table>\n");
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::td()
 {
-    AttrMap attrmap;
-    bool notempty = s_->BeginElement("td", &attrmap);
-
-    pout_->WriteFmt("<td");
-    AddId(attrmap);
-
-    CopyAttribute("style", attrmap);
-    CopyAttribute("colspan", attrmap);
-    CopyAttribute("rowspan", attrmap);
-    CopyAttribute("align", attrmap);
-    CopyAttribute("valign", attrmap);
-    CopyXmlLang(attrmap);
-
-    if(!notempty)
-    {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
-
-    ParseTextAndEndElement("td");
-    pout_->WriteStr("</td>\n");
+    ParseTextAttr(E_TD);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::text_author()
 {
-    AttrMap attrmap;
-    if(s_->BeginElement("text-author", &attrmap))
-    {
-        pout_->WriteFmt("<div class=\"text_author\"");
-        AddId(attrmap);
-        CopyXmlLang(attrmap);
-        pout_->WriteStr(">");
-
-        ParseTextAndEndElement("text-author");
-        pout_->WriteStr("</div>\n");
-    }
+    ParseTextAttr(E_TEXT_AUTHOR);
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::th()
 {
-    AttrMap attrmap;
-    bool notempty = s_->BeginElement("th", &attrmap);
-
-    pout_->WriteFmt("<th");
-    AddId(attrmap);
-
-    CopyAttribute("style", attrmap);
-    CopyAttribute("colspan", attrmap);
-    CopyAttribute("rowspan", attrmap);
-    CopyAttribute("align", attrmap);
-    CopyAttribute("valign", attrmap);
-    CopyXmlLang(attrmap);
-
-    if(!notempty)
-    {
-        pout_->WriteStr("/>");
-        return;
-    }
-    pout_->WriteStr(">");
-
-    ParseTextAndEndElement("th");
-    pout_->WriteStr("</th>\n");
+    ParseTextAttr(E_TH);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::title(bool startUnit, const String &anchorid)
+void Fb2ParserImpl::title()
 {
     AttrMap attrmap;
-    if(!s_->BeginElement("title", &attrmap))
+    AutoHandlerFor<Element> h(E_TITLE, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
 
-    if(startUnit)
-        StartUnit(Unit::TITLE);
-
-    pout_->WriteFmt("<div class=\"title\"");
-    CopyXmlLang(attrmap);
-    pout_->WriteFmt(">\n");
     for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
     {
         if(!t.s_.compare("p"))
         {
             //<p>
-            p("h1", "e_h1");
+            p();
             //</p>
         }
         else if(!t.s_.compare("empty-line"))
@@ -1276,17 +1081,12 @@ void Fb2ParserImpl::title(bool startUnit, const String &anchorid)
             s_->Error(ss.str());
         }
     }
-    if(!anchorid.empty())
-        pout_->WriteFmt("<h1><span class=\"anchor\"><a href=\"%s\">[&lt;-]</a></span></h1>", anchorid.c_str());
-    pout_->WriteStr("</div>\n");
-
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::title_info()
 {
-    s_->BeginNotEmptyElement("title-info");
+    AutoHandlerFor<NotEmptyElementSkipRest> h(E_TITLE_INFO, hv_, s_);
 
     //<genre>
     s_->CheckAndSkipElement("genre");
@@ -1305,7 +1105,7 @@ void Fb2ParserImpl::title_info()
 
     //<annotation>
     if(s_->IsNextElement("annotation"))
-        annotation(true);
+        annotation();
     //</annotation>
 
     //<keywords>
@@ -1314,7 +1114,7 @@ void Fb2ParserImpl::title_info()
 
     //<date>
     if(s_->IsNextElement("date"))
-        title_info_date_ = date__epub();
+        date();
     //<date>
 
     //<coverpage>
@@ -1325,25 +1125,15 @@ void Fb2ParserImpl::title_info()
     //<lang>
     lang();
     //</lang>
-
-    s_->SkipRestOfElementContent(); // skip rest of <title-info>
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::tr()
 {
     AttrMap attrmap;
-    bool notempty = s_->BeginElement("tr", &attrmap);
-    pout_->WriteStr("<tr");
-
-    CopyAttribute("align", attrmap);
-
-    if(!notempty)
-    {
-        pout_->WriteStr("/>");
+    AutoHandlerFor<Element> h(E_TR, hv_, s_, &attrmap);
+    if(!h.NotEmpty())
         return;
-    }
-    pout_->WriteStr(">");
 
     for(;;)
     {
@@ -1356,27 +1146,13 @@ void Fb2ParserImpl::tr()
             break;
         //</th>, </td>
     }
-
-    pout_->WriteStr("</tr>\n");
-    s_->EndElement();
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::v()
 {
-    AttrMap attrmap;
-    if(s_->BeginElement("v", &attrmap))
-    {
-        pout_->WriteStr("<p class=\"v\"");
-        AddId(attrmap);
-        CopyXmlLang(attrmap);
-        pout_->WriteStr(">");
-
-        ParseTextAndEndElement("v");
-        pout_->WriteStr("</p>\n");
-    }
+    ParseTextAttr(E_V);
 }
-*/
 
 //-----------------------------------------------------------------------
 Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner)
