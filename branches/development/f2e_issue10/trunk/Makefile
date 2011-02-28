@@ -43,8 +43,12 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		convinfo.cpp \
 		convpass1.cpp \
 		convpass2.cpp \
+		error.cpp \
+		fb2parser.cpp \
 		fb2toepub.cpp \
 		fb2toepubconv.cpp \
+		mangling.cpp \
+		opentypefont.cpp \
 		scandir.cpp \
 		scanner.cpp \
 		scannermisc.cpp \
@@ -53,11 +57,8 @@ CSRC := $(wildcard $(srcdir)/*.c) \
 		streamutf8.cpp \
 		streamzip.cpp \
 		translit.cpp \
-		uuidmisc.cpp \
-		mangling.cpp \
-		opentypefont.cpp \
 		types.cpp \
-		error.cpp
+		uuidmisc.cpp
 
 COBJ=$(addprefix $(objdir)/, $(addsuffix .o, $(basename $(notdir $(CSRC)))))
 
