@@ -21,9 +21,9 @@
 #include "hdr.h"
 
 #include "scanner.h"
-#include "converter.h"
 #include "streamconv.h"
 #include "streamzip.h"
+#include "fb2parser.h"
 #include <sstream>
 #include <vector>
 #include <sys/types.h>
@@ -44,43 +44,39 @@ static void PrintInfo(const String &name, const String &value)
 }
 
 //-----------------------------------------------------------------------
-class ConverterInfo : public Object, Noncopyable
+// HANDLERS
+//-----------------------------------------------------------------------
+class AuthorHandler : public Fb2NoAttrHandler, Noncopyable
 {
 public:
-    ConverterInfo (const String &in) : in_(in) {}
+    AuthorHandler() : pname_(CreateTextEHandler(" ")) {}
 
-    void Scan()
+    Ptr<Fb2EHandler> GetNameHandler() const {return static_cast<Fb2TextHandler*>(pname_);}
+    void Print()
     {
-        std::size_t size = 0;
-        {
-            struct stat st;
-            ::stat(in_.c_str(), &st);
-            size = st.st_size;
-        }
-
-        Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in_.c_str()));
-        s_ = CreateScanner(pin);
-        s_->SkipXMLDeclaration();
-        FictionBook();
-
-        // author(s)
         String authors;
-        {
-            strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
-            for(; cit < cit_end; ++cit)
-                authors = Concat(authors, ", ", *cit);
-        }
-
+        strvector::const_iterator cit = authors_.begin(), cit_end = authors_.end();
+        for(; cit < cit_end; ++cit)
+            authors = Concat(authors, ", ", *cit);
         PrintInfo("author", authors);
-        PrintInfo("title", title_);
-        PrintInfo("date", title_info_date_);
+    }
 
-        {
-            std::ostringstream sizeStr;
-            sizeStr << size;
-            PrintInfo("size", sizeStr.str());
-        }
+    //virtuals
+    void Begin(Fb2EType, Fb2Host*)  {pname_->Reset();}
+    void Contents(const String&)    {}
+    void End()                      {authors_.push_back(pname_->Text());}
 
+private:
+    Ptr<Fb2TextHandler> pname_;
+    strvector           authors_;
+};
+
+//-----------------------------------------------------------------------
+class SeqAttrHandler : public Fb2AttrHandler, Noncopyable
+{
+public:
+    void Print()
+    {
         // sequence, number
         if(!sequences_.empty())
         {
@@ -102,292 +98,122 @@ public:
         }
     }
 
+    //virtuals
+    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host*)
+    {
+        String name = attrmap["name"];
+        if(!name.empty())
+            sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
+    }
+    void Contents(const String&)        {}
+    void End()                          {}
+
 private:
-    String                  in_;
-    Ptr<LexScanner>         s_;
-    String                  title_, lang_, title_info_date_, isbn_;
-    strvector               authors_;
-
     typedef std::vector<std::pair<String, String> > seqvector;
-    seqvector               sequences_;
-
-    // FictionBook elements
-    void FictionBook            ();
-    //void a                      ();
-    //void annotation             ();
-    void author                 ();
-    //void binary                 ();
-    //void body                   ();
-    //void book_name              ();
-    void book_title             ();
-    //void cite                   ();
-    //void city                   ();
-    //void code                   ();
-    //void coverpage              ();
-    //void custom_info            ();
-    //void date                   ();
-    String date__textonly       ();
-    void description            ();
-    //void document_info          ();
-    //void email                  ();
-    //void emphasis               ();
-    //void empty_line             ();
-    //void epigraph               ();
-    //void first_name             ();
-    //void genre                  ();
-    //void history                ();
-    //void home_page              ();
-    //void id                     ();
-    //void image                  ();
-    String isbn                 ();
-    //void keywords               ();
-    void lang                   ();
-    //void last_name              ();
-    //void middle_name            ();
-    //void nickname               ();
-    //void output_document_class  ();
-    //void output                 ();
-    //void p                      ();
-    //void part                   ();
-    //void poem                   ();
-    //void program_used           ();
-    void publish_info           ();
-    //void publisher              ();
-    //void section                ();
-    void sequence               ();
-    //void src_lang               ();
-    //void src_ocr                ();
-    //void src_title_info         ();
-    //void src_url                ();
-    //void stanza                 ();
-    //void strikethrough          ();
-    //void strong                 ();
-    //void style                  ();
-    //void stylesheet             ();
-    //void sub                    ();
-    //void subtitle               ();
-    //void sup                    ();
-    //void table                  ();
-    //void td                     ();
-    //void text_author            ();
-    //void th                     ();
-    //void title                  ();
-    void title_info             ();
-    //void tr                     ();
-    //void translator             ();
-    //void v                      ();
-    //void version                ();
-    //void year                   ();
+    seqvector sequences_;
 };
 
 //-----------------------------------------------------------------------
-void ConverterInfo::FictionBook()
+class NopEHandler : public Fb2EHandler
 {
-    s_->BeginNotEmptyElement("FictionBook");
-
-    //<stylesheet>
-    s_->SkipAll("stylesheet");
-    //</stylesheet>
-
-    //<description>
-    description();
-    //</description>
-}
-
+public:
+    //virtuals
+    bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host*)    {return true;}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const                     {return oldCtxt;}
+    void            Data    (const String &data)                        {}
+    void            EndTag  (LexScanner *s)                             {}
+};
 //-----------------------------------------------------------------------
-void ConverterInfo::author()
+class RootEHandler : public Fb2EHandler
 {
-    s_->BeginNotEmptyElement("author");
-
-    String author;
-    if(s_->IsNextElement("first-name"))
+public:
+    //virtuals
+    bool StartTag(Fb2EType, LexScanner *s, Fb2Host*)
     {
-        author = s_->SimpleTextElement("first-name");
-
-        if(s_->IsNextElement("middle-name"))
-            author = Concat(author, " ", s_->SimpleTextElement("middle-name"));
-
-        author = Concat(author, " ", s_->SimpleTextElement("last-name"));
+        s->BeginNotEmptyElement("FictionBook");
+        return false;
     }
-    else if(s_->IsNextElement("nickname"))
-        author = s_->SimpleTextElement("nickname");
-    else
-        s_->Error("<first-name> or <nickname> expected");
+    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
+    {
+        return oldCtxt;
+    }
+    void    Data    (const String &data)            {}
+    void    EndTag  (LexScanner *s)                 {}
+};
 
-    authors_.push_back(author);
-    s_->SkipRestOfElementContent();
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::book_title()
-{
-    title_ = s_->SimpleTextElement("book-title");
-}
 
 //-----------------------------------------------------------------------
-String ConverterInfo::date__textonly()
-{
-    if(!s_->BeginElement("date"))
-        return "";
-
-    String text;
-    SetScannerDataMode setDataMode(s_);
-    if(s_->LookAhead().type_ == LexScanner::DATA)
-        text = s_->GetToken().s_;
-    s_->EndElement();
-    return text;
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::description()
-{
-    s_->BeginNotEmptyElement("description");
-
-    //<title-info>
-    title_info();
-    //</title-info>
-
-    //<src-title-info>
-    s_->SkipIfElement("src-title-info");
-    //</src-title-info>
-
-    //<document-info>
-    s_->CheckAndSkipElement("document-info");
-    //</document-info>
-
-    //<publish-info>
-    if(s_->IsNextElement("publish-info"))
-        publish_info();
-    //</publish-info>
-
-    s_->SkipRestOfElementContent(); // skip rest of <description>
-}
-
-//-----------------------------------------------------------------------
-String ConverterInfo::isbn()
-{
-    if(!s_->BeginElement("isbn"))
-        return "";
-
-    String text;
-    SetScannerDataMode setDataMode(s_);
-    if(s_->LookAhead().type_ == LexScanner::DATA)
-        text = s_->GetToken().s_;
-    s_->EndElement();
-    return text;
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::lang()
-{
-    lang_ = s_->SimpleTextElement("lang");
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::publish_info()
-{
-    if(!s_->BeginElement("publish-info"))
-        return;
-
-    //<book-name>
-    s_->SkipIfElement("book-name");
-    //</book-name>
-
-    //<publisher>
-    s_->SkipIfElement("publisher");
-    //</publisher>
-
-    //<city>
-    s_->SkipIfElement("city");
-    //</city>
-
-    //<year>
-    s_->SkipIfElement("year");
-    //</year>
-
-    //<isbn>
-    if(s_->IsNextElement("isbn"))
-        isbn_ = isbn();
-    //</isbn>
-
-    s_->SkipRestOfElementContent(); // skip rest of <publish-info>
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::sequence()
-{
-    AttrMap attrmap;
-    bool notempty = s_->BeginElement("sequence", &attrmap);
-
-    String name = attrmap["name"];
-    if(!name.empty())
-        sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
-
-    if(notempty)
-        s_->EndElement();
-}
-
-//-----------------------------------------------------------------------
-void ConverterInfo::title_info()
-{
-    s_->BeginNotEmptyElement("title-info");
-
-    //<genre>
-    s_->CheckAndSkipElement("genre");
-    s_->SkipAll("genre");
-    //</genre>
-
-    //<author>
-    do
-        author();
-    while(s_->IsNextElement("author"));
-    //<author>
-
-    //<book-title>
-    book_title();
-    //</book-title>
-
-    //<annotation>
-    s_->SkipIfElement("annotation");
-    //</annotation>
-
-    //<keywords>
-    s_->SkipIfElement("keywords");
-    //</keywords>
-
-    //<date>
-    if(s_->IsNextElement("date"))
-        title_info_date_ = date__textonly();
-    //<date>
-
-    //<coverpage>
-    s_->SkipIfElement("coverpage");
-    //</coverpage>
-
-    //<lang>
-    lang();
-    //</lang>
-
-    //<src-lang>
-    s_->SkipIfElement("src-lang");
-    //</src-lang>
-
-    //<translator>
-    s_->SkipIfElement("translator");
-    //</translator>
-
-    //<sequence>
-    while(s_->IsNextElement("sequence"))
-        sequence();
-    //</sequence>
-
-    s_->EndElement();
-}
-
 void FB2TOEPUB_DECL DoPrintInfo (const String &in)
 {
-    Ptr<ConverterInfo> conv = new ConverterInfo(in);
-    conv->Scan();
+    std::size_t size = 0;
+    {
+        struct stat st;
+        ::stat(in.c_str(), &st);
+        size = st.st_size;
+    }
+
+    Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
+    Ptr<Fb2Parser> parser = CreateFb2Parser(CreateScanner(pin));
+
+    // <author>
+    Ptr<AuthorHandler> author = new AuthorHandler();
+    parser->Register(E_AUTHOR, CreateEHandler(author, true));
+
+    // <author> contents
+    Ptr<Fb2EHandler> authorname = author->GetNameHandler();
+    parser->Register(E_FIRST_NAME,  authorname);
+    parser->Register(E_MIDDLE_NAME, authorname);
+    parser->Register(E_LAST_NAME,   authorname);
+    parser->Register(E_NICKNAME,    authorname);
+
+    // <book-title>
+    Ptr<Fb2TextHandler> title = CreateTextEHandler();
+    parser->Register(E_BOOK_TITLE, title);
+
+    // <lang>
+    //Ptr<Fb2TextHandler> lang = CreateTextEHandler();
+    //parser->Register(E_LANG, lang);
+
+    // <date>
+    Ptr<Fb2TextHandler> date = CreateTextEHandler();
+    parser->Register(E_DATE, date);
+
+    // <isbn>
+    //Ptr<Fb2TextHandler> isbn = CreateTextEHandler();
+    //parser->Register(E_ISBN, isbn);
+
+    // <sequence>
+    Ptr<SeqAttrHandler> sequence = new SeqAttrHandler();
+    parser->Register(E_SEQUENCE, CreateEHandler(sequence));
+
+    // skip rest
+    Ptr<Fb2EHandler> skip = CreateSkipEHandler();
+    parser->Register(E_SRC_TITLE_INFO,  skip);
+    parser->Register(E_DOCUMENT_INFO,   skip);
+
+    // skip <body> and <binary> without scanning
+    Ptr<Fb2EHandler> nop = new NopEHandler();
+    parser->Register(E_BODY,    nop);
+    parser->Register(E_BINARY,  nop);
+
+    // drop rest of FictionBook contents without scanning
+    parser->Register(E_FICTIONBOOK, Ptr<Fb2EHandler>(new RootEHandler()));
+
+    parser->Parse();
+
+    // print info
+    author->Print();                    // author
+    PrintInfo("title", title->Text());  // title
+    PrintInfo("date", date->Text());    // date
+    //PrintInfo("lang", lang->Text());    // lang
+    //PrintInfo("isbn", isbn->Text());    // isbn
+    {
+        // size
+        std::ostringstream sizeStr;
+        sizeStr << size;
+        PrintInfo("size", sizeStr.str());
+    }
+    sequence->Print();                  // sequence, number
 }
 
 

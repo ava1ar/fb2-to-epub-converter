@@ -37,7 +37,7 @@ struct ElementInfo
     ElementInfo(const String &name, bool notempty) : name_(name), notempty_(notempty) {}
 };
 
-static const ElementInfo einfo[Fb2Parser::E_COUNT] =
+static const ElementInfo einfo[E_COUNT] =
 {
     ElementInfo("FictionBook",          true),
     ElementInfo("a",                    false),
@@ -117,11 +117,11 @@ inline void EmptyElementError(LexScanner *s, const String &name)
 //-----------------------------------------------------------------------
 // Default handler
 //-----------------------------------------------------------------------
-class DefEHandler : public Fb2Parser::EHandler
+class DefEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag(Fb2Parser::EType type, LexScanner *s)
+    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
     {
         const ElementInfo &ei = einfo[type];
         if(s->BeginElement(ei.name_))
@@ -131,122 +131,172 @@ public:
             EmptyElementError(s, ei.name_);
         return true;
     }
-    void Data(const String&)    {}
-    void EndTag(LexScanner *s)  {s->SkipRestOfElementContent();}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
+    void            Data(const String&)             {}
+    void            EndTag(LexScanner *s)           {s->SkipRestOfElementContent();}
+
+    static Fb2EHandler* Obj()                       {return defaultHandler_;}
+
+private:
+    static Ptr<Fb2EHandler> defaultHandler_;
 };
+Ptr<Fb2EHandler> DefEHandler::defaultHandler_ = new DefEHandler();
 
+typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
+typedef std::vector<Fb2EType> TypeVector;
 
-typedef std::vector<Ptr<Fb2Parser::EHandler> > HandlerVector;
+//-----------------------------------------------------------------------
+// State structure
+//-----------------------------------------------------------------------
+struct ParserState
+{
+    TypeVector      elemTypeStack_;
+    Ptr<LexScanner> s_;
+
+    ParserState(LexScanner *s) : s_(s) {}
+};
 
 //-----------------------------------------------------------------------
 // Auto handler
 //-----------------------------------------------------------------------
-class AutoHandler : Noncopyable
+class AutoHandler : private Fb2Host, Noncopyable
 {
-    Fb2Parser::EType            type_;
-    Ptr<Fb2Parser::EHandler>    ph_;
+    Fb2EType            type_;
+    ParserState         *state_;
+    Ptr<Fb2EHandler>    ph_;
+    Ptr<Fb2Ctxt>        newCtxt_;
 public:
-    AutoHandler(Fb2Parser::EType type, const HandlerVector &hv) : type_(type), ph_(hv[type]) {}
+    AutoHandler(Fb2EType type, ParserState *state, Fb2Ctxt *ctxt)
+        :   type_(type),
+            state_(state),
+            ph_(ctxt->GetHandler(type)),    // get handler from old context
+            newCtxt_(ph_->GetCtxt(ctxt))    // get new context from handler
+    {
+    }
 
-    bool StartTag   (LexScanner *s)         {return ph_->StartTag(type_, s);}
-    void Data       (const String &data)    {ph_->Data(data);}
-    void EndTag     (LexScanner *s)         {ph_->EndTag(s);}
+    bool StartTag()
+    {
+        if (ph_->StartTag(type_, state_->s_, this))
+            return true;
+        state_->elemTypeStack_.push_back(type_);
+        return false;
+    }
+    Fb2Ctxt* Ctxt() const
+    {
+        return newCtxt_;
+    }
+    void Data(const String &data)
+    {
+        ph_->Data(data);
+    }
+    void EndTag()
+    {
+        state_->elemTypeStack_.pop_back();
+        ph_->EndTag(state_->s_);
+    }
+
+    //virtual 
+    LexScanner*             Scanner() const             {return state_->s_;}
+    size_t                  GetTypeStackSize() const    {return state_->elemTypeStack_.size();}
+    Fb2EType                GetTypeStackAt(int i) const {return state_->elemTypeStack_[i];}
 };
 
 //-----------------------------------------------------------------------
 // Syntax parser
 //-----------------------------------------------------------------------
-class Fb2ParserImpl : public Fb2Parser, Noncopyable
+class Fb2ParserImpl : public Fb2Parser, private Fb2Ctxt, Noncopyable
 {
 public:
-    Fb2ParserImpl(LexScanner *scanner) : s_(scanner), hv_(E_COUNT, def_) {}
+    Fb2ParserImpl(LexScanner *scanner) : state_(scanner), handlers_(E_COUNT, DefEHandler::Obj()) {}
 
     //virtuals
-    void Register(EType type, EHandler *h);
+    void Register(Fb2EType type, Fb2EHandler *h);
     void Parse();
 
 private:
-    Ptr<LexScanner>         s_;
-    HandlerVector           hv_;
-    static Ptr<EHandler>    def_;
+    HandlerVector   handlers_;
+    ParserState     state_;
 
-    void ParseText              (EType type);
-    void SimpleText             (EType type);
+    //virtual
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
+    {
+        return handlers_[type];
+    }
+
+    void ParseText              (Fb2EType type, Fb2Ctxt *ctxt);
+    void SimpleText             (Fb2EType type, Fb2Ctxt *ctxt);
 
     // FictionBook elements
-    void FictionBook            ();
-    void a                      ();
-    void annotation             ();
-    void author                 ();
-    void binary                 ();
-    void body                   ();
-    //void book_name              ();
-    void book_title             ();
-    void cite                   ();
-    //void city                   ();
-    void code                   ();
-    void coverpage              ();
-    //void custom_info            ();
-    void date                   ();
-    void description            ();
-    void document_info          ();
-    //void email                  ();
-    void emphasis               ();
-    void empty_line             ();
-    void epigraph               ();
-    void first_name             ();
-    //void genre                  ();
-    //void history                ();
-    //void home_page              ();
-    void id                     ();
-    void image                  ();
-    void isbn                   ();
-    //void keywords               ();
-    void lang                   ();
-    void last_name              ();
-    void middle_name            ();
-    void nickname               ();
-    //void output_document_class  ();
-    //void output                 ();
-    void p                      ();
-    //void part                   ();
-    void poem                   ();
-    //void program_used           ();
-    void publish_info           ();
-    //void publisher              ();
-    void section                ();
-    //void sequence               ();
-    //void src_lang               ();
-    //void src_ocr                ();
-    //void src_title_info         ();
-    //void src_url                ();
-    void stanza                 ();
-    void strikethrough          ();
-    void strong                 ();
-    void style                  ();
-    //void stylesheet             ();
-    void sub                    ();
-    void subtitle               ();
-    void sup                    ();
-    void table                  ();
-    void td                     ();
-    void text_author            ();
-    void th                     ();
-    void title                  ();
-    void title_info             ();
-    void tr                     ();
-    //void translator             ();
-    void v                      ();
-    //void version                ();
-    //void year                   ();
+    void FictionBook            (Fb2Ctxt *ctxt);
+    void a                      (Fb2Ctxt *ctxt);
+    void annotation             (Fb2Ctxt *ctxt);
+    void author                 (Fb2Ctxt *ctxt);
+    void binary                 (Fb2Ctxt *ctxt);
+    void body                   (Fb2Ctxt *ctxt);
+    //void book_name              (Fb2Ctxt *ctxt);
+    void book_title             (Fb2Ctxt *ctxt);
+    void cite                   (Fb2Ctxt *ctxt);
+    //void city                   (Fb2Ctxt *ctxt);
+    void code                   (Fb2Ctxt *ctxt);
+    void coverpage              (Fb2Ctxt *ctxt);
+    //void custom_info            (Fb2Ctxt *ctxt);
+    void date                   (Fb2Ctxt *ctxt);
+    void description            (Fb2Ctxt *ctxt);
+    void document_info          (Fb2Ctxt *ctxt);
+    //void email                  (Fb2Ctxt *ctxt);
+    void emphasis               (Fb2Ctxt *ctxt);
+    void empty_line             (Fb2Ctxt *ctxt);
+    void epigraph               (Fb2Ctxt *ctxt);
+    void first_name             (Fb2Ctxt *ctxt);
+    //void genre                  (Fb2Ctxt *ctxt);
+    //void history                (Fb2Ctxt *ctxt);
+    //void home_page              (Fb2Ctxt *ctxt);
+    void id                     (Fb2Ctxt *ctxt);
+    void image                  (Fb2Ctxt *ctxt);
+    void isbn                   (Fb2Ctxt *ctxt);
+    //void keywords               (Fb2Ctxt *ctxt);
+    void lang                   (Fb2Ctxt *ctxt);
+    void last_name              (Fb2Ctxt *ctxt);
+    void middle_name            (Fb2Ctxt *ctxt);
+    void nickname               (Fb2Ctxt *ctxt);
+    //void output_document_class  (Fb2Ctxt *ctxt);
+    //void output                 (Fb2Ctxt *ctxt);
+    void p                      (Fb2Ctxt *ctxt);
+    //void part                   (Fb2Ctxt *ctxt);
+    void poem                   (Fb2Ctxt *ctxt);
+    //void program_used           (Fb2Ctxt *ctxt);
+    void publish_info           (Fb2Ctxt *ctxt);
+    //void publisher              (Fb2Ctxt *ctxt);
+    void section                (Fb2Ctxt *ctxt);
+    void sequence               (Fb2Ctxt *ctxt);
+    //void src_lang               (Fb2Ctxt *ctxt);
+    //void src_ocr                (Fb2Ctxt *ctxt);
+    //void src_title_info         (Fb2Ctxt *ctxt);
+    //void src_url                (Fb2Ctxt *ctxt);
+    void stanza                 (Fb2Ctxt *ctxt);
+    void strikethrough          (Fb2Ctxt *ctxt);
+    void strong                 (Fb2Ctxt *ctxt);
+    void style                  (Fb2Ctxt *ctxt);
+    //void stylesheet             (Fb2Ctxt *ctxt);
+    void sub                    (Fb2Ctxt *ctxt);
+    void subtitle               (Fb2Ctxt *ctxt);
+    void sup                    (Fb2Ctxt *ctxt);
+    void table                  (Fb2Ctxt *ctxt);
+    void td                     (Fb2Ctxt *ctxt);
+    void text_author            (Fb2Ctxt *ctxt);
+    void th                     (Fb2Ctxt *ctxt);
+    void title                  (Fb2Ctxt *ctxt);
+    void title_info             (Fb2Ctxt *ctxt);
+    void tr                     (Fb2Ctxt *ctxt);
+    //void translator             (Fb2Ctxt *ctxt);
+    void v                      (Fb2Ctxt *ctxt);
+    //void version                (Fb2Ctxt *ctxt);
+    //void year                   (Fb2Ctxt *ctxt);
 };
 
 
 //-----------------------------------------------------------------------
-Ptr<Fb2Parser::EHandler> Fb2ParserImpl::def_ = new DefEHandler();
-
-//-----------------------------------------------------------------------
-void Fb2ParserImpl::Register(EType type, EHandler *h)
+void Fb2ParserImpl::Register(Fb2EType type, Fb2EHandler *h)
 {
     size_t idx = type;
 #if defined(_DEBUG)
@@ -257,62 +307,62 @@ void Fb2ParserImpl::Register(EType type, EHandler *h)
         InternalError(__FILE__, __LINE__, ss.str());
     }
 #endif
-    hv_[idx] = h;
+    handlers_[idx] = h;
 }
 
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::Parse()
 {
-    s_->SkipXMLDeclaration();
-    FictionBook();
+    state_.s_->SkipXMLDeclaration();
+    FictionBook(this);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::ParseText(EType type)
+void Fb2ParserImpl::ParseText(Fb2EType type, Fb2Ctxt *ctxt)
 {
-    AutoHandler h(type, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(type, &state_, ctxt);
+    if(h.StartTag())
         return;
 
-    SetScannerDataMode setDataMode(s_);
+    SetScannerDataMode setDataMode(state_.s_);
     for(;;)
     {
-        LexScanner::Token t = s_->LookAhead();
+        LexScanner::Token t = state_.s_->LookAhead();
         switch(t.type_)
         {
         default:
-            h.EndTag(s_);
+            h.EndTag();
             return;
 
         case LexScanner::DATA:
-            h.Data(s_->GetToken().s_);
+            h.Data(state_.s_->GetToken().s_);
             continue;
 
         case LexScanner::START:
             //<strong>, <emphasis>, <stile>, <a>, <strikethrough>, <sub>, <sup>, <code>, <image>
             if(!t.s_.compare("strong"))
-                strong();
+                strong(h.Ctxt());
             else if(!t.s_.compare("emphasis"))
-                emphasis();
+                emphasis(h.Ctxt());
             else if(!t.s_.compare("style"))
-                style();
+                style(h.Ctxt());
             else if(!t.s_.compare("a"))
-                a();
+                a(h.Ctxt());
             else if(!t.s_.compare("strikethrough"))
-                strikethrough();
+                strikethrough(h.Ctxt());
             else if(!t.s_.compare("sub"))
-                sub();
+                sub(h.Ctxt());
             else if(!t.s_.compare("sup"))
-                sup();
+                sup(h.Ctxt());
             else if(!t.s_.compare("code"))
-                code();
+                code(h.Ctxt());
             else if(!t.s_.compare("image"))
-                image();
+                image(h.Ctxt());
             else
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <" << einfo[type].name_ + ">";
-                s_->Error(ss.str());
+                state_.s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </a>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -321,92 +371,93 @@ void Fb2ParserImpl::ParseText(EType type)
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::SimpleText(EType type)
+void Fb2ParserImpl::SimpleText(Fb2EType type, Fb2Ctxt *ctxt)
 {
-    AutoHandler h(type, hv_);
-    if(!h.StartTag(s_))
+    AutoHandler h(type, &state_, ctxt);
+    if(!h.StartTag())
     {
-        SetScannerDataMode setDataMode(s_);
-        if(s_->LookAhead().type_ == LexScanner::DATA)
-            h.Data(s_->GetToken().s_);
-        h.EndTag(s_);
+        SetScannerDataMode setDataMode(state_.s_);
+        if(state_.s_->LookAhead().type_ == LexScanner::DATA)
+            h.Data(state_.s_->GetToken().s_);
+        h.EndTag();
     }
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::FictionBook()
+void Fb2ParserImpl::FictionBook(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_FICTIONBOOK, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_FICTIONBOOK, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<stylesheet>
-    s_->SkipAll("stylesheet");
+    state_.s_->SkipAll("stylesheet");
     //</stylesheet>
 
     //<description>
-    description();
+    description(h.Ctxt());
     //</description>
 
     //<body>
-    body();
-    if(s_->IsNextElement("body"))
-        body();
-    if(s_->IsNextElement("body"))
-        body();
+    body(h.Ctxt());
+    if(state_.s_->IsNextElement("body"))
+        body(h.Ctxt());
+    if(state_.s_->IsNextElement("body"))
+        body(h.Ctxt());
     //</body>
 
     //<binary>
-    while(s_->IsNextElement("binary"))
-        binary();
+    while(state_.s_->IsNextElement("binary"))
+        binary(h.Ctxt());
     //</binary>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::a()
+void Fb2ParserImpl::a(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_A, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_A, &state_, ctxt);
+    if(h.StartTag())
         return;
 
-    SetScannerDataMode setDataMode(s_);
+    SetScannerDataMode setDataMode(state_.s_);
     for(;;)
     {
-        LexScanner::Token t = s_->LookAhead();
+        LexScanner::Token t = state_.s_->LookAhead();
         switch(t.type_)
         {
         default:
-            h.EndTag(s_);
+            h.EndTag();
             return;
 
         case LexScanner::DATA:
-            h.Data(s_->GetToken().s_);
+            h.Data(state_.s_->GetToken().s_);
             continue;
 
         case LexScanner::START:
             //<strong>, <emphasis>, <stile>, <strikethrough>, <sub>, <sup>, <code>, <image>
             if(!t.s_.compare("strong"))
-                strong();
+                strong(h.Ctxt());
             else if(!t.s_.compare("emphasis"))
-                emphasis();
+                emphasis(h.Ctxt());
             else if(!t.s_.compare("style"))
-                style();
+                style(h.Ctxt());
             else if(!t.s_.compare("strikethrough"))
-                strikethrough();
+                strikethrough(h.Ctxt());
             else if(!t.s_.compare("sub"))
-                sub();
+                sub(h.Ctxt());
             else if(!t.s_.compare("sup"))
-                sup();
+                sup(h.Ctxt());
             else if(!t.s_.compare("code"))
-                code();
+                code(h.Ctxt());
             else if(!t.s_.compare("image"))
-                image();
+                image(h.Ctxt());
             else
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <a>";
-                s_->Error(ss.str());
+                state_.s_->Error(ss.str());
             }
             continue;
             //</strong>, </emphasis>, </stile>, </strikethrough>, </sub>, </sup>, </code>, </image>
@@ -415,690 +466,724 @@ void Fb2ParserImpl::a()
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::annotation()
+void Fb2ParserImpl::annotation(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_ANNOTATION, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_ANNOTATION, &state_, ctxt);
+    if(h.StartTag())
         return;
 
-    for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
+    for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
     {
         //<p>, <poem>, <cite>, <subtitle>, <empty-line>, <table>
         if(!t.s_.compare("p"))
-            p();
+            p(h.Ctxt());
         else if(!t.s_.compare("poem"))
-            poem();
+            poem(h.Ctxt());
         else if(!t.s_.compare("cite"))
-            cite();
+            cite(h.Ctxt());
         else if(!t.s_.compare("subtitle"))
-            subtitle();
+            subtitle(h.Ctxt());
         else if(!t.s_.compare("empty-line"))
-            empty_line();
+            empty_line(h.Ctxt());
         else if(!t.s_.compare("table"))
-            table();
+            table(h.Ctxt());
         else
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <annotation>";
-            s_->Error(ss.str());
+            state_.s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
     }
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::author()
+void Fb2ParserImpl::author(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_AUTHOR, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_AUTHOR, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
-    if(s_->IsNextElement("first-name"))
+    if(state_.s_->IsNextElement("first-name"))
     {
         //<first-name>
-        first_name();
+        first_name(h.Ctxt());
         //</first-name>
 
         //<middle-name>
-        if(s_->IsNextElement("middle-name"))
-            middle_name();
+        if(state_.s_->IsNextElement("middle-name"))
+            middle_name(h.Ctxt());
         //<middle-name>
 
         //<last-name>
-        last_name();
+        last_name(h.Ctxt());
         //</last-name>
     }
-    else if(s_->IsNextElement("nickname"))
+    else if(state_.s_->IsNextElement("nickname"))
     {
         //<nickname>
-        nickname();
+        nickname(h.Ctxt());
         //</nickname>
     }
     else
-        s_->Error("<first-name> or <nickname> expected");
+        state_.s_->Error("<first-name> or <nickname> expected");
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::binary()
+void Fb2ParserImpl::binary(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_BINARY, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_BINARY, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
-    SetScannerDataMode setDataMode(s_);
-    LexScanner::Token t = s_->GetToken();
+    SetScannerDataMode setDataMode(state_.s_);
+    LexScanner::Token t = state_.s_->GetToken();
     if(t.type_ != LexScanner::DATA)
-        s_->Error("<binary> data expected");
+        state_.s_->Error("<binary> data expected");
     h.Data(t.s_);
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::body()
+void Fb2ParserImpl::body(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_BODY, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_BODY, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<image>
-    if(s_->IsNextElement("image"))
-        image();
+    if(state_.s_->IsNextElement("image"))
+        image(h.Ctxt());
     //</image>
 
     //<title>
-    if(s_->IsNextElement("title"))
-        title();
+    if(state_.s_->IsNextElement("title"))
+        title(h.Ctxt());
     //</title>
 
     //<epigraph>
-    while(s_->IsNextElement("epigraph"))
-        epigraph();
+    while(state_.s_->IsNextElement("epigraph"))
+        epigraph(h.Ctxt());
     //</epigraph>
 
     do
     {
         //<section>
-        section();
+        section(h.Ctxt());
         //</section>
     }
-    while(s_->IsNextElement("section"));
+    while(state_.s_->IsNextElement("section"));
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::book_title()
+void Fb2ParserImpl::book_title(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_BOOK_TITLE);
+    SimpleText(E_BOOK_TITLE, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::cite()
+void Fb2ParserImpl::cite(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_CITE, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_CITE, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
-    for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
+    for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
     {
         //<p>, <subtitle>, <empty-line>, <poem>, <table>
         if(!t.s_.compare("p"))
-            p();
+            p(h.Ctxt());
         else if(!t.s_.compare("subtitle"))
-            subtitle();
+            subtitle(h.Ctxt());
         else if(!t.s_.compare("empty-line"))
-            empty_line();
+            empty_line(h.Ctxt());
         else if(!t.s_.compare("poem"))
-            poem();
+            poem(h.Ctxt());
         else if(!t.s_.compare("table"))
-            table();
+            table(h.Ctxt());
         else if(!t.s_.compare("text-author"))
             break;
         else
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <cite>";
-            s_->Error(ss.str());
+            state_.s_->Error(ss.str());
         }
         //</p>, </subtitle>, </empty-line>, </poem>, </table>
     }
 
     //<text-author>
-    while(s_->IsNextElement("text-author"))
-        text_author();
+    while(state_.s_->IsNextElement("text-author"))
+        text_author(h.Ctxt());
     //</text-author>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::code()
+void Fb2ParserImpl::code(Fb2Ctxt *ctxt)
 {
-    ParseText(E_CODE);
+    ParseText(E_CODE, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::coverpage()
+void Fb2ParserImpl::coverpage(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_COVERPAGE, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_COVERPAGE, &state_, ctxt);
+    if(h.StartTag())
+        return;
+
     do
-        image();
-    while(s_->IsNextElement("image"));
-    h.EndTag(s_);
+        image(h.Ctxt());
+    while(state_.s_->IsNextElement("image"));
+
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::date()
+void Fb2ParserImpl::date(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_DATE);
+    SimpleText(E_DATE, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::description()
+void Fb2ParserImpl::description(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_DESCRIPTION, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_DESCRIPTION, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<title-info>
-    title_info();
+    title_info(h.Ctxt());
     //</title-info>
 
     //<src-title-info>
-    s_->SkipIfElement("src-title-info");
+    state_.s_->SkipIfElement("src-title-info");
     //</src-title-info>
 
     //<document-info>
-    document_info();
+    document_info(h.Ctxt());
     //</document-info>
 
     //<publish-info>
-    if(s_->IsNextElement("publish-info"))
-        publish_info();
+    if(state_.s_->IsNextElement("publish-info"))
+        publish_info(h.Ctxt());
     //</publish-info>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::document_info()
+void Fb2ParserImpl::document_info(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_DOCUMENT_INFO, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_DOCUMENT_INFO, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<author>
-    s_->CheckAndSkipElement("author");
-    s_->SkipAll("author");
+    state_.s_->CheckAndSkipElement("author");
+    state_.s_->SkipAll("author");
     //</author>
 
     //<program-used>
-    s_->SkipIfElement("program-used");
+    state_.s_->SkipIfElement("program-used");
     //</program-used>
 
     //<date>
-    s_->CheckAndSkipElement("date");
+    state_.s_->CheckAndSkipElement("date");
     //</date>
 
     //<src-url>
-    s_->SkipAll("src-url");
+    state_.s_->SkipAll("src-url");
     //</src-url>
 
     //<src-ocr>
-    s_->SkipIfElement("src-ocr");
+    state_.s_->SkipIfElement("src-ocr");
     //</src-ocr>
 
     //<id>
-    id();
+    id(h.Ctxt());
     //<id>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::emphasis()
+void Fb2ParserImpl::emphasis(Fb2Ctxt *ctxt)
 {
-    ParseText(E_EMPHASIS);
+    ParseText(E_EMPHASIS, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::empty_line()
+void Fb2ParserImpl::empty_line(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_EMPTY_LINE, hv_);
-    if(!h.StartTag(s_))
-        h.EndTag(s_);
+    AutoHandler h(E_EMPTY_LINE, &state_, ctxt);
+    if(!h.StartTag())
+        h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::epigraph()
+void Fb2ParserImpl::epigraph(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_EPIGRAPH, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_EPIGRAPH, &state_, ctxt);
+    if(h.StartTag())
         return;
 
-    for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
+    for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
     {
         //<p>, <poem>, <cite>, <empty-line>
         if(!t.s_.compare("p"))
-            p();
+            p(h.Ctxt());
         else if(!t.s_.compare("poem"))
-            poem();
+            poem(h.Ctxt());
         else if(!t.s_.compare("cite"))
-            cite();
+            cite(h.Ctxt());
         else if(!t.s_.compare("empty-line"))
-            empty_line();
+            empty_line(h.Ctxt());
         else if(!t.s_.compare("text-author"))
             break;
         else
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <epigraph>";
-            s_->Error(ss.str());
+            state_.s_->Error(ss.str());
         }
         //</p>, </poem>, </cite>, </empty-line>
     }
 
     //<text-author>
-    while(s_->IsNextElement("text-author"))
-        text_author();
+    while(state_.s_->IsNextElement("text-author"))
+        text_author(h.Ctxt());
     //</text-author>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::first_name()
+void Fb2ParserImpl::first_name(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_FIRST_NAME);
+    SimpleText(E_FIRST_NAME, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::id()
+void Fb2ParserImpl::id(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_ID);
+    SimpleText(E_ID, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::image()
+void Fb2ParserImpl::image(Fb2Ctxt *ctxt)
 {
-    ClrScannerDataMode clrDataMode(s_);
-    AutoHandler h(E_IMAGE, hv_);
-    if(!h.StartTag(s_))
-        h.EndTag(s_);
+    ClrScannerDataMode clrDataMode(state_.s_);
+    AutoHandler h(E_IMAGE, &state_, ctxt);
+    if(!h.StartTag())
+        h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::isbn()
+void Fb2ParserImpl::isbn(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_ISBN);
+    SimpleText(E_ISBN, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::last_name()
+void Fb2ParserImpl::last_name(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_LAST_NAME);
+    SimpleText(E_LAST_NAME, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::middle_name()
+void Fb2ParserImpl::middle_name(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_MIDDLE_NAME);
+    SimpleText(E_MIDDLE_NAME, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::nickname()
+void Fb2ParserImpl::nickname(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_NICKNAME);
+    SimpleText(E_NICKNAME, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::lang()
+void Fb2ParserImpl::lang(Fb2Ctxt *ctxt)
 {
-    SimpleText(E_LANG);
+    SimpleText(E_LANG, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::p()
+void Fb2ParserImpl::p(Fb2Ctxt *ctxt)
 {
-    ParseText(E_P);
+    ParseText(E_P, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::poem()
+void Fb2ParserImpl::poem(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_POEM, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_POEM, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<title>
-    if(s_->IsNextElement("title"))
-        title();
+    if(state_.s_->IsNextElement("title"))
+        title(h.Ctxt());
     //</title>
 
     //<epigraph>
-    while(s_->IsNextElement("epigraph"))
-        epigraph();
+    while(state_.s_->IsNextElement("epigraph"))
+        epigraph(h.Ctxt());
     //</epigraph>
 
     //<stanza>
     do
-        stanza();
-    while(s_->IsNextElement("stanza"));
+        stanza(h.Ctxt());
+    while(state_.s_->IsNextElement("stanza"));
     //</stanza>
 
     //<text-author>
-    while(s_->IsNextElement("text-author"))
-        text_author();
+    while(state_.s_->IsNextElement("text-author"))
+        text_author(h.Ctxt());
     //</text-author>
 
     //<data>
-    if(s_->IsNextElement("date"))
-        date();
+    if(state_.s_->IsNextElement("date"))
+        date(h.Ctxt());
     //</data>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::publish_info()
+void Fb2ParserImpl::publish_info(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_PUBLISH_INFO, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_PUBLISH_INFO, &state_, ctxt);
+    if(h.StartTag())
         return;
 
     //<book-name>
-    s_->SkipIfElement("book-name");
+    state_.s_->SkipIfElement("book-name");
     //</book-name>
 
     //<publisher>
-    s_->SkipIfElement("publisher");
+    state_.s_->SkipIfElement("publisher");
     //</publisher>
 
     //<city>
-    s_->SkipIfElement("city");
+    state_.s_->SkipIfElement("city");
     //</city>
 
     //<year>
-    s_->SkipIfElement("year");
+    state_.s_->SkipIfElement("year");
     //</year>
 
     //<isbn>
-    if(s_->IsNextElement("isbn"))
-        isbn();
+    if(state_.s_->IsNextElement("isbn"))
+        isbn(h.Ctxt());
     //</isbn>
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::section()
+void Fb2ParserImpl::section(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_SECTION, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_SECTION, &state_, ctxt);
+    if(h.StartTag())
         return;
 
     //<title>
-    if(s_->IsNextElement("title"))
-        title();
+    if(state_.s_->IsNextElement("title"))
+        title(h.Ctxt());
     //</title>
 
     //<epigraph>
-    while(s_->IsNextElement("epigraph"))
-        epigraph();
+    while(state_.s_->IsNextElement("epigraph"))
+        epigraph(h.Ctxt());
     //</epigraph>
 
     //<image>
-    if(s_->IsNextElement("image"))
-        image();
+    if(state_.s_->IsNextElement("image"))
+        image(h.Ctxt());
     //</image>
 
     //<annotation>
-    if(s_->IsNextElement("annotation"))
-        annotation();
+    if(state_.s_->IsNextElement("annotation"))
+        annotation(h.Ctxt());
     //</annotation>
 
-    if(s_->IsNextElement("section"))
+    if(state_.s_->IsNextElement("section"))
         do
         {
             //<section>
-            section();
+            section(h.Ctxt());
             //</section>
         }
-        while(s_->IsNextElement("section"));
+        while(state_.s_->IsNextElement("section"));
     else
     {
-        for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
+        for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
         {
             //<p>, <image>, <poem>, <subtitle>, <cite>, <empty-line>, <table>
             if(!t.s_.compare("p"))
-                p();
+                p(h.Ctxt());
             else if(!t.s_.compare("image"))
-                image();
+                image(h.Ctxt());
             else if(!t.s_.compare("poem"))
-                poem();
+                poem(h.Ctxt());
             else if(!t.s_.compare("subtitle"))
-                subtitle();
+                subtitle(h.Ctxt());
             else if(!t.s_.compare("cite"))
-                cite();
+                cite(h.Ctxt());
             else if(!t.s_.compare("empty-line"))
-                empty_line();
+                empty_line(h.Ctxt());
             else if(!t.s_.compare("table"))
-                table();
+                table(h.Ctxt());
             else
             {
                 std::ostringstream ss;
                 ss << "<" << t.s_ << "> unexpected in <section>";
-                s_->Error(ss.str());
+                state_.s_->Error(ss.str());
             }
             //</p>, </image>, </poem>, </subtitle>, </cite>, </empty-line>, </table>
         }
     }
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::stanza()
+void Fb2ParserImpl::sequence(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_STANZA, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_SEQUENCE, &state_, ctxt);
+    if(!h.StartTag())
+        h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::stanza(Fb2Ctxt *ctxt)
+{
+    AutoHandler h(E_STANZA, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<title>
-    if(s_->IsNextElement("title"))
-        title();
+    if(state_.s_->IsNextElement("title"))
+        title(h.Ctxt());
     //</title>
 
     //<subtitle>
-    if(s_->IsNextElement("subtitle"))
-        subtitle();
+    if(state_.s_->IsNextElement("subtitle"))
+        subtitle(h.Ctxt());
     //</subtitle>
 
     do
     {
         //<v>
-        v();
+        v(h.Ctxt());
         //</v>
     }
-    while(s_->IsNextElement("v"));
+    while(state_.s_->IsNextElement("v"));
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::strikethrough()
+void Fb2ParserImpl::strikethrough(Fb2Ctxt *ctxt)
 {
-    ParseText(E_STRIKETHROUGH);
+    ParseText(E_STRIKETHROUGH, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::strong()
+void Fb2ParserImpl::strong(Fb2Ctxt *ctxt)
 {
-    ParseText(E_STRONG);
+    ParseText(E_STRONG, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::style()
+void Fb2ParserImpl::style(Fb2Ctxt *ctxt)
 {
-    ParseText(E_STYLE);
+    ParseText(E_STYLE, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::sub()
+void Fb2ParserImpl::sub(Fb2Ctxt *ctxt)
 {
-    ParseText(E_SUB);
+    ParseText(E_SUB, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::subtitle()
+void Fb2ParserImpl::subtitle(Fb2Ctxt *ctxt)
 {
-    ParseText(E_SUBTITLE);
+    ParseText(E_SUBTITLE, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::sup()
+void Fb2ParserImpl::sup(Fb2Ctxt *ctxt)
 {
-    ParseText(E_SUP);
+    ParseText(E_SUP, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::table()
+void Fb2ParserImpl::table(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_TABLE, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_TABLE, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     do
     {
         //<tr>
-        tr();
+        tr(h.Ctxt());
         //</tr>
     }
-    while(s_->IsNextElement("tr"));
+    while(state_.s_->IsNextElement("tr"));
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::td()
+void Fb2ParserImpl::td(Fb2Ctxt *ctxt)
 {
-    ParseText(E_TD);
+    ParseText(E_TD, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::text_author()
+void Fb2ParserImpl::text_author(Fb2Ctxt *ctxt)
 {
-    ParseText(E_TEXT_AUTHOR);
+    ParseText(E_TEXT_AUTHOR, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::th()
+void Fb2ParserImpl::th(Fb2Ctxt *ctxt)
 {
-    ParseText(E_TH);
+    ParseText(E_TH, ctxt);
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::title()
+void Fb2ParserImpl::title(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_TITLE, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_TITLE, &state_, ctxt);
+    if(h.StartTag())
         return;
 
-    for(LexScanner::Token t = s_->LookAhead(); t.type_ == LexScanner::START; t = s_->LookAhead())
+    for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
     {
         if(!t.s_.compare("p"))
         {
             //<p>
-            p();
+            p(h.Ctxt());
             //</p>
         }
         else if(!t.s_.compare("empty-line"))
         {
             //<empty-line>
-            empty_line();
+            empty_line(h.Ctxt());
             //</empty-line>
         }
         else
         {
             std::ostringstream ss;
             ss << "<" << t.s_ << "> unexpected in <title>";
-            s_->Error(ss.str());
+            state_.s_->Error(ss.str());
         }
     }
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::title_info()
+void Fb2ParserImpl::title_info(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_TITLE_INFO, hv_);
-    h.StartTag(s_);
+    AutoHandler h(E_TITLE_INFO, &state_, ctxt);
+    if(h.StartTag())
+        return;
 
     //<genre>
-    s_->CheckAndSkipElement("genre");
-    s_->SkipAll("genre");
+    state_.s_->CheckAndSkipElement("genre");
+    state_.s_->SkipAll("genre");
     //</genre>
 
     //<author>
     do
-        author();
-    while(s_->IsNextElement("author"));
+        author(h.Ctxt());
+    while(state_.s_->IsNextElement("author"));
     //<author>
 
     //<book-title>
-    book_title();
+    book_title(h.Ctxt());
     //</book-title>
 
     //<annotation>
-    if(s_->IsNextElement("annotation"))
-        annotation();
+    if(state_.s_->IsNextElement("annotation"))
+        annotation(h.Ctxt());
     //</annotation>
 
     //<keywords>
-    s_->SkipIfElement("keywords");
+    state_.s_->SkipIfElement("keywords");
     //</keywords>
 
     //<date>
-    if(s_->IsNextElement("date"))
-        date();
+    if(state_.s_->IsNextElement("date"))
+        date(h.Ctxt());
     //<date>
 
     //<coverpage>
-    if(s_->IsNextElement("coverpage"))
-        coverpage();
+    if(state_.s_->IsNextElement("coverpage"))
+        coverpage(h.Ctxt());
     //</coverpage>
 
     //<lang>
-    lang();
+    lang(h.Ctxt());
     //</lang>
 
-    h.EndTag(s_);
+    //<src-lang>
+    state_.s_->SkipIfElement("src-lang");
+    //</src-lang>
+
+    //<translator>
+    state_.s_->SkipIfElement("translator");
+    //</translator>
+
+    //<sequence>
+    while(state_.s_->IsNextElement("sequence"))
+        sequence(h.Ctxt());
+    //</sequence>
+
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::tr()
+void Fb2ParserImpl::tr(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_TR, hv_);
-    if(h.StartTag(s_))
+    AutoHandler h(E_TR, &state_, ctxt);
+    if(h.StartTag())
         return;
 
     for(;;)
     {
         //<th>, <td>
-        if(s_->IsNextElement("th"))
-            th();
-        else if(s_->IsNextElement("td"))
-            td();
+        if(state_.s_->IsNextElement("th"))
+            th(h.Ctxt());
+        else if(state_.s_->IsNextElement("td"))
+            td(h.Ctxt());
         else
             break;
         //</th>, </td>
     }
 
-    h.EndTag(s_);
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::v()
+void Fb2ParserImpl::v(Fb2Ctxt *ctxt)
 {
-    ParseText(E_V);
+    ParseText(E_V, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -1113,33 +1198,97 @@ Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner)
 // Helper classes implementation
 //-----------------------------------------------------------------------
 
-const String& Fb2Parser::EName(EType type)
+//-----------------------------------------------------------------------
+const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type)
 {
     return einfo[type].name_;
 }
 
-template<class EE> class EHandlerAttr : public Fb2Parser::EHandler
+//-----------------------------------------------------------------------
+// HANDLER TO SKIP WHOLE ELEMENT CONTENTS
+class SkipEHandler : public Fb2EHandler
 {
-    Ptr<Fb2Parser::AttrHandler> pah_;
 public:
-    EHandlerAttr(Fb2Parser::AttrHandler *pah) : pah_(pah) {}
+    //virtuals
+    bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host*)    {s->SkipElement(); return true;}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                    {return oldCtxt;}
+    void            Data    (const String &data)                        {}
+    void            EndTag  (LexScanner *s)                             {}
+};
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler()
+{
+    return new SkipEHandler();
+}
+
+// SIMPLE TEXT HANDLER
+class TextHandler : public Fb2TextHandler, Noncopyable
+{
+public:
+    TextHandler(const String &concatDivider) : divider_(concatDivider) {}
 
     //virtuals
-    bool StartTag(Fb2Parser::EType type, LexScanner *s)
+    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host*)
+    {
+        const ElementInfo &ei = einfo[type];
+        if(s->BeginElement(ei.name_))
+            return false;
+
+        if(ei.notempty_)
+            EmptyElementError(s, ei.name_);
+        return true;
+    }
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const
+    {
+        return oldCtxt;
+    }
+    void Data(const String &data)
+    {
+        text_ = Concat(text_, divider_, data);
+    }
+    void EndTag(LexScanner *s)
+    {
+        s->EndElement();
+    }
+    void Reset()                        {text_ = "";}
+    const String& Text() const          {return text_;}
+
+private:
+    String divider_;
+    String text_;
+};
+Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(const String &concatDivider)
+{
+    return new TextHandler(concatDivider);
+}
+
+
+//-----------------------------------------------------------------------
+template<class EE> class EHandlerAttr : public Fb2EHandler, Noncopyable
+{
+    Ptr<Fb2AttrHandler> pah_;
+public:
+    EHandlerAttr(Fb2AttrHandler *pah) : pah_(pah) {}
+
+    //virtuals
+    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
     {
         const ElementInfo &ei = einfo[type];
         AttrMap attrmap;
         if(s->BeginElement(ei.name_, &attrmap))
         {
-            pah_->Begin(type, s, attrmap);
+            pah_->Begin(type, attrmap, host);
             return false;
         }
 
         if(ei.notempty_)
             EmptyElementError(s, ei.name_);
-        pah_->Begin(type, s, attrmap);
+        pah_->Begin(type, attrmap, host);
         pah_->End();
         return true;
+    }
+    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
+    {
+        return oldCtxt;
     }
     void Data(const String &data)
     {
@@ -1153,27 +1302,31 @@ public:
 };
 
 //-----------------------------------------------------------------------
-template<class EE> class EHandlerNoAttr : public Fb2Parser::EHandler
+template<class EE> class EHandlerNoAttr : public Fb2EHandler, Noncopyable
 {
-    Ptr<Fb2Parser::NoAttrHandler> pah_;
+    Ptr<Fb2NoAttrHandler> pah_;
 public:
-    EHandlerNoAttr(Fb2Parser::NoAttrHandler *pah) : pah_(pah) {}
+    EHandlerNoAttr(Fb2NoAttrHandler *pah) : pah_(pah) {}
 
     //virtuals
-    bool StartTag(Fb2Parser::EType type, LexScanner *s)
+    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
     {
         const ElementInfo &ei = einfo[type];
         if(s->BeginElement(ei.name_))
         {
-            pah_->Begin(type, s);
+            pah_->Begin(type, host);
             return false;
         }
 
         if(ei.notempty_)
             EmptyElementError(s, ei.name_);
-        pah_->Begin(type, s);
+        pah_->Begin(type, host);
         pah_->End();
         return true;
+    }
+    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
+    {
+        return oldCtxt;
     }
     void Data(const String &data)
     {
@@ -1197,7 +1350,7 @@ struct EE_SkipRest
 };
 
 //-----------------------------------------------------------------------
-Ptr<Fb2Parser::EHandler> Fb2Parser::CreateEHandler(Fb2Parser::AttrHandler *ph, bool skipRest)
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2AttrHandler *ph, bool skipRest)
 {
     if(skipRest)
         return new EHandlerAttr<EE_SkipRest>(ph);
@@ -1206,12 +1359,14 @@ Ptr<Fb2Parser::EHandler> Fb2Parser::CreateEHandler(Fb2Parser::AttrHandler *ph, b
 }
 
 //-----------------------------------------------------------------------
-Ptr<Fb2Parser::EHandler> Fb2Parser::CreateEHandler(Fb2Parser::NoAttrHandler *ph, bool skipRest)
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2NoAttrHandler *ph, bool skipRest)
 {
     if(skipRest)
         return new EHandlerNoAttr<EE_SkipRest>(ph);
     else
         return new EHandlerNoAttr<EE_Normal>(ph);
 }
+
+
 
 };  //namespace Fb2ToEpub
