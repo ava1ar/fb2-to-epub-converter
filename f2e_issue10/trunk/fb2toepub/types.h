@@ -86,11 +86,26 @@ public:
     Object& operator=(const Object&)            {return *this;}
     virtual ~Object()                           {}
 
-    void Lock() const       {++cnt_;}
-    void Unlock() const     {if (!--cnt_) const_cast<Object*>(this)->DeleteUnreferenced();}
+    void Lock() const
+    {
+        if(++cnt_ == 1)
+            fprintf(stderr, "a ptr=%p\n", this);
+    }
+    void Unlock() const
+    {
+        if (!--cnt_)
+        {
+            fprintf(stderr, "f ptr=%p\n", this);
+            const_cast<Object*>(this)->DeleteUnreferenced();
+        }
+    }
 
 protected:
-    virtual void DeleteUnreferenced()           {delete this;}
+    virtual void DeleteUnreferenced()
+    {
+        //fprintf(stderr, "ptr=%p\n", this);
+        delete this;
+    }
 
 private:
     mutable long cnt_;
