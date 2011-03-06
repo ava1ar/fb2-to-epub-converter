@@ -88,14 +88,15 @@ public:
 
     void Lock() const
     {
-        if(++cnt_ == 1)
-            fprintf(stderr, "a ptr=%p\n", this);
+        //if(++cnt_ == 1)
+        //    fprintf(stderr, "a ptr=%p\n", this);
+        ++cnt;
     }
     void Unlock() const
     {
         if (!--cnt_)
         {
-            fprintf(stderr, "f ptr=%p\n", this);
+            //fprintf(stderr, "f ptr=%p\n", this);
             const_cast<Object*>(this)->DeleteUnreferenced();
         }
     }
