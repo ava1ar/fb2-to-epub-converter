@@ -181,10 +181,13 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     parser->Register(E_SEQUENCE, CreateEHandler(sequence));
 
     // skip rest without scanning
+
     Ptr<Fb2EHandler> nop = new NopEHandler();
+
     parser->Register(E_SRC_TITLE_INFO,  nop);
     parser->Register(E_DOCUMENT_INFO,   nop);
     parser->Register(E_PUBLISH_INFO,    nop);
+
     parser->Register(E_CUSTOM_INFO,     nop);
     parser->Register(E_BODY,            nop);
     parser->Register(E_BINARY,          nop);

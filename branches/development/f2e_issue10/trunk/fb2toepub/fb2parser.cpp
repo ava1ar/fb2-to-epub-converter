@@ -169,10 +169,10 @@ class AutoHandler : private Fb2Host, Noncopyable
 public:
     AutoHandler(Fb2EType type, ParserState *state, Fb2Ctxt *ctxt)
         :   type_(type),
-            state_(state),
-            ph_(ctxt->GetHandler(type)),    // get handler from old context
-            newCtxt_(ph_->GetCtxt(ctxt))    // get new context from handler
+            state_(state)
     {
+        ph_ = ctxt->GetHandler(type);   // get handler from old context
+        newCtxt_ = ph_->GetCtxt(ctxt);  // get new context from handler
     }
 
     bool StartTag()
@@ -205,24 +205,29 @@ public:
 //-----------------------------------------------------------------------
 // Syntax parser
 //-----------------------------------------------------------------------
-class Fb2ParserImpl : public Fb2Parser, private Fb2Ctxt, Noncopyable
+class Fb2ParserImpl : public Fb2Parser, Noncopyable
 {
 public:
-    Fb2ParserImpl(LexScanner *scanner) : state_(scanner), handlers_(E_COUNT, DefEHandler::Obj()) {}
+    Fb2ParserImpl(LexScanner *scanner) : state_(scanner), ctxt_(new Ctxt()) {}
 
     //virtuals
-    void Register(Fb2EType type, Fb2EHandler *h);
+    void Register(Fb2EType type, Fb2EHandler *h)    {ctxt_->Register(type, h);}
     void Parse();
 
 private:
-    HandlerVector   handlers_;
-    ParserState     state_;
-
-    //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
+    class Ctxt : public Fb2Ctxt
     {
-        return handlers_[type];
-    }
+        HandlerVector   handlers_;
+    public:
+        Ctxt() : handlers_(E_COUNT, DefEHandler::Obj())     {}
+
+        //virtual
+        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const    {return handlers_[type];}
+        void Register(Fb2EType type, Fb2EHandler *h);
+    };
+
+    ParserState     state_;
+    Ptr<Ctxt>       ctxt_;
 
     void AuthorElement          (Fb2EType type, Fb2Ctxt *ctxt);
     void ParseText              (Fb2EType type, Fb2Ctxt *ctxt);
@@ -300,7 +305,7 @@ private:
 
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::Register(Fb2EType type, Fb2EHandler *h)
+void Fb2ParserImpl::Ctxt::Register(Fb2EType type, Fb2EHandler *h)
 {
     size_t idx = type;
 #if defined(_DEBUG)
@@ -318,7 +323,7 @@ void Fb2ParserImpl::Register(Fb2EType type, Fb2EHandler *h)
 void Fb2ParserImpl::Parse()
 {
     state_.s_->SkipXMLDeclaration();
-    FictionBook(this);
+    FictionBook(ctxt_);
 }
 
 //-----------------------------------------------------------------------
