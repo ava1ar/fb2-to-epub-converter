@@ -72,7 +72,8 @@ namespace Fb2ToEpub
         E_POEM,
         E_PROGRAM_USED,
         E_PUBLISH_INFO,
-        E_PUBLISHER,
+        E_PUBLISHER_PI,     // <publisher> in <publish-info>
+        E_PUBLISHER_DI,     // <publisher> in <document-info>
         E_SECTION,
         E_SEQUENCE,
         E_SRC_LANG,

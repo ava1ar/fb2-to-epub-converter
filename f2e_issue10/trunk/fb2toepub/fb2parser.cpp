@@ -42,19 +42,19 @@ static const ElementInfo einfo[E_COUNT] =
     ElementInfo("FictionBook",          true),
     ElementInfo("a",                    false),
     ElementInfo("annotation",           false),
-    ElementInfo("author",               true),
+    ElementInfo("author",               false),
     ElementInfo("binary",               true),
-    ElementInfo("body",                 true),
+    ElementInfo("body",                 false),
     ElementInfo("book-name",            false),
     ElementInfo("book-title",           false),
     ElementInfo("cite",                 true),
     ElementInfo("city",                 false),
     ElementInfo("code",                 false),
-    ElementInfo("coverpage",            true),
+    ElementInfo("coverpage",            false),
     ElementInfo("custom-info",          false),
     ElementInfo("date",                 false),
     ElementInfo("description",          true),
-    ElementInfo("document-info",        true),
+    ElementInfo("document-info",        false),
     ElementInfo("email",                false),
     ElementInfo("emphasis",             false),
     ElementInfo("empty-line",           false),
@@ -75,17 +75,18 @@ static const ElementInfo einfo[E_COUNT] =
     ElementInfo("output",               false),
     ElementInfo("p",                    false),
     ElementInfo("part",                 false),
-    ElementInfo("poem",                 true),
+    ElementInfo("poem",                 false),
     ElementInfo("program-used",         false),
     ElementInfo("publish-info",         false),
-    ElementInfo("publisher",            false),
+    ElementInfo("publisher",            false),     // <publisher> in <publish-info>
+    ElementInfo("publisher",            false),     // <publisher> in <document-info>
     ElementInfo("section",              false),
     ElementInfo("sequence",             false),
     ElementInfo("src-lang",             false),
     ElementInfo("src-ocr",              false),
     ElementInfo("src-title-info",       false),
     ElementInfo("src-url",              false),
-    ElementInfo("stanza",               true),
+    ElementInfo("stanza",               false),
     ElementInfo("strikethrough",        false),
     ElementInfo("strong",               false),
     ElementInfo("style",                false),
@@ -93,7 +94,7 @@ static const ElementInfo einfo[E_COUNT] =
     ElementInfo("sub",                  false),
     ElementInfo("subtitle",             false),
     ElementInfo("sup",                  false),
-    ElementInfo("table",                true),
+    ElementInfo("table",                false),
     ElementInfo("td",                   false),
     ElementInfo("text-author",          false),
     ElementInfo("th",                   false),
@@ -223,8 +224,10 @@ private:
         return handlers_[type];
     }
 
+    void AuthorElement          (Fb2EType type, Fb2Ctxt *ctxt);
     void ParseText              (Fb2EType type, Fb2Ctxt *ctxt);
     void SimpleText             (Fb2EType type, Fb2Ctxt *ctxt);
+    void TitleInfo              (Fb2EType type, Fb2Ctxt *ctxt);
 
     // FictionBook elements
     void FictionBook            (Fb2Ctxt *ctxt);
@@ -233,28 +236,28 @@ private:
     void author                 (Fb2Ctxt *ctxt);
     void binary                 (Fb2Ctxt *ctxt);
     void body                   (Fb2Ctxt *ctxt);
-    //void book_name              (Fb2Ctxt *ctxt);
+    void book_name              (Fb2Ctxt *ctxt);
     void book_title             (Fb2Ctxt *ctxt);
     void cite                   (Fb2Ctxt *ctxt);
-    //void city                   (Fb2Ctxt *ctxt);
+    void city                   (Fb2Ctxt *ctxt);
     void code                   (Fb2Ctxt *ctxt);
     void coverpage              (Fb2Ctxt *ctxt);
-    //void custom_info            (Fb2Ctxt *ctxt);
+    void custom_info            (Fb2Ctxt *ctxt);
     void date                   (Fb2Ctxt *ctxt);
     void description            (Fb2Ctxt *ctxt);
     void document_info          (Fb2Ctxt *ctxt);
-    //void email                  (Fb2Ctxt *ctxt);
+    void email                  (Fb2Ctxt *ctxt);
     void emphasis               (Fb2Ctxt *ctxt);
     void empty_line             (Fb2Ctxt *ctxt);
     void epigraph               (Fb2Ctxt *ctxt);
     void first_name             (Fb2Ctxt *ctxt);
-    //void genre                  (Fb2Ctxt *ctxt);
-    //void history                (Fb2Ctxt *ctxt);
-    //void home_page              (Fb2Ctxt *ctxt);
+    void genre                  (Fb2Ctxt *ctxt);
+    void history                (Fb2Ctxt *ctxt);
+    void home_page              (Fb2Ctxt *ctxt);
     void id                     (Fb2Ctxt *ctxt);
     void image                  (Fb2Ctxt *ctxt);
     void isbn                   (Fb2Ctxt *ctxt);
-    //void keywords               (Fb2Ctxt *ctxt);
+    void keywords               (Fb2Ctxt *ctxt);
     void lang                   (Fb2Ctxt *ctxt);
     void last_name              (Fb2Ctxt *ctxt);
     void middle_name            (Fb2Ctxt *ctxt);
@@ -264,15 +267,16 @@ private:
     void p                      (Fb2Ctxt *ctxt);
     //void part                   (Fb2Ctxt *ctxt);
     void poem                   (Fb2Ctxt *ctxt);
-    //void program_used           (Fb2Ctxt *ctxt);
+    void program_used           (Fb2Ctxt *ctxt);
     void publish_info           (Fb2Ctxt *ctxt);
-    //void publisher              (Fb2Ctxt *ctxt);
+    void publisher_pi           (Fb2Ctxt *ctxt);    // <publisher> in <publish-info>
+    void publisher_di           (Fb2Ctxt *ctxt);    // <publisher> in <document-info>
     void section                (Fb2Ctxt *ctxt);
     void sequence               (Fb2Ctxt *ctxt);
-    //void src_lang               (Fb2Ctxt *ctxt);
-    //void src_ocr                (Fb2Ctxt *ctxt);
-    //void src_title_info         (Fb2Ctxt *ctxt);
-    //void src_url                (Fb2Ctxt *ctxt);
+    void src_lang               (Fb2Ctxt *ctxt);
+    void src_ocr                (Fb2Ctxt *ctxt);
+    void src_title_info         (Fb2Ctxt *ctxt);
+    void src_url                (Fb2Ctxt *ctxt);
     void stanza                 (Fb2Ctxt *ctxt);
     void strikethrough          (Fb2Ctxt *ctxt);
     void strong                 (Fb2Ctxt *ctxt);
@@ -288,10 +292,10 @@ private:
     void title                  (Fb2Ctxt *ctxt);
     void title_info             (Fb2Ctxt *ctxt);
     void tr                     (Fb2Ctxt *ctxt);
-    //void translator             (Fb2Ctxt *ctxt);
+    void translator             (Fb2Ctxt *ctxt);
     void v                      (Fb2Ctxt *ctxt);
-    //void version                (Fb2Ctxt *ctxt);
-    //void year                   (Fb2Ctxt *ctxt);
+    void version                (Fb2Ctxt *ctxt);
+    void year                   (Fb2Ctxt *ctxt);
 };
 
 
@@ -315,6 +319,55 @@ void Fb2ParserImpl::Parse()
 {
     state_.s_->SkipXMLDeclaration();
     FictionBook(this);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::AuthorElement(Fb2EType type, Fb2Ctxt *ctxt)
+{
+    AutoHandler h(type, &state_, ctxt);
+    if(h.StartTag())
+        return;
+
+    if(state_.s_->IsNextElement("first-name"))
+    {
+        //<first-name>
+        first_name(h.Ctxt());
+        //</first-name>
+
+        //<middle-name>
+        if(state_.s_->IsNextElement("middle-name"))
+            middle_name(h.Ctxt());
+        //<middle-name>
+
+        //<last-name>
+        last_name(h.Ctxt());
+        //</last-name>
+    }
+    else if(state_.s_->IsNextElement("nickname"))
+    {
+        //<nickname>
+        nickname(h.Ctxt());
+        //</nickname>
+    }
+    else
+        state_.s_->Error("<first-name> or <nickname> expected");
+
+    //<home-page>
+    while(state_.s_->IsNextElement("home-page"))
+        home_page(h.Ctxt());
+    //</home-page>
+
+    //<email>
+    while(state_.s_->IsNextElement("email"))
+        email(h.Ctxt());
+    //</email>
+
+    //<id>
+    if(state_.s_->IsNextElement("id"))
+        id(h.Ctxt());
+    //<id>
+
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
@@ -381,6 +434,71 @@ void Fb2ParserImpl::SimpleText(Fb2EType type, Fb2Ctxt *ctxt)
             h.Data(state_.s_->GetToken().s_);
         h.EndTag();
     }
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::TitleInfo(Fb2EType type, Fb2Ctxt *ctxt)
+{
+    AutoHandler h(type, &state_, ctxt);
+    if(h.StartTag())
+        return;
+
+    //<genre>
+    do
+        genre(h.Ctxt());
+    while(state_.s_->IsNextElement("genre"));
+    //</genre>
+
+    //<author>
+    do
+        author(h.Ctxt());
+    while(state_.s_->IsNextElement("author"));
+    //<author>
+
+    //<book-title>
+    book_title(h.Ctxt());
+    //</book-title>
+
+    //<annotation>
+    if(state_.s_->IsNextElement("annotation"))
+        annotation(h.Ctxt());
+    //</annotation>
+
+    //<keywords>
+    if(state_.s_->IsNextElement("keywords"))
+        keywords(h.Ctxt());
+    //</keywords>
+
+    //<date>
+    if(state_.s_->IsNextElement("date"))
+        date(h.Ctxt());
+    //<date>
+
+    //<coverpage>
+    if(state_.s_->IsNextElement("coverpage"))
+        coverpage(h.Ctxt());
+    //</coverpage>
+
+    //<lang>
+    lang(h.Ctxt());
+    //</lang>
+
+    //<src-lang>
+    if(state_.s_->IsNextElement("src-lang"))
+        src_lang(h.Ctxt());
+    //</src-lang>
+
+    //<translator>
+    while(state_.s_->IsNextElement("translator"))
+        translator(h.Ctxt());
+    //</translator>
+
+    //<sequence>
+    while(state_.s_->IsNextElement("sequence"))
+        sequence(h.Ctxt());
+    //</sequence>
+
+    h.EndTag();
 }
 
 //-----------------------------------------------------------------------
@@ -502,35 +620,7 @@ void Fb2ParserImpl::annotation(Fb2Ctxt *ctxt)
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::author(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_AUTHOR, &state_, ctxt);
-    if(h.StartTag())
-        return;
-
-    if(state_.s_->IsNextElement("first-name"))
-    {
-        //<first-name>
-        first_name(h.Ctxt());
-        //</first-name>
-
-        //<middle-name>
-        if(state_.s_->IsNextElement("middle-name"))
-            middle_name(h.Ctxt());
-        //<middle-name>
-
-        //<last-name>
-        last_name(h.Ctxt());
-        //</last-name>
-    }
-    else if(state_.s_->IsNextElement("nickname"))
-    {
-        //<nickname>
-        nickname(h.Ctxt());
-        //</nickname>
-    }
-    else
-        state_.s_->Error("<first-name> or <nickname> expected");
-
-    h.EndTag();
+    AuthorElement(E_AUTHOR, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -583,9 +673,21 @@ void Fb2ParserImpl::body(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::book_name(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_BOOK_NAME, ctxt);
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::book_title(Fb2Ctxt *ctxt)
 {
     SimpleText(E_BOOK_TITLE, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::city(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_CITY, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -634,6 +736,12 @@ void Fb2ParserImpl::code(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::custom_info(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_CUSTOM_INFO, ctxt);
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::coverpage(Fb2Ctxt *ctxt)
 {
     AutoHandler h(E_COVERPAGE, &state_, ctxt);
@@ -665,7 +773,8 @@ void Fb2ParserImpl::description(Fb2Ctxt *ctxt)
     //</title-info>
 
     //<src-title-info>
-    state_.s_->SkipIfElement("src-title-info");
+    if(state_.s_->IsNextElement("src-title-info"))
+        src_title_info(h.Ctxt());
     //</src-title-info>
 
     //<document-info>
@@ -677,7 +786,18 @@ void Fb2ParserImpl::description(Fb2Ctxt *ctxt)
         publish_info(h.Ctxt());
     //</publish-info>
 
+    //<custom-info>
+    while(state_.s_->IsNextElement("custom-info"))
+        custom_info(h.Ctxt());
+    //</custom-info>
+
     h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::email(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_EMAIL, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -688,29 +808,47 @@ void Fb2ParserImpl::document_info(Fb2Ctxt *ctxt)
         return;
 
     //<author>
-    state_.s_->CheckAndSkipElement("author");
-    state_.s_->SkipAll("author");
+    do
+        author(h.Ctxt());
+    while(state_.s_->IsNextElement("author"));
     //</author>
 
     //<program-used>
-    state_.s_->SkipIfElement("program-used");
+    if(state_.s_->IsNextElement("program-used"))
+        program_used(h.Ctxt());
     //</program-used>
 
     //<date>
-    state_.s_->CheckAndSkipElement("date");
+    date(h.Ctxt());
     //</date>
 
     //<src-url>
-    state_.s_->SkipAll("src-url");
+    while(state_.s_->IsNextElement("src-url"))
+        src_url(h.Ctxt());
     //</src-url>
 
     //<src-ocr>
-    state_.s_->SkipIfElement("src-ocr");
+    if(state_.s_->IsNextElement("src-ocr"))
+        src_ocr(h.Ctxt());
     //</src-ocr>
 
     //<id>
     id(h.Ctxt());
     //<id>
+
+    //<version>
+    version(h.Ctxt());
+    //</version>
+
+    //<history>
+    if(state_.s_->IsNextElement("history"))
+        history(h.Ctxt());
+    //</history>
+
+    //<publisher>
+    while(state_.s_->IsNextElement("publisher"))
+        publisher_di(h.Ctxt());
+    //</publisher>
 
     h.EndTag();
 }
@@ -773,6 +911,52 @@ void Fb2ParserImpl::first_name(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::genre(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_GENRE, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::history(Fb2Ctxt *ctxt)
+{
+    AutoHandler h(E_HISTORY, &state_, ctxt);
+    if(h.StartTag())
+        return;
+
+    for(LexScanner::Token t = state_.s_->LookAhead(); t.type_ == LexScanner::START; t = state_.s_->LookAhead())
+    {
+        //<p>, <poem>, <cite>, <subtitle>, <empty-line>, <table>
+        if(!t.s_.compare("p"))
+            p(h.Ctxt());
+        else if(!t.s_.compare("poem"))
+            poem(h.Ctxt());
+        else if(!t.s_.compare("cite"))
+            cite(h.Ctxt());
+        else if(!t.s_.compare("subtitle"))
+            subtitle(h.Ctxt());
+        else if(!t.s_.compare("empty-line"))
+            empty_line(h.Ctxt());
+        else if(!t.s_.compare("table"))
+            table(h.Ctxt());
+        else
+        {
+            std::ostringstream ss;
+            ss << "<" << t.s_ << "> unexpected in <history>";
+            state_.s_->Error(ss.str());
+        }
+        //</p>, </poem>, </cite>, </subtitle>, </empty-line>, </table>
+    }
+
+    h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::home_page(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_HOME_PAGE, ctxt);
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::id(Fb2Ctxt *ctxt)
 {
     SimpleText(E_ID, ctxt);
@@ -791,6 +975,12 @@ void Fb2ParserImpl::image(Fb2Ctxt *ctxt)
 void Fb2ParserImpl::isbn(Fb2Ctxt *ctxt)
 {
     SimpleText(E_ISBN, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::keywords(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_KEYWORDS, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -860,6 +1050,12 @@ void Fb2ParserImpl::poem(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::program_used(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_PROGRAM_USED, ctxt);
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::publish_info(Fb2Ctxt *ctxt)
 {
     AutoHandler h(E_PUBLISH_INFO, &state_, ctxt);
@@ -867,19 +1063,23 @@ void Fb2ParserImpl::publish_info(Fb2Ctxt *ctxt)
         return;
 
     //<book-name>
-    state_.s_->SkipIfElement("book-name");
+    if(state_.s_->IsNextElement("book-name"))
+        book_name(h.Ctxt());
     //</book-name>
 
     //<publisher>
-    state_.s_->SkipIfElement("publisher");
+    if(state_.s_->IsNextElement("publisher"))
+        publisher_pi(h.Ctxt());
     //</publisher>
 
     //<city>
-    state_.s_->SkipIfElement("city");
+    if(state_.s_->IsNextElement("city"))
+        city(h.Ctxt());
     //</city>
 
     //<year>
-    state_.s_->SkipIfElement("year");
+    if(state_.s_->IsNextElement("year"))
+        year(h.Ctxt());
     //</year>
 
     //<isbn>
@@ -888,6 +1088,18 @@ void Fb2ParserImpl::publish_info(Fb2Ctxt *ctxt)
     //</isbn>
 
     h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::publisher_pi(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_PUBLISHER_PI, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::publisher_di(Fb2Ctxt *ctxt)
+{
+    AuthorElement(E_PUBLISHER_DI, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -963,6 +1175,30 @@ void Fb2ParserImpl::sequence(Fb2Ctxt *ctxt)
     AutoHandler h(E_SEQUENCE, &state_, ctxt);
     if(!h.StartTag())
         h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::src_lang(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_SRC_LANG, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::src_ocr(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_SRC_OCR, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::src_title_info(Fb2Ctxt *ctxt)
+{
+    TitleInfo(E_SRC_TITLE_INFO, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::src_url(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_SRC_URL, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -1100,62 +1336,7 @@ void Fb2ParserImpl::title(Fb2Ctxt *ctxt)
 //-----------------------------------------------------------------------
 void Fb2ParserImpl::title_info(Fb2Ctxt *ctxt)
 {
-    AutoHandler h(E_TITLE_INFO, &state_, ctxt);
-    if(h.StartTag())
-        return;
-
-    //<genre>
-    state_.s_->CheckAndSkipElement("genre");
-    state_.s_->SkipAll("genre");
-    //</genre>
-
-    //<author>
-    do
-        author(h.Ctxt());
-    while(state_.s_->IsNextElement("author"));
-    //<author>
-
-    //<book-title>
-    book_title(h.Ctxt());
-    //</book-title>
-
-    //<annotation>
-    if(state_.s_->IsNextElement("annotation"))
-        annotation(h.Ctxt());
-    //</annotation>
-
-    //<keywords>
-    state_.s_->SkipIfElement("keywords");
-    //</keywords>
-
-    //<date>
-    if(state_.s_->IsNextElement("date"))
-        date(h.Ctxt());
-    //<date>
-
-    //<coverpage>
-    if(state_.s_->IsNextElement("coverpage"))
-        coverpage(h.Ctxt());
-    //</coverpage>
-
-    //<lang>
-    lang(h.Ctxt());
-    //</lang>
-
-    //<src-lang>
-    state_.s_->SkipIfElement("src-lang");
-    //</src-lang>
-
-    //<translator>
-    state_.s_->SkipIfElement("translator");
-    //</translator>
-
-    //<sequence>
-    while(state_.s_->IsNextElement("sequence"))
-        sequence(h.Ctxt());
-    //</sequence>
-
-    h.EndTag();
+    TitleInfo(E_TITLE_INFO, ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -1181,9 +1362,27 @@ void Fb2ParserImpl::tr(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::translator(Fb2Ctxt *ctxt)
+{
+    AuthorElement(E_TRANSLATOR, ctxt);
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::v(Fb2Ctxt *ctxt)
 {
     ParseText(E_V, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::version(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_VERSION, ctxt);
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::year(Fb2Ctxt *ctxt)
+{
+    SimpleText(E_YEAR, ctxt);
 }
 
 //-----------------------------------------------------------------------
