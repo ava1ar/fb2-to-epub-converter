@@ -62,9 +62,10 @@ public:
     }
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host*)  {pname_->Reset();}
-    void Contents(const String&)    {}
-    void End()                      {authors_.push_back(pname_->Text());}
+    void            Begin(Fb2EType, Fb2Host*)       {pname_->Reset();}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
+    void            Contents(const String&)         {}
+    void            End()                           {authors_.push_back(pname_->Text());}
 
 private:
     Ptr<Fb2TextHandler> pname_;
@@ -105,8 +106,9 @@ public:
         if(!name.empty())
             sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
     }
-    void Contents(const String&)        {}
-    void End()                          {}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
+    void            Contents(const String&)         {}
+    void            End()                           {}
 
 private:
     typedef std::vector<std::pair<String, String> > seqvector;
@@ -145,6 +147,13 @@ public:
 //-----------------------------------------------------------------------
 void FB2TOEPUB_DECL DoPrintInfo (const String &in)
 {
+    std::size_t size = 0;
+    {
+        struct stat st;
+        ::stat(in.c_str(), &st);
+        size = st.st_size;
+    }
+
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
 
     Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
@@ -195,12 +204,6 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     // drop rest of FictionBook contents without scanning
     parser->Register(E_FICTIONBOOK, Ptr<Fb2EHandler>(new RootEHandler()));
 
-    std::size_t size = 0;
-    {
-        struct stat st;
-        ::stat(in.c_str(), &st);
-        size = st.st_size;
-    }
     parser->Parse();
 
     // print info

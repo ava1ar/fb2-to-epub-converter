@@ -1492,7 +1492,7 @@ public:
     }
     Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
     {
-        return oldCtxt;
+        return pah_->GetCtxt(oldCtxt);
     }
     void Data(const String &data)
     {
@@ -1530,7 +1530,7 @@ public:
     }
     Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
     {
-        return oldCtxt;
+        return pah_->GetCtxt(oldCtxt);
     }
     void Data(const String &data)
     {

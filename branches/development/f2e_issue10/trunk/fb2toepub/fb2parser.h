@@ -184,9 +184,10 @@ namespace Fb2ToEpub
     class Fb2AttrHandler : public Object
     {
     public:
-        virtual void    Begin   (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
-        virtual void    Contents(const String &data)                                = 0;
-        virtual void    End     ()                                                  = 0;
+        virtual void            Begin   (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
+        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                            = 0;
+        virtual void            Contents(const String &data)                                = 0;
+        virtual void            End     ()                                                  = 0;
     };
     //-----------------------------------------------------------------------
     // SUB-HANDLER WITHOUT PROCESSING OF ATTRIBUTES
@@ -194,9 +195,10 @@ namespace Fb2ToEpub
     class Fb2NoAttrHandler : public Object
     {
     public:
-        virtual void    Begin   (Fb2EType type, Fb2Host *host)  = 0;
-        virtual void    Contents(const String &data)            = 0;
-        virtual void    End     ()                              = 0;
+        virtual void            Begin   (Fb2EType type, Fb2Host *host)  = 0;
+        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const        = 0;
+        virtual void            Contents(const String &data)            = 0;
+        virtual void            End     ()                              = 0;
     };
 
     // create Fb2EHandler object from (user-implemented) sub-handler object
