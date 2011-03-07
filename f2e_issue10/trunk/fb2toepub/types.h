@@ -90,7 +90,7 @@ public:
     {
         //if(++cnt_ == 1)
         //    fprintf(stderr, "a ptr=%p\n", this);
-        ++cnt;
+        ++cnt_;
     }
     void Unlock() const
     {
