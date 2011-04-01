@@ -115,34 +115,8 @@ inline void EmptyElementError(LexScanner *s, const String &name)
     s->Error(ss.str());
 }
 
+
 //-----------------------------------------------------------------------
-// Default handler
-//-----------------------------------------------------------------------
-class DefEHandler : public Fb2EHandler
-{
-public:
-    //virtuals
-    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
-    {
-        const ElementInfo &ei = einfo[type];
-        if(s->BeginElement(ei.name_))
-            return false;
-
-        if(ei.notempty_)
-            EmptyElementError(s, ei.name_);
-        return true;
-    }
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
-    void            Data(const String&)             {}
-    void            EndTag(LexScanner *s)           {s->SkipRestOfElementContent();}
-
-    static Fb2EHandler* Obj()                       {return defaultHandler_;}
-
-private:
-    static Ptr<Fb2EHandler> defaultHandler_;
-};
-Ptr<Fb2EHandler> DefEHandler::defaultHandler_ = new DefEHandler();
-
 typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
 typedef std::vector<Fb2EType> TypeVector;
 
@@ -208,7 +182,7 @@ public:
 class Fb2ParserImpl : public Fb2Parser, Noncopyable
 {
 public:
-    Fb2ParserImpl(LexScanner *scanner) : state_(scanner), ctxt_(new Ctxt()) {}
+    Fb2ParserImpl(LexScanner *scanner, Fb2EHandler *defHandler) : state_(scanner), ctxt_(new Ctxt(defHandler)) {}
 
     //virtuals
     void Register(Fb2EType type, Fb2EHandler *h)    {ctxt_->Register(type, h);}
@@ -219,7 +193,8 @@ private:
     {
         HandlerVector   handlers_;
     public:
-        Ctxt() : handlers_(E_COUNT, DefEHandler::Obj())     {}
+        Ctxt(Fb2EHandler *defHandler)
+            : handlers_(E_COUNT, defHandler) {}
 
         //virtual
         Ptr<Fb2EHandler> GetHandler(Fb2EType type) const    {return handlers_[type];}
@@ -1391,9 +1366,9 @@ void Fb2ParserImpl::year(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
-Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner)
+Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner, Fb2EHandler *defHandler)
 {
-    return new Fb2ParserImpl(scanner);
+    return new Fb2ParserImpl(scanner, defHandler);
 }
 
 
@@ -1409,27 +1384,99 @@ const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type)
 }
 
 //-----------------------------------------------------------------------
-// HANDLER TO SKIP WHOLE ELEMENT CONTENTS
+// RECURSIVE HANDLER
+//-----------------------------------------------------------------------
+class RecursiveEHandler : public Fb2EHandler
+{
+public:
+    //virtuals
+    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
+    {
+        const ElementInfo &ei = einfo[type];
+        if(s->BeginElement(ei.name_))
+            return false;
+
+        if(ei.notempty_)
+            EmptyElementError(s, ei.name_);
+        return true;
+    }
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
+    void            Data(const String&)             {}
+    void            EndTag(LexScanner *s)           {s->SkipRestOfElementContent();}
+
+    static Fb2EHandler* Obj()                       {return obj_;}
+
+private:
+    static Ptr<Fb2EHandler> obj_;
+};
+Ptr<Fb2EHandler> RecursiveEHandler::obj_ = new RecursiveEHandler();
+
+//-----------------------------------------------------------------------
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRecursiveEHandler()
+{
+    return RecursiveEHandler::Obj();
+}
+
+
+//-----------------------------------------------------------------------
+// SKIP HANDLER
+//-----------------------------------------------------------------------
 class SkipEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host*)    {s->SkipElement(); return true;}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                    {return oldCtxt;}
-    void            Data    (const String &data)                        {}
-    void            EndTag  (LexScanner *s)                             {}
+    bool            StartTag(Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const            {return oldCtxt;}
+    void            Data    (const String&)                     {}
+    void            EndTag  (LexScanner*)                       {}
+
+    static Fb2EHandler* Obj()                                   {return obj_;}
+
+private:
+    static Ptr<Fb2EHandler> obj_;
 };
+Ptr<Fb2EHandler> SkipEHandler::obj_ = new SkipEHandler();
+
+//-----------------------------------------------------------------------
 Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler()
 {
-    return new SkipEHandler();
+    return SkipEHandler::Obj();
 }
 
-// SIMPLE TEXT HANDLER
-class TextHandler : public Fb2TextHandler, Noncopyable
+
+//-----------------------------------------------------------------------
+// NOP HANDLER
+//-----------------------------------------------------------------------
+//-----------------------------------------------------------------------
+class NopEHandler : public Fb2EHandler
 {
 public:
-    TextHandler(const String &concatDivider) : divider_(concatDivider) {}
+    //virtuals
+    bool            StartTag(Fb2EType, LexScanner*, Fb2Host*)   {return true;}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const             {return oldCtxt;}
+    void            Data    (const String&)                     {}
+    void            EndTag  (LexScanner*)                       {}
 
+    static Fb2EHandler* Obj()                                   {return obj_;}
+
+private:
+    static Ptr<Fb2EHandler> obj_;
+};
+Ptr<Fb2EHandler> NopEHandler::obj_ = new NopEHandler();
+
+//-----------------------------------------------------------------------
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateNopEHandler()
+{
+    return NopEHandler::Obj();
+}
+
+
+//-----------------------------------------------------------------------
+// SIMPLE TEXT HANDLER
+//-----------------------------------------------------------------------
+class TextHandlerBase : public Fb2TextHandler
+{
+public:
     //virtuals
     bool StartTag(Fb2EType type, LexScanner *s, Fb2Host*)
     {
@@ -1445,24 +1492,52 @@ public:
     {
         return oldCtxt;
     }
-    void Data(const String &data)
-    {
-        text_ = Concat(text_, divider_, data);
-    }
     void EndTag(LexScanner *s)
     {
         s->EndElement();
     }
-    void Reset()                        {text_ = "";}
-    const String& Text() const          {return text_;}
+};
+//-----------------------------------------------------------------------
+class TextHandler : public TextHandlerBase
+{
+public:
+    TextHandler(String *text) : text_(text ? text : &buf_) {}
+
+    //virtuals
+    void Data(const String &data)       {*text_ += data;}
+    void Reset()                        {*text_ = "";}
+    const String& Text() const          {return *text_;}
+
+private:
+    String buf_, *text_;
+};
+//-----------------------------------------------------------------------
+class TextHandlerConcat : public TextHandlerBase
+{
+public:
+    TextHandlerConcat(const String &concatDivider, String *text)
+        : divider_(concatDivider), text_(text ? text : &buf_) {}
+
+    //virtuals
+    void Data(const String &data)       {*text_ = Concat(*text_, divider_, data);}
+    void Reset()                        {*text_ = "";}
+    const String& Text() const          {return *text_;}
 
 private:
     String divider_;
-    String text_;
+    String buf_, *text_;
 };
-Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(const String &concatDivider)
+//-----------------------------------------------------------------------
+Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(const String &concatDivider, String *text)
 {
-    return new TextHandler(concatDivider);
+    if(concatDivider.empty())
+        return new TextHandler(text);
+    else
+        return new TextHandlerConcat(concatDivider, text);
+}
+Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(String *text)
+{
+    return new TextHandler(text);
 }
 
 
@@ -1570,6 +1645,81 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2NoAttrHandler *ph, bool skipRe
     else
         return new EHandlerNoAttr<EE_Normal>(ph);
 }
+
+
+//-----------------------------------------------------------------------
+// ROOT ELEMENT HANDLER
+//-----------------------------------------------------------------------
+class FictionBoolElement : public Fb2RootHandler
+{
+public:
+    //virtuals
+    bool StartTag(Fb2EType, LexScanner *s, Fb2Host *host)
+    {
+        AttrMap attrmap;
+        s->BeginNotEmptyElement("FictionBook", &attrmap);
+
+        // namespaces
+        AttrMap::const_iterator cit = attrmap.begin(), cit_end = attrmap.end();
+        bool has_fb = false, has_emptyfb = false;
+        for(; cit != cit_end; ++cit)
+        {
+            static const String xmlns = "xmlns";
+            static const std::size_t xmlns_len = xmlns.length();
+            static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
+
+            if(!cit->second.compare(fbID))
+            {
+                if(!cit->first.compare(xmlns))
+                    has_emptyfb = true;
+                else if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
+                    host->Error("bad FictionBook namespace definition");
+                has_fb = true;
+            }
+            else if(!cit->second.compare(xlID))
+            {
+                if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
+                    host->Error("bad xlink namespace definition");
+                xlns_.insert(cit->first.substr(xmlns_len+1));
+            }
+        }
+        if(!has_fb)
+            host->Error("missing FictionBook namespace definition");
+        if(!has_emptyfb)
+            host->Error("non-empty FictionBook namespace not implemented");
+
+        return false;
+    }
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const    {return oldCtxt;}
+    void            Data    (const String &data)        {}
+    void            EndTag  (LexScanner *s)             {}      // skip rest without processing
+
+    //virtual
+    String Findhref(const AttrMap &attrmap) const
+    {
+        std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
+        for(; cit != cit_end; ++cit)
+        {
+            String href;
+            if(cit->empty())
+                href = "href";
+            else
+                href = (*cit)+":href";
+            AttrMap::const_iterator ait = attrmap.find(href);
+            if(ait != attrmap.end())
+                return ait->second;
+        }
+        return "";
+    }
+
+private:
+    std::set<String> xlns_; // xlink namespaces
+};
+Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler()
+{
+    return new FictionBoolElement();
+}
+
 
 
 

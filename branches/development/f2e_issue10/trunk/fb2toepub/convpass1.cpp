@@ -21,11 +21,223 @@
 #include "hdr.h"
 
 #include "converter.h"
+#include "fb2parser.h"
 #include <sstream>
 #include <set>
 
 namespace Fb2ToEpub
 {
+
+//-----------------------------------------------------------------------
+// PASS 1 ENGINE
+//-----------------------------------------------------------------------
+class Engine
+{
+public:
+    Engine(UnitArray *units)
+        : units_(units), bodyType_(Unit::BODY_NONE), sectionCnt_(0)
+    {
+        sections_.push_back(-1);
+    }
+
+    const String* AddId(const AttrMap &attrmap)
+    {
+        AttrMap::const_iterator cit = attrmap.find("id");
+        if(cit == attrmap.end())
+            return NULL;
+
+        if(allRefIds_.find(cit->second) != allRefIds_.end())
+            return NULL;    // ignore second instance
+
+        allRefIds_.insert(cit->second);
+        units_->back().refIds_.push_back(cit->second);
+        return &cit->second;
+    }
+
+    void BeginBody()
+    {
+        switch(bodyType_)
+        {
+        case Unit::BODY_NONE:   bodyType_ = Unit::MAIN; break;
+        case Unit::MAIN:        bodyType_ = Unit::NOTES; break;
+        default:                bodyType_ = Unit::COMMENTS; break;
+        }
+    }
+
+    void BeginSection(const AttrMap &attrmap, Fb2Host *host)
+    {
+        int idx = units_->size();
+        units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, sections_.back()));
+        const String *id = AddId(attrmap);
+
+        // check if it has anchor
+        if (host->Scanner()->IsNextElement("title") &&
+            (bodyType_ == Unit::NOTES || bodyType_ == Unit::COMMENTS) &&
+            id &&
+            !id->empty())
+        {
+            units_->back().noteRefId_ = *id;
+        }
+        sections_.push_back(idx);
+    }
+
+    void EndSection()
+    {
+        sections_.pop_back();
+    }
+
+private:
+    UnitArray           *units_;
+    std::set<String>    allRefIds_;
+    Unit::BodyType      bodyType_;
+    int                 sectionCnt_;
+    std::vector<int>    sections_;
+};
+
+//-----------------------------------------------------------------------
+// HANDLER TO COLLECT REFIDS, AND (OPTIONALLY) INPUT TEXT
+//-----------------------------------------------------------------------
+class RefIdHandler : public Fb2AttrHandler
+{
+public:
+    RefIdHandler(Engine *engine, String *text)                      : engine_(engine), text_(text) {}
+
+    //virtuals
+    void            Begin   (Fb2EType, AttrMap &attrmap, Fb2Host*)  {engine_->AddId(attrmap);}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                {return oldCtxt;}
+    void            Contents(const String &data)                    {if(text_) *text_ += data;}
+    void            End     ()                                      {}
+
+private:
+    Engine  *engine_;
+    String  *text_;
+};
+
+
+//-----------------------------------------------------------------------
+// BODY HANDLER
+//-----------------------------------------------------------------------
+class BodyHandler : public Fb2NoAttrHandler
+{
+public:
+    BodyHandler(Engine *engine) : engine_(engine) {}
+
+    //virtuals
+    void Begin(Fb2EType, Fb2Host *host)                     {engine_->BeginBody();}
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const           {return oldCtxt;}
+    void Contents(const String &data)                       {}
+    void End()                                              {}
+
+private:
+    Engine  *engine_;
+};
+
+
+//-----------------------------------------------------------------------
+// SECTION HANDLER
+//-----------------------------------------------------------------------
+class SectionHandler : public Fb2AttrHandler
+{
+public:
+    SectionHandler(Engine *engine) : engine_(engine) {}
+
+    //virtuals
+    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)   {engine_->BeginSection(attrmap, host);}
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const           {return oldCtxt;}
+    void Contents(const String &data)                       {}
+    void End()                                              {engine_->EndSection();}
+
+private:
+    Engine  *engine_;
+};
+
+
+//-----------------------------------------------------------------------
+void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
+{
+    Engine engine(units);
+    Ptr<Fb2Parser> parser = CreateFb2Parser(scanner, CreateRecursiveEHandler());
+
+    Ptr<Fb2EHandler> skip = CreateSkipEHandler();
+    Ptr<Fb2EHandler> nop = CreateNopEHandler();
+
+    std::set<String> allRefIds; // all ref ids
+
+    // <FictionBook>
+    Ptr<Fb2RootHandler> fb = CreateRootEHandler();
+    parser->Register(E_FICTIONBOOK, fb);
+
+    // <body>
+    {
+        Ptr<Fb2NoAttrHandler> bh = new BodyHandler(&engine);
+        parser->RegisterSubHandler(E_BODY, bh);
+    }
+
+    // by default all text elements with id attribute only collect reference ids
+    {
+        Ptr<RefIdHandler> tmp = new RefIdHandler(&engine, NULL);
+        Ptr<Fb2EHandler> collectRefId = CreateEHandler(tmp);
+
+        parser->Register(E_P,           collectRefId);
+        parser->Register(E_SUBTITLE,    collectRefId);
+        parser->Register(E_TD,          collectRefId);
+        parser->Register(E_TEXT_AUTHOR, collectRefId);
+        parser->Register(E_TH,          collectRefId);
+        parser->Register(E_V,           collectRefId);
+    }
+
+    // skip rest of <description>
+    parser->Register(E_SRC_TITLE_INFO,  skip);
+    parser->Register(E_DOCUMENT_INFO,   skip);
+    parser->Register(E_PUBLISH_INFO,    skip);
+    parser->Register(E_CUSTOM_INFO,     skip);
+
+    // drop rest of <FictionBook>
+    parser->Register(E_BINARY,          nop);
+
+    parser->Parse();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //-----------------------------------------------------------------------
@@ -105,17 +317,17 @@ private:
     void style                  (String *plainText);
     //void stylesheet             ();
     void sub                    (String *plainText);
-    void subtitle               (String *plainText = NULL);
+    void subtitle               ();
     void sup                    (String *plainText);
     void table                  ();
     void td                     ();
-    void text_author            (String *plainText = NULL);
+    void text_author            ();
     void th                     ();
     void title                  (String *plainText = NULL, bool startUnit = false);
     void title_info             ();
     void tr                     ();
     //void translator             ();
-    void v                      (String *plainText = NULL);
+    void v                      ();
     //void version                ();
     //void year                   ();
 };
@@ -739,13 +951,13 @@ void ConverterPass1::sub(String *plainText)
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::subtitle(String *plainText)
+void ConverterPass1::subtitle()
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("subtitle", &attrmap);
     AddId(attrmap);
     if(notempty)
-        ParseTextAndEndElement("subtitle", plainText);
+        ParseTextAndEndElement("subtitle", NULL);
 }
 
 //-----------------------------------------------------------------------
@@ -782,13 +994,13 @@ void ConverterPass1::td()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::text_author(String *plainText)
+void ConverterPass1::text_author()
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("text-author", &attrmap);
     AddId(attrmap);
     if(notempty)
-        ParseTextAndEndElement("text-author", plainText);
+        ParseTextAndEndElement("text-author", NULL);
 }
 
 //-----------------------------------------------------------------------
@@ -916,13 +1128,13 @@ void ConverterPass1::tr()
 }
 
 //-----------------------------------------------------------------------
-void ConverterPass1::v(String *plainText)
+void ConverterPass1::v()
 {
     AttrMap attrmap;
     bool notempty = s_->BeginElement("v", &attrmap);
     AddId(attrmap);
     if(notempty)
-        ParseTextAndEndElement("v", plainText);
+        ParseTextAndEndElement("v", NULL);
 }
 
 
