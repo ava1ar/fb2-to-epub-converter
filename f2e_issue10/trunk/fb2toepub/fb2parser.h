@@ -112,6 +112,12 @@ namespace Fb2ToEpub
         virtual LexScanner*             Scanner() const             = 0;
         virtual size_t                  GetTypeStackSize() const    = 0;
         virtual Fb2EType                GetTypeStackAt(int i) const = 0;
+
+        //helper
+        void Error(const String &what)
+        {
+            Scanner()->Error(what);
+        }
     };
 
     //-----------------------------------------------------------------------
@@ -135,48 +141,6 @@ namespace Fb2ToEpub
         virtual void            Data    (const String &data)                            = 0;
         virtual void            EndTag  (LexScanner *s)                                 = 0;
     };
-
-    //-----------------------------------------------------------------------
-    // FB2 SYNTAX PARSER
-    //-----------------------------------------------------------------------
-    class Fb2Parser : public Object
-    {
-    public:
-        virtual void Register(Fb2EType type, Fb2EHandler *h)        = 0;
-        virtual void Parse()                                        = 0;
-    };
-
-    //-----------------------------------------------------------------------
-    Ptr<Fb2Parser> FB2TOEPUB_DECL   CreateFb2Parser(LexScanner *scanner);
-
-
-    //-----------------------------------------------------------------------
-    // HELPER INTERFACES AND METHODS
-    // (helps to implement different kinds of Fb2EHandler)
-    //-----------------------------------------------------------------------
-
-    //-----------------------------------------------------------------------
-    // NAME BY TYPE
-    const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type);
-
-    //-----------------------------------------------------------------------
-    // HANDLER TO SKIP WHOLE ELEMENT CONTENTS
-    //-----------------------------------------------------------------------
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler();
-
-    //-----------------------------------------------------------------------
-    // SIMPLE TEXT HANDLER
-    //-----------------------------------------------------------------------
-    class Fb2TextHandler : public Fb2EHandler
-    {
-    public:
-        virtual void            Reset()         = 0;
-        virtual const String&   Text() const    = 0;
-    };
-
-    //-----------------------------------------------------------------------
-    Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(const String &concatDivider = "");
-
 
     //-----------------------------------------------------------------------
     // SUB-HANDLER WITH PROCESSING OF ATTRIBUTES
@@ -204,6 +168,78 @@ namespace Fb2ToEpub
     // create Fb2EHandler object from (user-implemented) sub-handler object
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2AttrHandler *ph, bool skipRest = false);
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2NoAttrHandler *ph, bool skipRest = false);
+
+    //-----------------------------------------------------------------------
+    // FB2 SYNTAX PARSER
+    //-----------------------------------------------------------------------
+    class Fb2Parser : public Object
+    {
+    public:
+        virtual void Register(Fb2EType type, Fb2EHandler *h)        = 0;
+        virtual void Parse()                                        = 0;
+
+        // helper
+        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *ph, bool skipRest = false)
+            {Register(type, CreateEHandler(ph, skipRest));}
+        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *ph, bool skipRest = false)
+            {Register(type, CreateEHandler(ph, skipRest));}
+    };
+
+    //-----------------------------------------------------------------------
+    // CREATE FB2 SYNTAX PARSER
+    //-----------------------------------------------------------------------
+    Ptr<Fb2Parser> FB2TOEPUB_DECL   CreateFb2Parser(LexScanner *scanner, Fb2EHandler *defHandler);
+
+
+    //-----------------------------------------------------------------------
+    // HELPER INTERFACES AND METHODS
+    // (helps to implement different kinds of Fb2EHandler)
+    //-----------------------------------------------------------------------
+
+    //-----------------------------------------------------------------------
+    // NAME BY TYPE
+    const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type);
+
+    //-----------------------------------------------------------------------
+    // HANDLER FOR RECIRSIVE PROCESSING
+    // (Do nothing but allow recursive processing.)
+    //
+    // HANDLER TO SKIP WHOLE ELEMENT CONTENTS WITH XMP PARSING
+    // (Do nothing and skip the whole XML element (i.e. no recursive processing).
+    //
+    // HANDLER TO SKIP WHOLE ELEMENT CONTENTS WITHOUT XMP PARSING
+    // (Do nothing, don't parse at all.)
+    //-----------------------------------------------------------------------
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRecursiveEHandler();
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler();
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateNopEHandler();
+
+    //-----------------------------------------------------------------------
+    // SIMPLE TEXT HANDLER
+    //-----------------------------------------------------------------------
+    class Fb2TextHandler : public Fb2EHandler
+    {
+    public:
+        virtual void            Reset()         = 0;
+        virtual const String&   Text() const    = 0;
+    };
+
+    //-----------------------------------------------------------------------
+    Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(const String &concatDivider = "", String *text = NULL);
+    Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(String *text);
+
+
+    //-----------------------------------------------------------------------
+    // ROOT ELEMENT HANDLER
+    //-----------------------------------------------------------------------
+    class Fb2RootHandler : public Fb2EHandler
+    {
+    public:
+        virtual String Findhref(const AttrMap &attrmap) const   = 0;
+    };
+    //-----------------------------------------------------------------------
+    Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler();
+
 
 };  //namespace Fb2ToEpub
 

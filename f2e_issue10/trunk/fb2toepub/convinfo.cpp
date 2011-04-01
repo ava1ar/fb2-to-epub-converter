@@ -116,16 +116,6 @@ private:
 };
 
 //-----------------------------------------------------------------------
-class NopEHandler : public Fb2EHandler
-{
-public:
-    //virtuals
-    bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host*)    {return true;}
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const                     {return oldCtxt;}
-    void            Data    (const String &data)                        {}
-    void            EndTag  (LexScanner *s)                             {}
-};
-//-----------------------------------------------------------------------
 class RootEHandler : public Fb2EHandler
 {
 public:
@@ -154,14 +144,15 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
         size = st.st_size;
     }
 
-    Ptr<Fb2EHandler> skip = CreateSkipEHandler();
-
     Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
-    Ptr<Fb2Parser> parser = CreateFb2Parser(CreateScanner(pin));
+    Ptr<Fb2Parser> parser = CreateFb2Parser(CreateScanner(pin), CreateRecursiveEHandler());
+
+    Ptr<Fb2EHandler> skip = CreateSkipEHandler();
+    Ptr<Fb2EHandler> nop = CreateNopEHandler();
 
     // <title-info><author>
     Ptr<AuthorHandler> author = new AuthorHandler();
-    parser->Register(E_AUTHOR, CreateEHandler(author, true));
+    parser->RegisterSubHandler(E_AUTHOR, author, true);
 
     // <title-info><author> contents
     Ptr<Fb2EHandler> authorname = author->GetNameHandler();
@@ -170,33 +161,26 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     parser->Register(E_LAST_NAME,   authorname);
     parser->Register(E_NICKNAME,    authorname);
 
-    // <title-info><book-title>
-    Ptr<Fb2TextHandler> title = CreateTextEHandler();
-    parser->Register(E_BOOK_TITLE, title);
-
-    // <title-info><date>
-    Ptr<Fb2TextHandler> date = CreateTextEHandler();
-    parser->Register(E_DATE, date);
+    // <title-info><book-title>, <title-info><date>
+    String title, date;
+    parser->Register(E_BOOK_TITLE, CreateTextEHandler(&title));
+    parser->Register(E_DATE, CreateTextEHandler(&date));
 
     // <title-info><lang>
-    //Ptr<Fb2TextHandler> lang = CreateTextEHandler();
-    //parser->Register(E_LANG, lang);
+    //String lang;
+    //parser->Register(E_LANG, CreateTextEHandler(&lang));
 
     // <title-info><translator> - skip (to avoid interference with <author>)
     parser->Register(E_TRANSLATOR, skip);
 
     // <title-info><sequence>
     Ptr<SeqAttrHandler> sequence = new SeqAttrHandler();
-    parser->Register(E_SEQUENCE, CreateEHandler(sequence));
+    parser->RegisterSubHandler(E_SEQUENCE, sequence);
 
     // skip rest without scanning
-
-    Ptr<Fb2EHandler> nop = new NopEHandler();
-
     parser->Register(E_SRC_TITLE_INFO,  nop);
     parser->Register(E_DOCUMENT_INFO,   nop);
     parser->Register(E_PUBLISH_INFO,    nop);
-
     parser->Register(E_CUSTOM_INFO,     nop);
     parser->Register(E_BODY,            nop);
     parser->Register(E_BINARY,          nop);
@@ -207,10 +191,10 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     parser->Parse();
 
     // print info
-    author->Print();                    // author
-    PrintInfo("title", title->Text());  // title
-    PrintInfo("date", date->Text());    // date
-    //PrintInfo("lang", lang->Text());    // lang
+    author->Print();                // author
+    PrintInfo("title", title);      // title
+    PrintInfo("date", date);        // date
+    //PrintInfo("lang", lang);      // lang
     {
         // size
         std::ostringstream sizeStr;
