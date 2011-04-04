@@ -137,7 +137,7 @@ namespace Fb2ToEpub
     {
     public:
         virtual bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)   = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                        = 0;
+        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                              = 0;
         virtual void            Data    (const String &data)                            = 0;
         virtual void            EndTag  (LexScanner *s)                                 = 0;
     };
@@ -149,7 +149,7 @@ namespace Fb2ToEpub
     {
     public:
         virtual void            Begin   (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                            = 0;
+        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                                  = 0;
         virtual void            Contents(const String &data)                                = 0;
         virtual void            End     ()                                                  = 0;
     };
@@ -160,14 +160,14 @@ namespace Fb2ToEpub
     {
     public:
         virtual void            Begin   (Fb2EType type, Fb2Host *host)  = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const        = 0;
+        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)              = 0;
         virtual void            Contents(const String &data)            = 0;
         virtual void            End     ()                              = 0;
     };
 
     // create Fb2EHandler object from (user-implemented) sub-handler object
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2AttrHandler *ph, bool skipRest = false);
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2NoAttrHandler *ph, bool skipRest = false);
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest = false);
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest = false);
 
     //-----------------------------------------------------------------------
     // FB2 SYNTAX PARSER

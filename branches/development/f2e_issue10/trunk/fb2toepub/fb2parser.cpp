@@ -1400,9 +1400,9 @@ public:
             EmptyElementError(s, ei.name_);
         return true;
     }
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const {return oldCtxt;}
-    void            Data(const String&)             {}
-    void            EndTag(LexScanner *s)           {s->SkipRestOfElementContent();}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)   {return oldCtxt;}
+    void            Data(const String&)         {}
+    void            EndTag(LexScanner *s)       {s->SkipRestOfElementContent();}
 
     static Fb2EHandler* Obj()                       {return obj_;}
 
@@ -1426,7 +1426,7 @@ class SkipEHandler : public Fb2EHandler
 public:
     //virtuals
     bool            StartTag(Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const            {return oldCtxt;}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                  {return oldCtxt;}
     void            Data    (const String&)                     {}
     void            EndTag  (LexScanner*)                       {}
 
@@ -1453,7 +1453,7 @@ class NopEHandler : public Fb2EHandler
 public:
     //virtuals
     bool            StartTag(Fb2EType, LexScanner*, Fb2Host*)   {return true;}
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt) const             {return oldCtxt;}
+    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)                   {return oldCtxt;}
     void            Data    (const String&)                     {}
     void            EndTag  (LexScanner*)                       {}
 
@@ -1488,7 +1488,7 @@ public:
             EmptyElementError(s, ei.name_);
         return true;
     }
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt)
     {
         return oldCtxt;
     }
@@ -1565,7 +1565,7 @@ public:
         pah_->End();
         return true;
     }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
+    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt)
     {
         return pah_->GetCtxt(oldCtxt);
     }
@@ -1603,7 +1603,7 @@ public:
         pah_->End();
         return true;
     }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt) const
+    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt)
     {
         return pah_->GetCtxt(oldCtxt);
     }
@@ -1629,7 +1629,7 @@ struct EE_SkipRest
 };
 
 //-----------------------------------------------------------------------
-Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2AttrHandler *ph, bool skipRest)
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest)
 {
     if(skipRest)
         return new EHandlerAttr<EE_SkipRest>(ph);
@@ -1638,7 +1638,7 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2AttrHandler *ph, bool skipRest
 }
 
 //-----------------------------------------------------------------------
-Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Fb2NoAttrHandler *ph, bool skipRest)
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest)
 {
     if(skipRest)
         return new EHandlerNoAttr<EE_SkipRest>(ph);
@@ -1690,9 +1690,9 @@ public:
 
         return false;
     }
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const    {return oldCtxt;}
-    void            Data    (const String &data)        {}
-    void            EndTag  (LexScanner *s)             {}      // skip rest without processing
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)      {return oldCtxt;}
+    void            Data    (const String &data)    {}
+    void            EndTag  (LexScanner *s)         {}      // skip rest without processing
 
     //virtual
     String Findhref(const AttrMap &attrmap) const

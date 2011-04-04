@@ -97,14 +97,14 @@ private:
 //-----------------------------------------------------------------------
 // HANDLER TO COLLECT REFIDS, AND (OPTIONALLY) INPUT TEXT
 //-----------------------------------------------------------------------
-class RefIdHandler : public Fb2AttrHandler
+class RefIdElement : public Fb2AttrHandler
 {
 public:
-    RefIdHandler(Engine *engine, String *text)                      : engine_(engine), text_(text) {}
+    RefIdElement(Engine *engine, String *text)                      : engine_(engine), text_(text) {}
 
     //virtuals
     void            Begin   (Fb2EType, AttrMap &attrmap, Fb2Host*)  {engine_->AddId(attrmap);}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt) const                {return oldCtxt;}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                      {return oldCtxt;}
     void            Contents(const String &data)                    {if(text_) *text_ += data;}
     void            End     ()                                      {}
 
@@ -117,41 +117,161 @@ private:
 //-----------------------------------------------------------------------
 // BODY HANDLER
 //-----------------------------------------------------------------------
-class BodyHandler : public Fb2NoAttrHandler
+class Body : public Fb2NoAttrHandler
 {
 public:
-    BodyHandler(Engine *engine) : engine_(engine) {}
+    Body(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host *host)                     {engine_->BeginBody();}
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const           {return oldCtxt;}
-    void Contents(const String &data)                       {}
-    void End()                                              {}
+    void Begin(Fb2EType, Fb2Host *host)     {engine_->BeginBody();}
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) {return oldCtxt;}
+    void Contents(const String &data)       {}
+    void End()                              {}
 
 private:
     Engine  *engine_;
+};
+
+
+//-----------------------------------------------------------------------
+// PARAGRAPH TITLE CONTEXT FROM SECTION CONTEXT
+//-----------------------------------------------------------------------
+class SectionTitleP : public Fb2AttrHandler
+{
+public:
+    SectionTitleP(Engine *engine, String *text)                     : engine_(engine), text_(text) {}
+
+    //virtuals
+    void            Begin   (Fb2EType, AttrMap &attrmap, Fb2Host*)  {engine_->AddId(attrmap);}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                      {return oldCtxt;}
+    void            Contents(const String &data)                    {tmp_ += data;}
+
+    void End()
+    {
+        *text_ = Concat(*text_, " ", tmp_);
+        tmp_.clear();
+    }
+
+private:
+    Engine  *engine_;
+    String  *text_, tmp_;
+};
+
+//-----------------------------------------------------------------------
+// EMPTY LINE TITLE CONTEXT FROM SECTION CONTEXT
+//-----------------------------------------------------------------------
+class SectionTitleEmptyLine : public Fb2NoAttrHandler
+{
+public:
+    SectionTitleEmptyLine(String *text)             : text_(text) {}
+
+    //virtuals
+    void            Begin   (Fb2EType, Fb2Host*)    {}
+    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)      {return oldCtxt;}
+    void            Contents(const String&)         {}
+    void            End     ()                      {*text_ += " ";}
+
+private:
+    String  *text_;
+};
+
+//-----------------------------------------------------------------------
+// TITLE HANDLER FROM SECTION CONTEXT
+//-----------------------------------------------------------------------
+class SectionTitle : public Fb2NoAttrHandler
+{
+public:
+    SectionTitle(Engine *engine) : engine_(engine) {}
+
+    //virtuals
+    void Begin(Fb2EType, Fb2Host *host)     {}
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) {return new Ctxt(oldCtxt, &text_, engine_);}
+    void Contents(const String &data)       {}
+    void End()                              {}
+
+private:
+    class Ctxt : public Fb2Ctxt
+    {
+        Ptr<Fb2Ctxt>        oldCtxt_;
+        Engine              *engine_;
+        Ptr<Fb2EHandler>    p_, el_, textElement_;
+    public:
+        Ctxt(Fb2Ctxt *oldCtxt, String *text, Engine *engine)
+            :   oldCtxt_(oldCtxt),
+                engine_(engine),
+                p_(CreateEHandler(new SectionTitleP(engine, text))),
+                el_(CreateEHandler(new SectionTitleEmptyLine(text))),
+                textElement_(CreateEHandler(new RefIdElement(engine, text)))
+        {
+        }
+        //virtual
+        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
+        {
+            switch(type)
+            {
+            case E_A:               // special case
+            case E_EMPTY_LINE:      return el_;
+            case E_P:               return p_;
+            case E_CODE:
+            case E_EMPHASIS:
+            case E_STRIKETHROUGH:
+            case E_STRONG:
+            case E_STYLE:
+            case E_SUB:
+            case E_SUP:             return textElement_;
+            default:                return oldCtxt_->GetHandler(type);
+            }
+        }
+    };
+
+    Engine  *engine_;
+    String  text_;
 };
 
 
 //-----------------------------------------------------------------------
 // SECTION HANDLER
 //-----------------------------------------------------------------------
-class SectionHandler : public Fb2AttrHandler
+class Section : public Fb2AttrHandler
 {
 public:
-    SectionHandler(Engine *engine) : engine_(engine) {}
+    Section(Engine *engine) : engine_(engine) {}
 
     //virtuals
     void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)   {engine_->BeginSection(attrmap, host);}
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) const           {return oldCtxt;}
+    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt)                 {return new Ctxt(oldCtxt, engine_);}
     void Contents(const String &data)                       {}
     void End()                                              {engine_->EndSection();}
 
 private:
+    class Ctxt : public Fb2Ctxt
+    {
+        Ptr<Fb2Ctxt>        oldCtxt_;
+        Engine              *engine_;
+        Ptr<Fb2EHandler>    title_;
+    public:
+        Ctxt(Fb2Ctxt *oldCtxt, Engine *engine)
+            :   oldCtxt_(oldCtxt),
+                engine_(engine),
+                title_(CreateEHandler(new SectionTitle(engine)))
+        {
+        }
+        //virtual
+        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
+        {
+            switch(type)
+            {
+            case E_TITLE:   return title_;
+            default:        return oldCtxt_->GetHandler(type);
+            }
+        }
+    };
     Engine  *engine_;
 };
 
 
+//-----------------------------------------------------------------------
+// Pass 1
 //-----------------------------------------------------------------------
 void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 {
@@ -169,14 +289,13 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 
     // <body>
     {
-        Ptr<Fb2NoAttrHandler> bh = new BodyHandler(&engine);
+        Ptr<Fb2NoAttrHandler> bh = new Body(&engine);
         parser->RegisterSubHandler(E_BODY, bh);
     }
 
     // by default all text elements with id attribute only collect reference ids
     {
-        Ptr<RefIdHandler> tmp = new RefIdHandler(&engine, NULL);
-        Ptr<Fb2EHandler> collectRefId = CreateEHandler(tmp);
+        Ptr<Fb2EHandler> collectRefId = CreateEHandler(new RefIdElement(&engine, NULL));
 
         parser->Register(E_P,           collectRefId);
         parser->Register(E_SUBTITLE,    collectRefId);
