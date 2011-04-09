@@ -54,6 +54,14 @@ public:
         return &cit->second;
     }
 
+    void StartUnit(Unit::Type unitType)
+    {
+        if(unitType == Unit::SECTION)
+            units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, sections_.back()));
+        else
+            units_->push_back(Unit(bodyType_, unitType, 0, -1));
+    }
+
     void BeginBody()
     {
         switch(bodyType_)
@@ -79,6 +87,11 @@ public:
             units_->back().noteRefId_ = *id;
         }
         sections_.push_back(idx);
+    }
+
+    void SetSectionTitle(const String &title)
+    {
+        units_->back().title_ = title;
     }
 
     void EndSection()
@@ -184,10 +197,14 @@ public:
     SectionTitle(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host *host)     {}
+    void Begin(Fb2EType, Fb2Host*)          {}
     Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) {return new Ctxt(oldCtxt, &text_, engine_);}
-    void Contents(const String &data)       {}
-    void End()                              {}
+    void Contents(const String &)           {}
+    void End()
+    {
+        engine_->SetSectionTitle(text_);
+        text_.clear();
+    }
 
 private:
     class Ctxt : public Fb2Ctxt
