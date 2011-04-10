@@ -76,41 +76,38 @@ template<typename T> struct Unconst<const T>
 */
 
 //-----------------------------------------------------------------------
-// OBJECT
+// OBJECT INTERFACE
 //-----------------------------------------------------------------------
-class FB2TOEPUB_DECL Object
+class ObjectI
 {
 public:
-    Object()                                    : cnt_(0) {}
-    Object(const Object&)                       : cnt_(0) {}
-    Object& operator=(const Object&)            {return *this;}
-    virtual ~Object()                           {}
+    virtual ~ObjectI()          {}
+    virtual void Lock() const   = 0;
+    virtual void Unlock() const = 0;
+};
 
-    void Lock() const
-    {
-        //if(++cnt_ == 1)
-        //    fprintf(stderr, "a ptr=%p\n", this);
-        ++cnt_;
-    }
-    void Unlock() const
-    {
-        if (!--cnt_)
-        {
-            //fprintf(stderr, "f ptr=%p\n", this);
-            const_cast<Object*>(this)->DeleteUnreferenced();
-        }
-    }
+//-----------------------------------------------------------------------
+// OBJECT BASE IMPLEMENTATION
+//-----------------------------------------------------------------------
+class ObjectBase : public ObjectI
+{
+public:
+    ObjectBase()                                : cnt_(0) {}
+    ObjectBase(const ObjectBase&)               : cnt_(0) {}
+    ObjectBase& operator=(const ObjectBase&)    {return *this;}
 
-protected:
-    virtual void DeleteUnreferenced()
-    {
-        //fprintf(stderr, "ptr=%p\n", this);
-        delete this;
-    }
+    // virtuals
+    void Lock() const       {++cnt_;}
+    void Unlock() const     {if (!--cnt_) delete const_cast<ObjectBase*>(this);}
 
 private:
     mutable long cnt_;
 };
+
+//-----------------------------------------------------------------------
+// OBJECT FORCED TO BE SINGLE
+//-----------------------------------------------------------------------
+class Object : virtual public ObjectBase {};
 
 
 //-----------------------------------------------------------------------
