@@ -230,12 +230,18 @@ namespace Fb2ToEpub
 
 
     //-----------------------------------------------------------------------
-    // ROOT ELEMENT HANDLER
+    // NAMESPACE LOOKUP AND ROOT ELEMENT HANDLER
+    //-----------------------------------------------------------------------
+    class Fb2NsLookup : public Object
+    {
+    public:
+        virtual String Findhref(const AttrMap &attrmap) const = 0;
+    };
     //-----------------------------------------------------------------------
     class Fb2RootHandler : public Fb2EHandler
     {
     public:
-        virtual String Findhref(const AttrMap &attrmap) const   = 0;
+        virtual Ptr<Fb2NsLookup> GetNsLookupObj() const = 0;
     };
     //-----------------------------------------------------------------------
     Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler();

@@ -1656,38 +1656,7 @@ public:
     //virtuals
     bool StartTag(Fb2EType, LexScanner *s, Fb2Host *host)
     {
-        AttrMap attrmap;
-        s->BeginNotEmptyElement("FictionBook", &attrmap);
-
-        // namespaces
-        AttrMap::const_iterator cit = attrmap.begin(), cit_end = attrmap.end();
-        bool has_fb = false, has_emptyfb = false;
-        for(; cit != cit_end; ++cit)
-        {
-            static const String xmlns = "xmlns";
-            static const std::size_t xmlns_len = xmlns.length();
-            static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
-
-            if(!cit->second.compare(fbID))
-            {
-                if(!cit->first.compare(xmlns))
-                    has_emptyfb = true;
-                else if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                    host->Error("bad FictionBook namespace definition");
-                has_fb = true;
-            }
-            else if(!cit->second.compare(xlID))
-            {
-                if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
-                    host->Error("bad xlink namespace definition");
-                xlns_.insert(cit->first.substr(xmlns_len+1));
-            }
-        }
-        if(!has_fb)
-            host->Error("missing FictionBook namespace definition");
-        if(!has_emptyfb)
-            host->Error("non-empty FictionBook namespace not implemented");
-
+        lookup_ = new Lookup(s, host);
         return false;
     }
     Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)      {return oldCtxt;}
@@ -1695,25 +1664,70 @@ public:
     void            EndTag  (LexScanner *s)         {}      // skip rest without processing
 
     //virtual
-    String Findhref(const AttrMap &attrmap) const
-    {
-        std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
-        for(; cit != cit_end; ++cit)
-        {
-            String href;
-            if(cit->empty())
-                href = "href";
-            else
-                href = (*cit)+":href";
-            AttrMap::const_iterator ait = attrmap.find(href);
-            if(ait != attrmap.end())
-                return ait->second;
-        }
-        return "";
-    }
+    Ptr<Fb2NsLookup> GetNsLookupObj() const         {return static_cast<Lookup*>(lookup_);}
 
 private:
-    std::set<String> xlns_; // xlink namespaces
+    class Lookup : public Fb2NsLookup
+    {
+    public:
+        Lookup(LexScanner *s, Fb2Host *host)
+        {
+            AttrMap attrmap;
+            s->BeginNotEmptyElement("FictionBook", &attrmap);
+
+            // namespaces
+            AttrMap::const_iterator cit = attrmap.begin(), cit_end = attrmap.end();
+            bool has_fb = false, has_emptyfb = false;
+            for(; cit != cit_end; ++cit)
+            {
+                static const String xmlns = "xmlns";
+                static const std::size_t xmlns_len = xmlns.length();
+                static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
+
+                if(!cit->second.compare(fbID))
+                {
+                    if(!cit->first.compare(xmlns))
+                        has_emptyfb = true;
+                    else if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
+                        host->Error("bad FictionBook namespace definition");
+                    has_fb = true;
+                }
+                else if(!cit->second.compare(xlID))
+                {
+                    if(cit->first.compare(0, xmlns_len+1, xmlns+":"))
+                        host->Error("bad xlink namespace definition");
+                    xlns_.insert(cit->first.substr(xmlns_len+1));
+                }
+            }
+            if(!has_fb)
+                host->Error("missing FictionBook namespace definition");
+            if(!has_emptyfb)
+                host->Error("non-empty FictionBook namespace not implemented");
+        }
+
+        //virtual
+        String Findhref(const AttrMap &attrmap) const
+        {
+            std::set<String>::const_iterator cit = xlns_.begin(), cit_end = xlns_.end();
+            for(; cit != cit_end; ++cit)
+            {
+                String href;
+                if(cit->empty())
+                    href = "href";
+                else
+                    href = (*cit)+":href";
+                AttrMap::const_iterator ait = attrmap.find(href);
+                if(ait != attrmap.end())
+                    return ait->second;
+            }
+            return "";
+        }
+
+    private:
+        std::set<String> xlns_; // xlink namespaces
+    };
+
+    Ptr<Lookup> lookup_;
 };
 Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler()
 {
