@@ -131,6 +131,13 @@ public:
         }
         return *this;
     }
+
+    // conversion
+    template<typename T1>
+    Ptr(const Ptr<T1> &that)                        : p_(that.ptr()) {if (p_) p_->Lock();}
+    template<typename T1>
+    const Ptr<T>& operator=(const Ptr<T1> &that)    {return operator=(that.ptr());}
+
     T* ptr() const              {return p_;}
     operator T*() const         {return p_;}
     T* operator->() const       {return p_;}
