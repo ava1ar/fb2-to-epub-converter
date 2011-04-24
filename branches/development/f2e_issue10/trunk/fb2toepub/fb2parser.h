@@ -59,7 +59,9 @@ namespace Fb2ToEpub
         E_HOME_PAGE,
         E_ID,
         E_ISBN,
-        E_IMAGE,
+        E_IMAGE,            // <image> in <body>, <section> (except top image)
+        E_IMAGE_INLINE,     // <image> in <coverpage>, <p>, <a>, <v>, <subtitle>, <th>, <td>, <text-author>
+        E_IMAGE_SECTION_TOP,// <image> in the top of the <section>
         E_KEYWORDS,
         E_LANG,
         E_LAST_NAME,
@@ -104,19 +106,37 @@ namespace Fb2ToEpub
     };
 
     //-----------------------------------------------------------------------
+    // NAMESPACE LOOKUP
+    // (Curremtly supports only "href" resolution. Eventually can support
+    // namespaces for all elements and attributes.)
+    //-----------------------------------------------------------------------
+    class Fb2NsLookup : public Object
+    {
+    public:
+        virtual String Findhref(const AttrMap &attrmap) const = 0;
+    };
+
+    //-----------------------------------------------------------------------
     // HOST FOR ELEMENT HANDLER
     //-----------------------------------------------------------------------
     class Fb2Host
     {
     public:
-        virtual LexScanner*             Scanner() const             = 0;
-        virtual size_t                  GetTypeStackSize() const    = 0;
-        virtual Fb2EType                GetTypeStackAt(int i) const = 0;
+        virtual LexScanner* Scanner() const                         = 0;
+        virtual size_t      GetTypeStackSize() const                = 0;
+        virtual Fb2EType    GetTypeStackAt(int i) const             = 0;
+        virtual String      Findhref(const AttrMap &attrmap) const  = 0;
 
-        //helper
+        virtual void        RegisterNsLookup(Fb2NsLookup *lookup)   = 0;    // registered by FictionBook handler
+
+        //helpers
         void Error(const String &what)
         {
             Scanner()->Error(what);
+        }
+        Fb2EType GetParentType() const
+        {
+            return GetTypeStackAt(GetTypeStackSize() - 1);
         }
     };
 
@@ -175,6 +195,7 @@ namespace Fb2ToEpub
     class Fb2Parser : public Object
     {
     public:
+        virtual Ptr<Fb2Ctxt> GetDefaultCtxt() const                 = 0;
         virtual void Register(Fb2EType type, Fb2EHandler *h)        = 0;
         virtual void Parse()                                        = 0;
 
@@ -230,21 +251,13 @@ namespace Fb2ToEpub
 
 
     //-----------------------------------------------------------------------
-    // NAMESPACE LOOKUP AND ROOT ELEMENT HANDLER
+    // STANDARD ROOT ELEMENT HANDLER
+    // It is a handler of "FictionBook" element. It processes XMP namespaces
+    // and registers appropriate namespace lookup object in host.
+    // (Note that by default fb2 parser doesn't have special FictionBook handler
+    // processing namespaces!)
     //-----------------------------------------------------------------------
-    class Fb2NsLookup : public Object
-    {
-    public:
-        virtual String Findhref(const AttrMap &attrmap) const = 0;
-    };
-    //-----------------------------------------------------------------------
-    class Fb2RootHandler : public Fb2EHandler
-    {
-    public:
-        virtual Ptr<Fb2NsLookup> GetNsLookupObj() const = 0;
-    };
-    //-----------------------------------------------------------------------
-    Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler();
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRootEHandler();
 
 
 };  //namespace Fb2ToEpub

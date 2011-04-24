@@ -65,7 +65,9 @@ static const ElementInfo einfo[E_COUNT] =
     ElementInfo("home-page",            false),
     ElementInfo("id",                   false),
     ElementInfo("isbn",                 false),
-    ElementInfo("image",                false),
+    ElementInfo("image",                false),     // <image> in <body>, <section> (except top image)
+    ElementInfo("image",                false),     // <image> in all others (inline)
+    ElementInfo("image",                false),     // <image> in the top of the <section>
     ElementInfo("keywords",             false),
     ElementInfo("lang",                 false),
     ElementInfo("last-name",            false),
@@ -121,14 +123,29 @@ typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
 typedef std::vector<Fb2EType> TypeVector;
 
 //-----------------------------------------------------------------------
+// Dummy namespace lookup
+//-----------------------------------------------------------------------
+class DummyNsLookup : public Fb2NsLookup
+{
+public:
+    //virtual
+    String Findhref(const AttrMap &attrmap) const
+    {
+        InternalError(__FILE__, __LINE__, "Namespace lookup isn't registered");
+        return "";
+    }
+};
+
+//-----------------------------------------------------------------------
 // State structure
 //-----------------------------------------------------------------------
 struct ParserState
 {
-    TypeVector      elemTypeStack_;
-    Ptr<LexScanner> s_;
+    TypeVector          elemTypeStack_;
+    Ptr<LexScanner>     s_;
+    Ptr<Fb2NsLookup>    nsLookup_;
 
-    ParserState(LexScanner *s) : s_(s) {}
+    ParserState(LexScanner *s) : s_(s), nsLookup_(new DummyNsLookup()) {}
 };
 
 //-----------------------------------------------------------------------
@@ -171,9 +188,16 @@ public:
     }
 
     //virtual 
-    LexScanner*             Scanner() const             {return state_->s_;}
-    size_t                  GetTypeStackSize() const    {return state_->elemTypeStack_.size();}
-    Fb2EType                GetTypeStackAt(int i) const {return state_->elemTypeStack_[i];}
+    LexScanner* Scanner() const                         {return state_->s_;}
+    size_t      GetTypeStackSize() const                {return state_->elemTypeStack_.size();}
+    Fb2EType    GetTypeStackAt(int i) const             {return state_->elemTypeStack_[i];}
+    String      Findhref(const AttrMap &attrmap) const  {return state_->nsLookup_->Findhref(attrmap);}
+
+    //virtual
+    void RegisterNsLookup(Fb2NsLookup *lookup)
+    {
+        state_->nsLookup_ = lookup;
+    }
 };
 
 //-----------------------------------------------------------------------
@@ -185,6 +209,7 @@ public:
     Fb2ParserImpl(LexScanner *scanner, Fb2EHandler *defHandler) : state_(scanner), ctxt_(new Ctxt(defHandler)) {}
 
     //virtuals
+    Ptr<Fb2Ctxt> GetDefaultCtxt() const             {return ctxt_;}
     void Register(Fb2EType type, Fb2EHandler *h)    {ctxt_->Register(type, h);}
     void Parse();
 
@@ -235,7 +260,9 @@ private:
     void history                (Fb2Ctxt *ctxt);
     void home_page              (Fb2Ctxt *ctxt);
     void id                     (Fb2Ctxt *ctxt);
-    void image                  (Fb2Ctxt *ctxt);
+    void image                  (Fb2Ctxt *ctxt);    // <image> in <body>, <section> (except top image)
+    void image_inline           (Fb2Ctxt *ctxt);    // <image> in <coverpage>, <p>, <a>, <v>, <subtitle>, <th>, <td>, <text-author>
+    void image_section_top      (Fb2Ctxt *ctxt);    // <image> in the top of the <section>
     void isbn                   (Fb2Ctxt *ctxt);
     void keywords               (Fb2Ctxt *ctxt);
     void lang                   (Fb2Ctxt *ctxt);
@@ -390,7 +417,7 @@ void Fb2ParserImpl::ParseText(Fb2EType type, Fb2Ctxt *ctxt)
             else if(!t.s_.compare("code"))
                 code(h.Ctxt());
             else if(!t.s_.compare("image"))
-                image(h.Ctxt());
+                image_inline(h.Ctxt());
             else
             {
                 std::ostringstream ss;
@@ -550,7 +577,7 @@ void Fb2ParserImpl::a(Fb2Ctxt *ctxt)
             else if(!t.s_.compare("code"))
                 code(h.Ctxt());
             else if(!t.s_.compare("image"))
-                image(h.Ctxt());
+                image_inline(h.Ctxt());
             else
             {
                 std::ostringstream ss;
@@ -729,7 +756,7 @@ void Fb2ParserImpl::coverpage(Fb2Ctxt *ctxt)
         return;
 
     do
-        image(h.Ctxt());
+        image_inline(h.Ctxt());
     while(state_.s_->IsNextElement("image"));
 
     h.EndTag();
@@ -952,6 +979,24 @@ void Fb2ParserImpl::image(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
+void Fb2ParserImpl::image_inline(Fb2Ctxt *ctxt)
+{
+    ClrScannerDataMode clrDataMode(state_.s_);
+    AutoHandler h(E_IMAGE_INLINE, &state_, ctxt);
+    if(!h.StartTag())
+        h.EndTag();
+}
+
+//-----------------------------------------------------------------------
+void Fb2ParserImpl::image_section_top(Fb2Ctxt *ctxt)
+{
+    ClrScannerDataMode clrDataMode(state_.s_);
+    AutoHandler h(E_IMAGE_SECTION_TOP, &state_, ctxt);
+    if(!h.StartTag())
+        h.EndTag();
+}
+
+//-----------------------------------------------------------------------
 void Fb2ParserImpl::isbn(Fb2Ctxt *ctxt)
 {
     SimpleText(E_ISBN, ctxt);
@@ -1101,7 +1146,7 @@ void Fb2ParserImpl::section(Fb2Ctxt *ctxt)
 
     //<image>
     if(state_.s_->IsNextElement("image"))
-        image(h.Ctxt());
+        image_section_top(h.Ctxt());
     //</image>
 
     //<annotation>
@@ -1650,21 +1695,19 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool sk
 //-----------------------------------------------------------------------
 // ROOT ELEMENT HANDLER
 //-----------------------------------------------------------------------
-class FictionBoolElement : public Fb2RootHandler
+class FictionBoolElement : public Fb2EHandler
 {
 public:
     //virtuals
     bool StartTag(Fb2EType, LexScanner *s, Fb2Host *host)
     {
-        lookup_ = new Lookup(s, host);
+        Ptr<Lookup> lookup = new Lookup(s, host);
+        host->RegisterNsLookup(lookup);
         return false;
     }
     Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)      {return oldCtxt;}
     void            Data    (const String &data)    {}
     void            EndTag  (LexScanner *s)         {}      // skip rest without processing
-
-    //virtual
-    Ptr<Fb2NsLookup> GetNsLookupObj() const         {return static_cast<Lookup*>(lookup_);}
 
 private:
     class Lookup : public Fb2NsLookup
@@ -1726,10 +1769,8 @@ private:
     private:
         std::set<String> xlns_; // xlink namespaces
     };
-
-    Ptr<Lookup> lookup_;
 };
-Ptr<Fb2RootHandler> FB2TOEPUB_DECL CreateRootEHandler()
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRootEHandler()
 {
     return new FictionBoolElement();
 }
