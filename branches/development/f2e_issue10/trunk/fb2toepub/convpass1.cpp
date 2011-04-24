@@ -122,14 +122,12 @@ class StartUnitHandler : public Fb2NoAttrHandler
 {
     Engine          *engine_;
     Unit::Type      unitType_;
-    Ptr<Fb2Ctxt>    ctxt_;      // previous context (i.e. this handler is used only on one level)
 public:
-    StartUnitHandler(Engine *engine, Unit::Type unitType, Fb2Ctxt *ctxt)
-        : engine_(engine), unitType_(unitType), ctxt_(ctxt) {}
+    StartUnitHandler(Engine *engine, Unit::Type unitType)
+        : engine_(engine), unitType_(unitType) {}
 
     //virtuals
     void            Begin   (Fb2EType, Fb2Host*)    {engine_->StartUnit(unitType_);}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt*)              {return ctxt_;}
     void            Contents(const String&)         {}
     void            End     ()                      {}
 };
@@ -137,14 +135,12 @@ class StartUnitHandler1 : public Fb2NoAttrHandler
 {
     Engine          *engine_;
     Unit::Type      unitType_;
-    Ptr<Fb2Ctxt>    ctxt_;      // previous context (i.e. this handler is used only on one level)
 public:
-    StartUnitHandler1(Engine *engine, Unit::Type unitType, Fb2Ctxt *ctxt)
-        : engine_(engine), unitType_(unitType), ctxt_(ctxt) {}
+    StartUnitHandler1(Engine *engine, Unit::Type unitType)
+        : engine_(engine), unitType_(unitType) {}
 
     //virtuals
     void            Begin   (Fb2EType, Fb2Host*)    {engine_->StartUnit(unitType_);}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt*)              {return ctxt_;}
     void            Contents(const String&)         {}
     void            End     ()                      {}
 };
@@ -153,10 +149,9 @@ class StartUnitAddRefIdHandler : public Fb2AttrHandler
 {
     Engine          *engine_;
     Unit::Type      unitType_;
-    Ptr<Fb2Ctxt>    ctxt_;      // previous context (i.e. this handler is used only on one level)
 public:
-    StartUnitAddRefIdHandler(Engine *engine, Unit::Type unitType, Fb2Ctxt *ctxt)
-        : engine_(engine), unitType_(unitType), ctxt_(ctxt) {}
+    StartUnitAddRefIdHandler(Engine *engine, Unit::Type unitType)
+        : engine_(engine), unitType_(unitType) {}
 
     //virtuals
     void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)
@@ -164,51 +159,36 @@ public:
         engine_->StartUnit(unitType_);
         engine_->AddRefId(attrmap, host);
     }
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt*)      {return ctxt_;}
     void            Contents(const String&) {}
     void            End     ()              {}
 };
 
 
 //-----------------------------------------------------------------------
-// TITLE-INFO HANDLER
+// TITLE-INFO HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class TitleInfo : public Fb2NoAttrHandler
+class TitleInfoCtxt : public Fb2Ctxt
 {
+    Ptr<Fb2Ctxt>        oldCtxt_;
+    Engine              *engine_;
 public:
-    TitleInfo(Engine *engine) : engine_(engine) {}
-
-    //virtuals
-    void Begin(Fb2EType, Fb2Host *host)     {}
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) {return new Ctxt(oldCtxt, engine_);}
-    void Contents(const String &data)       {}
-    void End()                              {}
-
-private:
-    //-----------------------------------------------------------------------
-    class Ctxt : public Fb2Ctxt
+    TitleInfoCtxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
+    //virtual
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt)
     {
-        Ptr<Fb2Ctxt>        oldCtxt_;
-        Engine              *engine_;
-    public:
-        Ctxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
-        //virtual
-        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
+        switch(type)
         {
-            switch(type)
-            {
-            case E_ANNOTATION:
-                return CreateEHandler(new StartUnitAddRefIdHandler(engine_, Unit::ANNOTATION, oldCtxt_));
-            default:
-                return oldCtxt_->GetHandler(type);
-            }
+        case E_ANNOTATION:
+            *newCtxt = oldCtxt_;
+            return CreateEHandler(new StartUnitAddRefIdHandler(engine_, Unit::ANNOTATION));
+        default:
+            return oldCtxt_->GetHandler(type, newCtxt);
         }
-    };
-    Engine  *engine_;
+    }
 };
 
 //-----------------------------------------------------------------------
-// BODY HANDLER
+// BODY HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
 class Body : public Fb2NoAttrHandler
 {
@@ -217,38 +197,39 @@ public:
 
     //virtuals
     void Begin(Fb2EType, Fb2Host *host)     {engine_->BeginBody();}
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt) {return new Ctxt(oldCtxt, engine_);}
     void Contents(const String &data)       {}
     void End()                              {}
 
 private:
-    //-----------------------------------------------------------------------
-    class Ctxt : public Fb2Ctxt
-    {
-        Ptr<Fb2Ctxt>        oldCtxt_;
-        Engine              *engine_;
-    public:
-        Ctxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
-        //virtual
-        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
-        {
-            switch(type)
-            {
-            case E_IMAGE:
-                return CreateEHandler(new StartUnitAddRefIdHandler(engine_, Unit::IMAGE, oldCtxt_));
-            case E_TITLE:
-                return CreateEHandler(new StartUnitHandler1(engine_, Unit::TITLE, oldCtxt_));
-            default:
-                return oldCtxt_->GetHandler(type);
-            }
-        }
-    };
     Engine  *engine_;
+};
+//-----------------------------------------------------------------------
+class BodyCtxt : public Fb2Ctxt
+{
+    Ptr<Fb2Ctxt>        oldCtxt_;
+    Engine              *engine_;
+public:
+    BodyCtxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
+    //virtual
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt)
+    {
+        switch(type)
+        {
+        case E_IMAGE:
+            *newCtxt = oldCtxt_;
+            return CreateEHandler(new StartUnitAddRefIdHandler(engine_, Unit::IMAGE));
+        case E_TITLE:
+            *newCtxt = oldCtxt_;
+            return CreateEHandler(new StartUnitHandler1(engine_, Unit::TITLE));
+        default:
+            return oldCtxt_->GetHandler(type, newCtxt);
+        }
+    }
 };
 
 
 //-----------------------------------------------------------------------
-// SECTION HANDLER
+// SECTION HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
 class Section : public Fb2AttrHandler
 {
@@ -257,34 +238,39 @@ public:
 
     //virtuals
     void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)   {engine_->BeginSection(attrmap, host);}
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt)                 {return new Ctxt(oldCtxt, engine_);}
     void Contents(const String &data)                       {}
     void End()                                              {engine_->EndSection();}
 
 private:
-    class Ctxt : public Fb2Ctxt
+    Engine  *engine_;
+};
+//-----------------------------------------------------------------------
+class SectionCtxt : public Fb2Ctxt
+{
+    Ptr<Fb2Ctxt>        oldCtxt_;
+    Engine              *engine_;
+    //Ptr<Fb2EHandler>    title_;
+public:
+    SectionCtxt(Fb2Ctxt *oldCtxt, Engine *engine)
+        :   oldCtxt_(oldCtxt),
+            engine_(engine)
+            //title_(CreateEHandler(new SectionTitle(engine)))
     {
-        Ptr<Fb2Ctxt>        oldCtxt_;
-        Engine              *engine_;
-        //Ptr<Fb2EHandler>    title_;
-    public:
-        Ctxt(Fb2Ctxt *oldCtxt, Engine *engine)
-            :   oldCtxt_(oldCtxt),
-                engine_(engine)
-                //title_(CreateEHandler(new SectionTitle(engine)))
+    }
+    //virtual
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt)
+    {
+        switch(type)
         {
-        }
-        //virtual
-        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const
-        {
-            switch(type)
+        case E_TITLE:   //return title_;
+        default:
             {
-            case E_TITLE:   //return title_;
-            default:        return oldCtxt_->GetHandler(type);
+                Ptr<Fb2EHandler> ph = oldCtxt_->GetHandler(type, newCtxt);
+                *newCtxt = this;
+                return ph;
             }
         }
-    };
-    Engine  *engine_;
+    }
 };
 
 
@@ -295,49 +281,50 @@ private:
 void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 {
     Engine engine(units);
-    Ptr<Fb2Parser> parser = CreateFb2Parser(scanner, CreateRecursiveEHandler());
+    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt(CreateRecursiveEHandler());
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
 
-    std::set<String> allRefIds; // all ref ids
-
     // <FictionBook>
-    parser->Register(E_FICTIONBOOK, CreateRootEHandler());
+    ctxt->RegisterHandler(E_FICTIONBOOK, CreateRootEHandler());
 
     // <title-info>
     {
-        Ptr<Fb2NoAttrHandler> h = new TitleInfo(&engine);
-        parser->RegisterSubHandler(E_TITLE_INFO, h, true);
+        Ptr<Fb2Ctxt> pc = new TitleInfoCtxt(ctxt, &engine);
+        ctxt->RegisterCtxt(E_TITLE_INFO, pc);
     }
 
     // <coverpage>
     {
-        Ptr<Fb2NoAttrHandler> h = new StartUnitHandler(&engine, Unit::COVERPAGE, parser->GetDefaultCtxt());
-        parser->RegisterSubHandler(E_COVERPAGE, h, true);
+        Ptr<Fb2NoAttrHandler> ph = new StartUnitHandler(&engine, Unit::COVERPAGE);
+        ctxt->RegisterSubHandler(E_COVERPAGE, ph, true);
     }
 
     // skip rest of <description>
-    parser->Register(E_SRC_TITLE_INFO,  skip);
-    parser->Register(E_DOCUMENT_INFO,   skip);
-    parser->Register(E_PUBLISH_INFO,    skip);
-    parser->Register(E_CUSTOM_INFO,     skip);
+    ctxt->RegisterHandler(E_SRC_TITLE_INFO, skip);
+    ctxt->RegisterHandler(E_DOCUMENT_INFO,  skip);
+    ctxt->RegisterHandler(E_PUBLISH_INFO,   skip);
+    ctxt->RegisterHandler(E_CUSTOM_INFO,    skip);
 
     // <body>
     {
-        Ptr<Fb2NoAttrHandler> h = new Body(&engine);
-        parser->RegisterSubHandler(E_BODY, h);
+        Ptr<Fb2Ctxt> pc = new BodyCtxt(ctxt, &engine);
+        Ptr<Fb2NoAttrHandler> ph = new Body(&engine);
+        ctxt->RegisterCtxtSubHandler(E_BODY, pc, ph);
     }
 
     // <section>
     {
-        Ptr<Fb2AttrHandler> h = new Section(&engine);
-        parser->RegisterSubHandler(E_SECTION, h);
+        Ptr<Fb2Ctxt> pc = new SectionCtxt(ctxt, &engine);
+        Ptr<Fb2AttrHandler> ph = new Section(&engine);
+        ctxt->RegisterCtxtSubHandler(E_SECTION, pc, ph);
     }
 
     // skip rest of <FictionBook>
-    parser->Register(E_BINARY,          skip);
+    ctxt->RegisterHandler(E_BINARY, skip);
 
-    parser->Parse();
+    // parsing
+    CreateFb2Parser(scanner)->Parse(ctxt);
 }
 
 

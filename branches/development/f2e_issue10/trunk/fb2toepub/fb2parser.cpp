@@ -119,7 +119,6 @@ inline void EmptyElementError(LexScanner *s, const String &name)
 
 
 //-----------------------------------------------------------------------
-typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
 typedef std::vector<Fb2EType> TypeVector;
 
 //-----------------------------------------------------------------------
@@ -162,8 +161,7 @@ public:
         :   type_(type),
             state_(state)
     {
-        ph_ = ctxt->GetHandler(type);   // get handler from old context
-        newCtxt_ = ph_->GetCtxt(ctxt);  // get new context from handler
+        ph_ = ctxt->GetHandler(type, &newCtxt_);
     }
 
     bool StartTag()
@@ -206,28 +204,13 @@ public:
 class Fb2ParserImpl : public Fb2Parser, Noncopyable
 {
 public:
-    Fb2ParserImpl(LexScanner *scanner, Fb2EHandler *defHandler) : state_(scanner), ctxt_(new Ctxt(defHandler)) {}
+    Fb2ParserImpl(LexScanner *scanner) : state_(scanner) {}
 
     //virtuals
-    Ptr<Fb2Ctxt> GetDefaultCtxt() const             {return ctxt_;}
-    void Register(Fb2EType type, Fb2EHandler *h)    {ctxt_->Register(type, h);}
-    void Parse();
+    void Parse(Fb2Ctxt *ctxt);
 
 private:
-    class Ctxt : public Fb2Ctxt
-    {
-        HandlerVector   handlers_;
-    public:
-        Ctxt(Fb2EHandler *defHandler)
-            : handlers_(E_COUNT, defHandler) {}
-
-        //virtual
-        Ptr<Fb2EHandler> GetHandler(Fb2EType type) const    {return handlers_[type];}
-        void Register(Fb2EType type, Fb2EHandler *h);
-    };
-
     ParserState     state_;
-    Ptr<Ctxt>       ctxt_;
 
     void AuthorElement          (Fb2EType type, Fb2Ctxt *ctxt);
     void ParseText              (Fb2EType type, Fb2Ctxt *ctxt);
@@ -307,25 +290,10 @@ private:
 
 
 //-----------------------------------------------------------------------
-void Fb2ParserImpl::Ctxt::Register(Fb2EType type, Fb2EHandler *h)
-{
-    size_t idx = type;
-#if defined(_DEBUG)
-    if(idx >= E_COUNT)
-    {
-        std::ostringstream ss;
-        ss << "Bad index " << idx;
-        InternalError(__FILE__, __LINE__, ss.str());
-    }
-#endif
-    handlers_[idx] = h;
-}
-
-//-----------------------------------------------------------------------
-void Fb2ParserImpl::Parse()
+void Fb2ParserImpl::Parse(Fb2Ctxt *ctxt)
 {
     state_.s_->SkipXMLDeclaration();
-    FictionBook(ctxt_);
+    FictionBook(ctxt);
 }
 
 //-----------------------------------------------------------------------
@@ -1411,9 +1379,9 @@ void Fb2ParserImpl::year(Fb2Ctxt *ctxt)
 }
 
 //-----------------------------------------------------------------------
-Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner, Fb2EHandler *defHandler)
+Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner)
 {
-    return new Fb2ParserImpl(scanner, defHandler);
+    return new Fb2ParserImpl(scanner);
 }
 
 
@@ -1422,11 +1390,68 @@ Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner, Fb2EHandler *
 // Helper classes implementation
 //-----------------------------------------------------------------------
 
+typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
+typedef std::vector<Ptr<Fb2Ctxt> > CtxtVector;
+
+//-----------------------------------------------------------------------
+class Fb2StdCtxtImpl : public Fb2StdCtxt
+{
+    HandlerVector   handlers_;
+    CtxtVector      ctxts_;
+public:
+    Fb2StdCtxtImpl(Fb2EHandler *defHandler) : handlers_(E_COUNT, defHandler)
+    {
+        ctxts_.resize(E_COUNT, this);
+    }
+
+    //virtual
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt)
+    {
+        *newCtxt = ctxts_[type];
+        return handlers_[type];
+    }
+    void RegisterCtxt(Fb2EType type, Fb2Ctxt *ctxt)
+    {
+        size_t idx = type;
+#if defined(_DEBUG)
+        if(idx >= E_COUNT)
+        {
+            std::ostringstream ss;
+            ss << "Bad index " << idx;
+            InternalError(__FILE__, __LINE__, ss.str());
+        }
+#endif
+        ctxts_[idx] = ctxt;
+    }
+    void RegisterHandler(Fb2EType type, Fb2EHandler *h)
+    {
+        size_t idx = type;
+#if defined(_DEBUG)
+        if(idx >= E_COUNT)
+        {
+            std::ostringstream ss;
+            ss << "Bad index " << idx;
+            InternalError(__FILE__, __LINE__, ss.str());
+        }
+#endif
+        handlers_[idx] = h;
+    }
+};
+
+//-----------------------------------------------------------------------
+Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt(Fb2EHandler *defHandler)
+{
+    return new Fb2StdCtxtImpl(defHandler);
+}
+
+
+//-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
 const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type)
 {
     return einfo[type].name_;
 }
+
 
 //-----------------------------------------------------------------------
 // RECURSIVE HANDLER
@@ -1445,7 +1470,6 @@ public:
             EmptyElementError(s, ei.name_);
         return true;
     }
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)   {return oldCtxt;}
     void            Data(const String&)         {}
     void            EndTag(LexScanner *s)       {s->SkipRestOfElementContent();}
 
@@ -1471,7 +1495,6 @@ class SkipEHandler : public Fb2EHandler
 public:
     //virtuals
     bool            StartTag(Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                  {return oldCtxt;}
     void            Data    (const String&)                     {}
     void            EndTag  (LexScanner*)                       {}
 
@@ -1498,7 +1521,6 @@ class NopEHandler : public Fb2EHandler
 public:
     //virtuals
     bool            StartTag(Fb2EType, LexScanner*, Fb2Host*)   {return true;}
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)                   {return oldCtxt;}
     void            Data    (const String&)                     {}
     void            EndTag  (LexScanner*)                       {}
 
@@ -1532,10 +1554,6 @@ public:
         if(ei.notempty_)
             EmptyElementError(s, ei.name_);
         return true;
-    }
-    Ptr<Fb2Ctxt> GetCtxt (Fb2Ctxt *oldCtxt)
-    {
-        return oldCtxt;
     }
     void EndTag(LexScanner *s)
     {
@@ -1610,10 +1628,6 @@ public:
         pah_->End();
         return true;
     }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt)
-    {
-        return pah_->GetCtxt(oldCtxt);
-    }
     void Data(const String &data)
     {
         pah_->Contents(data);
@@ -1647,10 +1661,6 @@ public:
         pah_->Begin(type, host);
         pah_->End();
         return true;
-    }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt)
-    {
-        return pah_->GetCtxt(oldCtxt);
     }
     void Data(const String &data)
     {
@@ -1705,7 +1715,6 @@ public:
         host->RegisterNsLookup(lookup);
         return false;
     }
-    Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)      {return oldCtxt;}
     void            Data    (const String &data)    {}
     void            EndTag  (LexScanner *s)         {}      // skip rest without processing
 
