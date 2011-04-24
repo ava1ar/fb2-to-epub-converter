@@ -141,26 +141,25 @@ namespace Fb2ToEpub
     };
 
     //-----------------------------------------------------------------------
-    // CONTEXT
-    //-----------------------------------------------------------------------
-    class Fb2EHandler;
-    class Fb2Ctxt : public Object
-    {
-    public:
-        virtual Ptr<Fb2EHandler> GetHandler(Fb2EType type) const    = 0;
-    };
-
-    //-----------------------------------------------------------------------
     // ELEMENT HANDLER
     //-----------------------------------------------------------------------
     class Fb2EHandler : public Object
     {
     public:
         virtual bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)   = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                              = 0;
         virtual void            Data    (const String &data)                            = 0;
         virtual void            EndTag  (LexScanner *s)                                 = 0;
     };
+
+    //-----------------------------------------------------------------------
+    // CONTEXT
+    //-----------------------------------------------------------------------
+    class Fb2Ctxt : public Object
+    {
+    public:
+        virtual Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt) = 0;
+    };
+
 
     //-----------------------------------------------------------------------
     // SUB-HANDLER WITH PROCESSING OF ATTRIBUTES
@@ -169,7 +168,6 @@ namespace Fb2ToEpub
     {
     public:
         virtual void            Begin   (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)                                  = 0;
         virtual void            Contents(const String &data)                                = 0;
         virtual void            End     ()                                                  = 0;
     };
@@ -180,7 +178,6 @@ namespace Fb2ToEpub
     {
     public:
         virtual void            Begin   (Fb2EType type, Fb2Host *host)  = 0;
-        virtual Ptr<Fb2Ctxt>    GetCtxt (Fb2Ctxt *oldCtxt)              = 0;
         virtual void            Contents(const String &data)            = 0;
         virtual void            End     ()                              = 0;
     };
@@ -189,27 +186,58 @@ namespace Fb2ToEpub
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest = false);
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest = false);
 
+
     //-----------------------------------------------------------------------
     // FB2 SYNTAX PARSER
     //-----------------------------------------------------------------------
     class Fb2Parser : public Object
     {
     public:
-        virtual Ptr<Fb2Ctxt> GetDefaultCtxt() const                 = 0;
-        virtual void Register(Fb2EType type, Fb2EHandler *h)        = 0;
-        virtual void Parse()                                        = 0;
-
-        // helper
-        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *ph, bool skipRest = false)
-            {Register(type, CreateEHandler(ph, skipRest));}
-        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *ph, bool skipRest = false)
-            {Register(type, CreateEHandler(ph, skipRest));}
+        virtual void Parse(Fb2Ctxt *ctxt) = 0;
     };
+    //-----------------------------------------------------------------------
+    Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner);
+
 
     //-----------------------------------------------------------------------
-    // CREATE FB2 SYNTAX PARSER
+    // HELPER STANDARD CONTEXT
     //-----------------------------------------------------------------------
-    Ptr<Fb2Parser> FB2TOEPUB_DECL   CreateFb2Parser(LexScanner *scanner, Fb2EHandler *defHandler);
+    class Fb2StdCtxt : public Fb2Ctxt
+    {
+    public:
+        virtual void RegisterCtxt   (Fb2EType type, Fb2Ctxt *ctxt)  = 0;
+        virtual void RegisterHandler(Fb2EType type, Fb2EHandler *h) = 0;
+
+        // helpers
+        void RegisterCtxtHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2EHandler *h)
+        {
+            RegisterCtxt(type, ctxt);
+            RegisterHandler(type, h);
+        }
+        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *ph, bool skipRest = false)
+        {
+            RegisterHandler(type, CreateEHandler(ph, skipRest));
+        }
+        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *ph, bool skipRest = false)
+        {
+            RegisterHandler(type, CreateEHandler(ph, skipRest));
+        }
+        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2AttrHandler *ph, bool skipRest = false)
+        {
+            RegisterCtxt(type, ctxt);
+            RegisterHandler(type, CreateEHandler(ph, skipRest));
+        }
+        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2NoAttrHandler *ph, bool skipRest = false)
+        {
+            RegisterCtxt(type, ctxt);
+            RegisterHandler(type, CreateEHandler(ph, skipRest));
+        }
+    };
+    //-----------------------------------------------------------------------
+    // Return the implementation of Fb2StdCtxt.
+    // By default, all handlers returned by RegisterHandler are set to "defHandler",
+    // and all ctxts returned by RegisterCtxt are set to "this".
+    Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt(Fb2EHandler *defHandler);
 
 
     //-----------------------------------------------------------------------

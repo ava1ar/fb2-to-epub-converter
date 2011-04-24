@@ -63,7 +63,6 @@ public:
 
     //virtuals
     void            Begin(Fb2EType, Fb2Host*)   {pname_->Reset();}
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)   {return oldCtxt;}
     void            Contents(const String&)     {}
     void            End()                       {authors_.push_back(pname_->Text());}
 
@@ -106,7 +105,6 @@ public:
         if(!name.empty())
             sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
     }
-    Ptr<Fb2Ctxt>    GetCtxt(Fb2Ctxt *oldCtxt)   {return oldCtxt;}
     void            Contents(const String&)     {}
     void            End()                       {}
 
@@ -125,7 +123,6 @@ public:
         s->BeginNotEmptyElement("FictionBook");
         return false;
     }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2Ctxt *oldCtxt)  {return oldCtxt;}
     void    Data    (const String &data)    {}
     void    EndTag  (LexScanner *s)         {}
 };
@@ -141,51 +138,52 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
         size = st.st_size;
     }
 
-    Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
-    Ptr<Fb2Parser> parser = CreateFb2Parser(CreateScanner(pin), CreateRecursiveEHandler());
+    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt(CreateRecursiveEHandler());
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
     Ptr<Fb2EHandler> nop = CreateNopEHandler();
 
     // <title-info><author>
     Ptr<AuthorHandler> author = new AuthorHandler();
-    parser->RegisterSubHandler(E_AUTHOR, author, true);
+    ctxt->RegisterSubHandler(E_AUTHOR, author, true);
 
     // <title-info><author> contents
     Ptr<Fb2EHandler> authorname = author->GetNameHandler();
-    parser->Register(E_FIRST_NAME,  authorname);
-    parser->Register(E_MIDDLE_NAME, authorname);
-    parser->Register(E_LAST_NAME,   authorname);
-    parser->Register(E_NICKNAME,    authorname);
+    ctxt->RegisterHandler(E_FIRST_NAME,     authorname);
+    ctxt->RegisterHandler(E_MIDDLE_NAME,    authorname);
+    ctxt->RegisterHandler(E_LAST_NAME,      authorname);
+    ctxt->RegisterHandler(E_NICKNAME,       authorname);
 
     // <title-info><book-title>, <title-info><date>
     String title, date;
-    parser->Register(E_BOOK_TITLE, CreateTextEHandler(&title));
-    parser->Register(E_DATE, CreateTextEHandler(&date));
+    ctxt->RegisterHandler(E_BOOK_TITLE, CreateTextEHandler(&title));
+    ctxt->RegisterHandler(E_DATE, CreateTextEHandler(&date));
 
     // <title-info><lang>
     //String lang;
-    //parser->Register(E_LANG, CreateTextEHandler(&lang));
+    //ctxt->RegisterHandler(E_LANG, CreateTextEHandler(&lang));
 
     // <title-info><translator> - skip (to avoid interference with <author>)
-    parser->Register(E_TRANSLATOR, skip);
+    ctxt->RegisterHandler(E_TRANSLATOR, skip);
 
     // <title-info><sequence>
     Ptr<SeqAttrHandler> sequence = new SeqAttrHandler();
-    parser->RegisterSubHandler(E_SEQUENCE, sequence);
+    ctxt->RegisterSubHandler(E_SEQUENCE, sequence);
 
     // skip rest without scanning
-    parser->Register(E_SRC_TITLE_INFO,  nop);
-    parser->Register(E_DOCUMENT_INFO,   nop);
-    parser->Register(E_PUBLISH_INFO,    nop);
-    parser->Register(E_CUSTOM_INFO,     nop);
-    parser->Register(E_BODY,            nop);
-    parser->Register(E_BINARY,          nop);
+    ctxt->RegisterHandler(E_SRC_TITLE_INFO, nop);
+    ctxt->RegisterHandler(E_DOCUMENT_INFO,  nop);
+    ctxt->RegisterHandler(E_PUBLISH_INFO,   nop);
+    ctxt->RegisterHandler(E_CUSTOM_INFO,    nop);
+    ctxt->RegisterHandler(E_BODY,           nop);
+    ctxt->RegisterHandler(E_BINARY,         nop);
 
     // drop rest of FictionBook contents without scanning
-    parser->Register(E_FICTIONBOOK, Ptr<Fb2EHandler>(new RootEHandler()));
+    ctxt->RegisterHandler(E_FICTIONBOOK, Ptr<Fb2EHandler>(new RootEHandler()));
 
-    parser->Parse();
+    // parsing
+    Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
+    CreateFb2Parser(CreateScanner(pin))->Parse(ctxt);
 
     // print info
     author->Print();                // author
