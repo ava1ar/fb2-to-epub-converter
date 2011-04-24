@@ -37,6 +37,26 @@ int PrintInfo(const String &in)
 int Convert(InStm *pin, const strvector &css, const strvector &fonts, const strvector &mfonts,
             XlitConv *xlitConv, OutPackStm *pout)
 {
+    // test of new pass 1
+    {
+        UnitArray units;
+        DoConvertionPass1_new(CreateScanner(pin), &units);
+        pin->Rewind();
+
+#if 1
+        {
+            printf("TEST RESULTS:\n\n\n\n");
+
+            for(std::size_t i = 0; i < units.size(); ++i)
+                printf ("%d %d-%d-%d %s size=%d, parent=%d, level = %d\n", i, units[i].bodyType_, units[i].type_,
+                        units[i].id_, units[i].title_.c_str(), units[i].size_, units[i].parent_, units[i].level_);
+
+            printf("\n\nREGULAR RESULTS:\n\n\n\n");
+        }
+#endif
+    }
+
+
     // perform pass 1 to determine fb2 document structure and to collect all cross-references inside the fb2 file
     UnitArray units;
     DoConvertionPass1(CreateScanner(pin), &units);
