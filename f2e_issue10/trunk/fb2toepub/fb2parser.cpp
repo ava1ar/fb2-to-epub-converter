@@ -159,9 +159,10 @@ class AutoHandler : private Fb2Host, Noncopyable
 public:
     AutoHandler(Fb2EType type, ParserState *state, Fb2Ctxt *ctxt)
         :   type_(type),
-            state_(state)
+            state_(state),
+            ph_(ctxt->GetHandler(type)),
+            newCtxt_(ctxt->GetCtxt(type))
     {
-        ph_ = ctxt->GetHandler(type, &newCtxt_);
     }
 
     bool StartTag()
@@ -175,9 +176,9 @@ public:
     {
         return newCtxt_;
     }
-    void Data(const String &data)
+    void Data(const String &data, size_t size)
     {
-        ph_->Data(data);
+        ph_->Data(data, size);
     }
     void EndTag()
     {
@@ -363,7 +364,8 @@ void Fb2ParserImpl::ParseText(Fb2EType type, Fb2Ctxt *ctxt)
             return;
 
         case LexScanner::DATA:
-            h.Data(state_.s_->GetToken().s_);
+            state_.s_->GetToken();
+            h.Data(t.s_, t.size_);
             continue;
 
         case LexScanner::START:
@@ -406,7 +408,10 @@ void Fb2ParserImpl::SimpleText(Fb2EType type, Fb2Ctxt *ctxt)
     {
         SetScannerDataMode setDataMode(state_.s_);
         if(state_.s_->LookAhead().type_ == LexScanner::DATA)
-            h.Data(state_.s_->GetToken().s_);
+        {
+            LexScanner::Token t = state_.s_->GetToken();
+            h.Data(t.s_, t.size_);
+        }
         h.EndTag();
     }
 }
@@ -525,7 +530,8 @@ void Fb2ParserImpl::a(Fb2Ctxt *ctxt)
             return;
 
         case LexScanner::DATA:
-            h.Data(state_.s_->GetToken().s_);
+            state_.s_->GetToken();
+            h.Data(t.s_, t.size_);
             continue;
 
         case LexScanner::START:
@@ -609,7 +615,7 @@ void Fb2ParserImpl::binary(Fb2Ctxt *ctxt)
     LexScanner::Token t = state_.s_->GetToken();
     if(t.type_ != LexScanner::DATA)
         state_.s_->Error("<binary> data expected");
-    h.Data(t.s_);
+    h.Data(t.s_, t.size_);
 
     h.EndTag();
 }
@@ -1399,17 +1405,14 @@ class Fb2StdCtxtImpl : public Fb2StdCtxt
     HandlerVector   handlers_;
     CtxtVector      ctxts_;
 public:
-    Fb2StdCtxtImpl(Fb2EHandler *defHandler) : handlers_(E_COUNT, defHandler)
+    Fb2StdCtxtImpl(Fb2EHandler *defHandler)     : handlers_(E_COUNT, defHandler)
     {
         ctxts_.resize(E_COUNT, this);
     }
 
     //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt)
-    {
-        *newCtxt = ctxts_[type];
-        return handlers_[type];
-    }
+    Ptr<Fb2EHandler> GetHandler(Fb2EType type)  {return handlers_[type];}
+    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)         {return ctxts_[type];}
     void RegisterCtxt(Fb2EType type, Fb2Ctxt *ctxt)
     {
         size_t idx = type;
@@ -1470,10 +1473,10 @@ public:
             EmptyElementError(s, ei.name_);
         return true;
     }
-    void            Data(const String&)         {}
-    void            EndTag(LexScanner *s)       {s->SkipRestOfElementContent();}
+    void Data(const String&, size_t)    {}
+    void EndTag(LexScanner *s)          {s->SkipRestOfElementContent();}
 
-    static Fb2EHandler* Obj()                       {return obj_;}
+    static Fb2EHandler* Obj()           {return obj_;}
 
 private:
     static Ptr<Fb2EHandler> obj_;
@@ -1494,11 +1497,11 @@ class SkipEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool            StartTag(Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
-    void            Data    (const String&)                     {}
-    void            EndTag  (LexScanner*)                       {}
+    bool StartTag   (Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
+    void Data       (const String&, size_t)             {}
+    void EndTag     (LexScanner*)                       {}
 
-    static Fb2EHandler* Obj()                                   {return obj_;}
+    static Fb2EHandler* Obj()                           {return obj_;}
 
 private:
     static Ptr<Fb2EHandler> obj_;
@@ -1520,11 +1523,11 @@ class NopEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool            StartTag(Fb2EType, LexScanner*, Fb2Host*)   {return true;}
-    void            Data    (const String&)                     {}
-    void            EndTag  (LexScanner*)                       {}
+    bool StartTag   (Fb2EType, LexScanner*, Fb2Host*)   {return true;}
+    void Data       (const String&, size_t)             {}
+    void EndTag     (LexScanner*)                       {}
 
-    static Fb2EHandler* Obj()                                   {return obj_;}
+    static Fb2EHandler* Obj()                           {return obj_;}
 
 private:
     static Ptr<Fb2EHandler> obj_;
@@ -1567,9 +1570,9 @@ public:
     TextHandler(String *text) : text_(text ? text : &buf_) {}
 
     //virtuals
-    void Data(const String &data)       {*text_ += data;}
-    void Reset()                        {*text_ = "";}
-    const String& Text() const          {return *text_;}
+    void Data(const String &data, size_t)   {*text_ += data;}
+    void Reset()                            {*text_ = "";}
+    const String& Text() const              {return *text_;}
 
 private:
     String buf_, *text_;
@@ -1582,9 +1585,9 @@ public:
         : divider_(concatDivider), text_(text ? text : &buf_) {}
 
     //virtuals
-    void Data(const String &data)       {*text_ = Concat(*text_, divider_, data);}
-    void Reset()                        {*text_ = "";}
-    const String& Text() const          {return *text_;}
+    void Data(const String &data, size_t)   {*text_ = Concat(*text_, divider_, data);}
+    void Reset()                            {*text_ = "";}
+    const String& Text() const              {return *text_;}
 
 private:
     String divider_;
@@ -1628,9 +1631,9 @@ public:
         pah_->End();
         return true;
     }
-    void Data(const String &data)
+    void Data(const String &data, size_t size)
     {
-        pah_->Contents(data);
+        pah_->Contents(data, size);
     }
     void EndTag(LexScanner *s)
     {
@@ -1662,9 +1665,9 @@ public:
         pah_->End();
         return true;
     }
-    void Data(const String &data)
+    void Data(const String &data, size_t size)
     {
-        pah_->Contents(data);
+        pah_->Contents(data, size);
     }
     void EndTag(LexScanner *s)
     {
@@ -1715,8 +1718,8 @@ public:
         host->RegisterNsLookup(lookup);
         return false;
     }
-    void            Data    (const String &data)    {}
-    void            EndTag  (LexScanner *s)         {}      // skip rest without processing
+    void Data   (const String&, size_t) {}
+    void EndTag (LexScanner*)           {}      // skip rest without processing
 
 private:
     class Lookup : public Fb2NsLookup

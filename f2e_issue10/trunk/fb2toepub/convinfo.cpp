@@ -62,9 +62,9 @@ public:
     }
 
     //virtuals
-    void            Begin(Fb2EType, Fb2Host*)   {pname_->Reset();}
-    void            Contents(const String&)     {}
-    void            End()                       {authors_.push_back(pname_->Text());}
+    void Begin(Fb2EType, Fb2Host*)          {pname_->Reset();}
+    void Contents(const String&, size_t)    {}
+    void End()                              {authors_.push_back(pname_->Text());}
 
 private:
     Ptr<Fb2TextHandler> pname_;
@@ -105,8 +105,8 @@ public:
         if(!name.empty())
             sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
     }
-    void            Contents(const String&)     {}
-    void            End()                       {}
+    void Contents(const String&, size_t)    {}
+    void End()                              {}
 
 private:
     typedef std::vector<std::pair<String, String> > seqvector;
@@ -123,8 +123,8 @@ public:
         s->BeginNotEmptyElement("FictionBook");
         return false;
     }
-    void    Data    (const String &data)    {}
-    void    EndTag  (LexScanner *s)         {}
+    void Data   (const String&, size_t) {}
+    void EndTag (LexScanner*)           {}
 };
 
 
