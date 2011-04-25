@@ -147,7 +147,7 @@ namespace Fb2ToEpub
     {
     public:
         virtual bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)   = 0;
-        virtual void            Data    (const String &data)                            = 0;
+        virtual void            Data    (const String &data, size_t size)               = 0;
         virtual void            EndTag  (LexScanner *s)                                 = 0;
     };
 
@@ -157,7 +157,15 @@ namespace Fb2ToEpub
     class Fb2Ctxt : public Object
     {
     public:
-        virtual Ptr<Fb2EHandler> GetHandler(Fb2EType type, Ptr<Fb2Ctxt> *newCtxt) = 0;
+        virtual Ptr<Fb2EHandler>    GetHandler(Fb2EType type)   = 0;
+        virtual Ptr<Fb2Ctxt>        GetCtxt(Fb2EType type)      = 0;
+
+        // helper
+        void GetHandlerCtxt(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
+        {
+            *h = GetHandler(type);
+            *ctxt = GetCtxt(type);
+        }
     };
 
 
@@ -167,9 +175,9 @@ namespace Fb2ToEpub
     class Fb2AttrHandler : public Object
     {
     public:
-        virtual void            Begin   (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
-        virtual void            Contents(const String &data)                                = 0;
-        virtual void            End     ()                                                  = 0;
+        virtual void Begin      (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
+        virtual void Contents   (const String &data, size_t size)                   = 0;
+        virtual void End        ()                                                  = 0;
     };
     //-----------------------------------------------------------------------
     // SUB-HANDLER WITHOUT PROCESSING OF ATTRIBUTES
@@ -177,9 +185,9 @@ namespace Fb2ToEpub
     class Fb2NoAttrHandler : public Object
     {
     public:
-        virtual void            Begin   (Fb2EType type, Fb2Host *host)  = 0;
-        virtual void            Contents(const String &data)            = 0;
-        virtual void            End     ()                              = 0;
+        virtual void Begin      (Fb2EType type, Fb2Host *host)      = 0;
+        virtual void Contents   (const String &data, size_t size)   = 0;
+        virtual void End        ()                                  = 0;
     };
 
     // create Fb2EHandler object from (user-implemented) sub-handler object
