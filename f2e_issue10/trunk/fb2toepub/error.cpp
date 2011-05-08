@@ -29,11 +29,14 @@ namespace Fb2ToEpub
 //-----------------------------------------------------------------------
 static String GetFName(const String file)
 {
+    return file;
+    /*
     String::size_type pos = file.find_last_of("\\/:");
     if(pos != String::npos)
         return file.substr(pos+1);
     else
         return file;
+    */
 }
 
 

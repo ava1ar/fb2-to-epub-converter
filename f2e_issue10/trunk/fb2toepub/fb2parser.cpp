@@ -1395,24 +1395,34 @@ Ptr<Fb2Parser> FB2TOEPUB_DECL CreateFb2Parser(LexScanner *scanner)
 //-----------------------------------------------------------------------
 // Helper classes implementation
 //-----------------------------------------------------------------------
-
-typedef std::vector<Ptr<Fb2EHandler> > HandlerVector;
-typedef std::vector<Ptr<Fb2Ctxt> > CtxtVector;
-
 //-----------------------------------------------------------------------
 class Fb2StdCtxtImpl : public Fb2StdCtxt
 {
-    HandlerVector   handlers_;
-    CtxtVector      ctxts_;
-public:
-    Fb2StdCtxtImpl(Fb2EHandler *defHandler)     : handlers_(E_COUNT, defHandler)
+    struct Entry
     {
-        ctxts_.resize(E_COUNT, this);
-    }
+        Ptr<Fb2EHandler>        h_;
+        Ptr<Fb2Ctxt>            ctxt_;
 
+        Entry() {}
+        Entry(Fb2EHandler *h) : h_(h) {}
+    };
+
+    typedef std::vector<Entry> EntryVector;
+    EntryVector entries_;
+
+    Fb2StdCtxtImpl() : entries_(E_COUNT, Entry(CreateRecursiveEHandler())) {}
+
+public:
     //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type)  {return handlers_[type];}
-    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)         {return ctxts_[type];}
+    Ptr<Fb2EHandler>    GetHandler(Fb2EType type)           {return entries_[type].h_;}
+    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)
+    {
+        Ptr<Fb2Ctxt> ctxt = entries_[type].ctxt_;
+        if(ctxt)
+            return ctxt;
+        else
+            return this;
+    }
     void RegisterCtxt(Fb2EType type, Fb2Ctxt *ctxt)
     {
         size_t idx = type;
@@ -1424,7 +1434,10 @@ public:
             InternalError(__FILE__, __LINE__, ss.str());
         }
 #endif
-        ctxts_[idx] = ctxt;
+        if(ctxt == this)
+            entries_[idx].ctxt_ = NULL;
+        else
+            entries_[idx].ctxt_ = ctxt;
     }
     void RegisterHandler(Fb2EType type, Fb2EHandler *h)
     {
@@ -1437,14 +1450,21 @@ public:
             InternalError(__FILE__, __LINE__, ss.str());
         }
 #endif
-        handlers_[idx] = h;
+        entries_[idx].h_ = h;
+    }
+
+    static Fb2StdCtxt* Obj()
+    {
+        static Ptr<Fb2StdCtxt> obj_ = new Fb2StdCtxtImpl();
+        return obj_;
     }
 };
 
+
 //-----------------------------------------------------------------------
-Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt(Fb2EHandler *defHandler)
+Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt()
 {
-    return new Fb2StdCtxtImpl(defHandler);
+    return Fb2StdCtxtImpl::Obj();
 }
 
 
@@ -1476,12 +1496,12 @@ public:
     void Data(const String&, size_t)    {}
     void EndTag(LexScanner *s)          {s->SkipRestOfElementContent();}
 
-    static Fb2EHandler* Obj()           {return obj_;}
-
-private:
-    static Ptr<Fb2EHandler> obj_;
+    static Fb2EHandler* Obj()
+    {
+        static Ptr<Fb2EHandler> obj_ = new RecursiveEHandler();
+        return obj_;
+    }
 };
-Ptr<Fb2EHandler> RecursiveEHandler::obj_ = new RecursiveEHandler();
 
 //-----------------------------------------------------------------------
 Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRecursiveEHandler()
@@ -1501,12 +1521,12 @@ public:
     void Data       (const String&, size_t)             {}
     void EndTag     (LexScanner*)                       {}
 
-    static Fb2EHandler* Obj()                           {return obj_;}
-
-private:
-    static Ptr<Fb2EHandler> obj_;
+    static Fb2EHandler* Obj()
+    {
+        static Ptr<Fb2EHandler> obj_ = new SkipEHandler();
+        return obj_;
+    }
 };
-Ptr<Fb2EHandler> SkipEHandler::obj_ = new SkipEHandler();
 
 //-----------------------------------------------------------------------
 Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler()
@@ -1527,12 +1547,12 @@ public:
     void Data       (const String&, size_t)             {}
     void EndTag     (LexScanner*)                       {}
 
-    static Fb2EHandler* Obj()                           {return obj_;}
-
-private:
-    static Ptr<Fb2EHandler> obj_;
+    static Fb2EHandler* Obj()
+    {
+        static Ptr<Fb2EHandler> obj_ = new NopEHandler();
+        return obj_;
+    }
 };
-Ptr<Fb2EHandler> NopEHandler::obj_ = new NopEHandler();
 
 //-----------------------------------------------------------------------
 Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateNopEHandler()

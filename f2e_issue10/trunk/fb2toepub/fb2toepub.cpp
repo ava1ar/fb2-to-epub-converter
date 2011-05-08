@@ -242,14 +242,18 @@ int main(int argc, char **argv)
     }
     catch(const Exception &ex)
     {
-        fprintf(stderr, "%s\n[%d]%s\n", ex.What().c_str(), errno, strerror(errno));
+        fprintf(stderr, "%s\n", ex.What().c_str());
+        if(errno)
+            fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;
     }
     catch(...)
     {
-        fprintf(stderr, "Unknown error\n[%d]%s\n", errno, strerror(errno));
+        fprintf(stderr, "Unknown error\n");
+        if(errno)
+            fprintf(stderr, "[%d]%s\n", errno, strerror(errno));
         if(fOutputFileCreated)
             DeleteFile(out);
         return 1;

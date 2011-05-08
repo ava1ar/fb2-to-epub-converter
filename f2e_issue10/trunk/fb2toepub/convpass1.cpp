@@ -339,6 +339,13 @@ public:
         switch(type)
         {
         case E_TITLE:   //return title_;
+        case E_P:
+        case E_IMAGE:
+        case E_POEM:
+        case E_SUBTITLE:
+        case E_CITE:
+        case E_EMPTY_LINE:
+        case E_TABLE:
         default:
             return oldCtxt_->GetHandler(type);
         }
@@ -357,7 +364,7 @@ public:
 void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 {
     Engine engine(units);
-    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt(CreateRecursiveEHandler());
+    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt();
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
 
