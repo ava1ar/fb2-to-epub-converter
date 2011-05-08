@@ -138,7 +138,7 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
         size = st.st_size;
     }
 
-    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt(CreateRecursiveEHandler());
+    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt();
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
     Ptr<Fb2EHandler> nop = CreateNopEHandler();

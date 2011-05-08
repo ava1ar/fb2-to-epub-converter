@@ -152,24 +152,6 @@ namespace Fb2ToEpub
     };
 
     //-----------------------------------------------------------------------
-    // CONTEXT
-    //-----------------------------------------------------------------------
-    class Fb2Ctxt : public Object
-    {
-    public:
-        virtual Ptr<Fb2EHandler>    GetHandler(Fb2EType type)   = 0;
-        virtual Ptr<Fb2Ctxt>        GetCtxt(Fb2EType type)      = 0;
-
-        // helper
-        void GetHandlerCtxt(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
-        {
-            *h = GetHandler(type);
-            *ctxt = GetCtxt(type);
-        }
-    };
-
-
-    //-----------------------------------------------------------------------
     // SUB-HANDLER WITH PROCESSING OF ATTRIBUTES
     //-----------------------------------------------------------------------
     class Fb2AttrHandler : public Object
@@ -193,6 +175,17 @@ namespace Fb2ToEpub
     // create Fb2EHandler object from (user-implemented) sub-handler object
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest = false);
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest = false);
+
+
+    //-----------------------------------------------------------------------
+    // CONTEXT
+    //-----------------------------------------------------------------------
+    class Fb2Ctxt : public Object
+    {
+    public:
+        virtual Ptr<Fb2EHandler>    GetHandler(Fb2EType type)           = 0;
+        virtual Ptr<Fb2Ctxt>        GetCtxt(Fb2EType type)              = 0;
+    };
 
 
     //-----------------------------------------------------------------------
@@ -222,30 +215,30 @@ namespace Fb2ToEpub
             RegisterCtxt(type, ctxt);
             RegisterHandler(type, h);
         }
-        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *ph, bool skipRest = false)
+        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *sh, bool skipRest = false)
         {
-            RegisterHandler(type, CreateEHandler(ph, skipRest));
+            RegisterHandler(type, CreateEHandler(sh, skipRest));
         }
-        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *ph, bool skipRest = false)
+        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *sh, bool skipRest = false)
         {
-            RegisterHandler(type, CreateEHandler(ph, skipRest));
+            RegisterHandler(type, CreateEHandler(sh, skipRest));
         }
-        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2AttrHandler *ph, bool skipRest = false)
+        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2AttrHandler *sh, bool skipRest = false)
         {
             RegisterCtxt(type, ctxt);
-            RegisterHandler(type, CreateEHandler(ph, skipRest));
+            RegisterHandler(type, CreateEHandler(sh, skipRest));
         }
-        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2NoAttrHandler *ph, bool skipRest = false)
+        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2NoAttrHandler *sh, bool skipRest = false)
         {
             RegisterCtxt(type, ctxt);
-            RegisterHandler(type, CreateEHandler(ph, skipRest));
+            RegisterHandler(type, CreateEHandler(sh, skipRest));
         }
     };
     //-----------------------------------------------------------------------
     // Return the implementation of Fb2StdCtxt.
-    // By default, all handlers returned by RegisterHandler are set to "defHandler",
+    // By default, all handlers returned by RegisterHandler are set to default handler,
     // and all ctxts returned by RegisterCtxt are set to "this".
-    Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt(Fb2EHandler *defHandler);
+    Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt();
 
 
     //-----------------------------------------------------------------------
