@@ -122,22 +122,19 @@ namespace Fb2ToEpub
     class Fb2Host
     {
     public:
-        virtual LexScanner* Scanner() const                         = 0;
-        virtual size_t      GetTypeStackSize() const                = 0;
-        virtual Fb2EType    GetTypeStackAt(int i) const             = 0;
-        virtual String      Findhref(const AttrMap &attrmap) const  = 0;
-
-        virtual void        RegisterNsLookup(Fb2NsLookup *lookup)   = 0;    // registered by FictionBook handler
+        virtual const AttrMap&  GetAttributes() const                   = 0;
+        virtual String          Findhref() const                        = 0;
+        virtual size_t          GetTypeStackSize() const                = 0;
+        virtual Fb2EType        GetTypeStackAt(int i) const             = 0;
+        virtual LexScanner*     Scanner() const                         = 0;
+        virtual void            RegisterNsLookup(Fb2NsLookup *lookup)   = 0;    // registered by FictionBook handler
+        virtual void            Exit() const                            = 0;    // force exiting perser
 
         //helpers
-        void Error(const String &what)
-        {
-            Scanner()->Error(what);
-        }
-        Fb2EType GetParentType() const
-        {
-            return GetTypeStackAt(GetTypeStackSize() - 1);
-        }
+        void                    Error(const String &what)               {Scanner()->Error(what);}
+        Fb2EType                Type() const;
+        Fb2EType                ParentType() const;
+        String                  GetAttrValue(const String &attr) const;
     };
 
     //-----------------------------------------------------------------------
@@ -146,36 +143,10 @@ namespace Fb2ToEpub
     class Fb2EHandler : public Object
     {
     public:
-        virtual bool            StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)   = 0;
-        virtual void            Data    (const String &data, size_t size)               = 0;
-        virtual void            EndTag  (LexScanner *s)                                 = 0;
+        virtual bool            StartTag(Fb2Host *host)                     = 0;
+        virtual void            Data    (const String &data, size_t size)   = 0;
+        virtual bool            EndTag  (bool empty, Fb2Host *host)         = 0;
     };
-
-    //-----------------------------------------------------------------------
-    // SUB-HANDLER WITH PROCESSING OF ATTRIBUTES
-    //-----------------------------------------------------------------------
-    class Fb2AttrHandler : public Object
-    {
-    public:
-        virtual void Begin      (Fb2EType type, AttrMap &attrmap, Fb2Host *host)    = 0;
-        virtual void Contents   (const String &data, size_t size)                   = 0;
-        virtual void End        ()                                                  = 0;
-    };
-    //-----------------------------------------------------------------------
-    // SUB-HANDLER WITHOUT PROCESSING OF ATTRIBUTES
-    //-----------------------------------------------------------------------
-    class Fb2NoAttrHandler : public Object
-    {
-    public:
-        virtual void Begin      (Fb2EType type, Fb2Host *host)      = 0;
-        virtual void Contents   (const String &data, size_t size)   = 0;
-        virtual void End        ()                                  = 0;
-    };
-
-    // create Fb2EHandler object from (user-implemented) sub-handler object
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest = false);
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest = false);
-
 
     //-----------------------------------------------------------------------
     // CONTEXT
@@ -183,8 +154,7 @@ namespace Fb2ToEpub
     class Fb2Ctxt : public Object
     {
     public:
-        virtual Ptr<Fb2EHandler>    GetHandler(Fb2EType type)           = 0;
-        virtual Ptr<Fb2Ctxt>        GetCtxt(Fb2EType type)              = 0;
+        virtual void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt) = 0;
     };
 
 
@@ -215,24 +185,6 @@ namespace Fb2ToEpub
             RegisterCtxt(type, ctxt);
             RegisterHandler(type, h);
         }
-        void RegisterSubHandler(Fb2EType type, Fb2AttrHandler *sh, bool skipRest = false)
-        {
-            RegisterHandler(type, CreateEHandler(sh, skipRest));
-        }
-        void RegisterSubHandler(Fb2EType type, Fb2NoAttrHandler *sh, bool skipRest = false)
-        {
-            RegisterHandler(type, CreateEHandler(sh, skipRest));
-        }
-        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2AttrHandler *sh, bool skipRest = false)
-        {
-            RegisterCtxt(type, ctxt);
-            RegisterHandler(type, CreateEHandler(sh, skipRest));
-        }
-        void RegisterCtxtSubHandler(Fb2EType type, Fb2Ctxt *ctxt, Fb2NoAttrHandler *sh, bool skipRest = false)
-        {
-            RegisterCtxt(type, ctxt);
-            RegisterHandler(type, CreateEHandler(sh, skipRest));
-        }
     };
     //-----------------------------------------------------------------------
     // Return the implementation of Fb2StdCtxt.
@@ -257,12 +209,12 @@ namespace Fb2ToEpub
     // HANDLER TO SKIP WHOLE ELEMENT CONTENTS WITH XMP PARSING
     // (Do nothing and skip the whole XML element (i.e. no recursive processing).
     //
-    // HANDLER TO SKIP WHOLE ELEMENT CONTENTS WITHOUT XMP PARSING
+    // HANDLER TO EXIT XMP PARSING
     // (Do nothing, don't parse at all.)
     //-----------------------------------------------------------------------
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRecursiveEHandler();
     Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler();
-    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateNopEHandler();
+    Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateExitEHandler();
 
     //-----------------------------------------------------------------------
     // SIMPLE TEXT HANDLER

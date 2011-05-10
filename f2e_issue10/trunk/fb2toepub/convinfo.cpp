@@ -46,7 +46,7 @@ static void PrintInfo(const String &name, const String &value)
 //-----------------------------------------------------------------------
 // HANDLERS
 //-----------------------------------------------------------------------
-class AuthorHandler : public Fb2NoAttrHandler, Noncopyable
+class AuthorHandler : public Fb2EHandler, Noncopyable
 {
 public:
     AuthorHandler() : pname_(CreateTextEHandler(" ")) {}
@@ -62,9 +62,15 @@ public:
     }
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host*)          {pname_->Reset();}
-    void Contents(const String&, size_t)    {}
-    void End()                              {authors_.push_back(pname_->Text());}
+    bool StartTag(Fb2Host*)             {pname_->Reset(); return false;}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        authors_.push_back(pname_->Text());
+        if(!empty)
+            host->Scanner()->SkipRestOfElementContent();
+        return true;
+    }
 
 private:
     Ptr<Fb2TextHandler> pname_;
@@ -72,7 +78,7 @@ private:
 };
 
 //-----------------------------------------------------------------------
-class SeqAttrHandler : public Fb2AttrHandler, Noncopyable
+class SeqAttrHandler : public Fb2EHandler, Noncopyable
 {
 public:
     void Print()
@@ -99,14 +105,15 @@ public:
     }
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host*)
+    bool StartTag(Fb2Host *host)
     {
-        String name = attrmap["name"];
+        String name = host->GetAttrValue("name");
         if(!name.empty())
-            sequences_.push_back(seqvector::value_type(name, attrmap["number"]));
+            sequences_.push_back(seqvector::value_type(name, host->GetAttrValue("number")));
+        return false;
     }
-    void Contents(const String&, size_t)    {}
-    void End()                              {}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool, Fb2Host*)         {return false;}
 
 private:
     typedef std::vector<std::pair<String, String> > seqvector;
@@ -118,13 +125,9 @@ class RootEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag(Fb2EType, LexScanner *s, Fb2Host*)
-    {
-        s->BeginNotEmptyElement("FictionBook");
-        return false;
-    }
+    bool StartTag(Fb2Host*)             {return false;}
     void Data   (const String&, size_t) {}
-    void EndTag (LexScanner*)           {}
+    bool EndTag (bool, Fb2Host*)        {return true;}
 };
 
 
@@ -141,11 +144,11 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt();
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
-    Ptr<Fb2EHandler> nop = CreateNopEHandler();
+    Ptr<Fb2EHandler> nop = CreateExitEHandler();
 
     // <title-info><author>
     Ptr<AuthorHandler> author = new AuthorHandler();
-    ctxt->RegisterSubHandler(E_AUTHOR, author, true);
+    ctxt->RegisterHandler(E_AUTHOR, author);
 
     // <title-info><author> contents
     Ptr<Fb2EHandler> authorname = author->GetNameHandler();
@@ -168,7 +171,7 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
 
     // <title-info><sequence>
     Ptr<SeqAttrHandler> sequence = new SeqAttrHandler();
-    ctxt->RegisterSubHandler(E_SEQUENCE, sequence);
+    ctxt->RegisterHandler(E_SEQUENCE, sequence);
 
     // skip rest without scanning
     ctxt->RegisterHandler(E_SRC_TITLE_INFO, nop);
