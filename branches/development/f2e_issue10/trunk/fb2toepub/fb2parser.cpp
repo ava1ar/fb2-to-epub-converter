@@ -121,6 +121,39 @@ inline void EmptyElementError(LexScanner *s, const String &name)
 //-----------------------------------------------------------------------
 typedef std::vector<Fb2EType> TypeVector;
 
+
+//-----------------------------------------------------------------------
+// Fb2Host helper methods
+//-----------------------------------------------------------------------
+Fb2EType Fb2Host::Type() const
+{
+    size_t size = GetTypeStackSize();
+#if defined(_DEBUG)
+    if(size < 1)
+        InternalError(__FILE__, __LINE__, "empty type stack");
+#endif
+    return GetTypeStackAt(size-1);
+}
+Fb2EType Fb2Host::ParentType() const
+{
+    size_t size = GetTypeStackSize();
+#if defined(_DEBUG)
+    if(size < 2)
+        InternalError(__FILE__, __LINE__, "no parent element type");
+#endif
+    return GetTypeStackAt(size-2);
+}
+String Fb2Host::GetAttrValue(const String &attr) const
+{
+    const AttrMap& attrmap = GetAttributes();
+    AttrMap::const_iterator cit = attrmap.find(attr);
+    if(cit != attrmap.end())
+        return cit->second;
+    else
+        return "";
+}
+
+
 //-----------------------------------------------------------------------
 // Dummy namespace lookup
 //-----------------------------------------------------------------------
@@ -128,7 +161,7 @@ class DummyNsLookup : public Fb2NsLookup
 {
 public:
     //virtual
-    String Findhref(const AttrMap &attrmap) const
+    String Findhref(const AttrMap&) const
     {
         InternalError(__FILE__, __LINE__, "Namespace lookup isn't registered");
         return "";
@@ -147,57 +180,126 @@ struct ParserState
     ParserState(LexScanner *s) : s_(s), nsLookup_(new DummyNsLookup()) {}
 };
 
+
+//-----------------------------------------------------------------------
+// Exit parser exception
+//-----------------------------------------------------------------------
+struct ExitParserException {};
+
+
 //-----------------------------------------------------------------------
 // Auto handler
 //-----------------------------------------------------------------------
 class AutoHandler : private Fb2Host, Noncopyable
 {
+public:
+    AutoHandler(Fb2EType type, ParserState *prsState, Fb2Ctxt *ctxt);
+
+    bool            StartTag();
+    Fb2Ctxt*        Ctxt() const                            {return newCtxt_;}
+    void            Data(const String &data, size_t size)   {ph_->Data(data, size);}
+    void            EndTag();
+
+    //virtuals
+    const AttrMap&  GetAttributes() const;
+    String          Findhref() const                        {return prsState_->nsLookup_->Findhref(attrmap_);}
+    size_t          GetTypeStackSize() const                {return prsState_->elemTypeStack_.size();}
+    Fb2EType        GetTypeStackAt(int i) const             {return prsState_->elemTypeStack_[i];}
+    LexScanner*     Scanner() const                         {return prsState_->s_;}
+    void            RegisterNsLookup(Fb2NsLookup *lookup)   {prsState_->nsLookup_ = lookup;}
+    void            Exit() const                            {throw ExitParserException();}
+
+private:
+    enum MyState {NOT_SCANNED, SCANNED_EMPTY, SCANNED_NOTEMPTY};
+
     Fb2EType            type_;
-    ParserState         *state_;
+    ParserState         *prsState_;
+    mutable MyState     state_;
+    mutable bool        hasAttributes_;
+    mutable AttrMap     attrmap_;
     Ptr<Fb2EHandler>    ph_;
     Ptr<Fb2Ctxt>        newCtxt_;
-public:
-    AutoHandler(Fb2EType type, ParserState *state, Fb2Ctxt *ctxt)
-        :   type_(type),
-            state_(state),
-            ph_(ctxt->GetHandler(type)),
-            newCtxt_(ctxt->GetCtxt(type))
+};
+
+//-----------------------------------------------------------------------
+AutoHandler::AutoHandler(Fb2EType type, ParserState *prsState, Fb2Ctxt *ctxt)
+    :   type_(type),
+        prsState_(prsState),
+        state_(NOT_SCANNED),
+        hasAttributes_(false)
+{
+    ctxt->GetNext(type_, &ph_, &newCtxt_);
+}
+
+//-----------------------------------------------------------------------
+bool AutoHandler::StartTag()
+{
+    prsState_->elemTypeStack_.push_back(type_);
+    if (ph_->StartTag(this))
     {
+        prsState_->elemTypeStack_.pop_back();
+        return true;    // handler has done all itself
     }
 
-    bool StartTag()
+    if(state_ == NOT_SCANNED)
     {
-        if (ph_->StartTag(type_, state_->s_, this))
-            return true;
-        state_->elemTypeStack_.push_back(type_);
+        const ElementInfo &ei = einfo[type_];
+        if(prsState_->s_->BeginElement(ei.name_))
+            state_ = SCANNED_NOTEMPTY;
+        else
+        {
+            if(ei.notempty_)
+                EmptyElementError(prsState_->s_, ei.name_);
+            state_ = SCANNED_EMPTY;
+        }
+    }
+
+    switch(state_)
+    {
+    default:
+        InternalError(__FILE__, __LINE__, "bad host state");
+        return true;
+
+    case SCANNED_EMPTY:
+        ph_->EndTag(true, this);
+        prsState_->elemTypeStack_.pop_back();
+        return true;
+
+    case SCANNED_NOTEMPTY:
         return false;
     }
-    Fb2Ctxt* Ctxt() const
-    {
-        return newCtxt_;
-    }
-    void Data(const String &data, size_t size)
-    {
-        ph_->Data(data, size);
-    }
-    void EndTag()
-    {
-        state_->elemTypeStack_.pop_back();
-        ph_->EndTag(state_->s_);
-    }
+}
 
-    //virtual 
-    LexScanner* Scanner() const                         {return state_->s_;}
-    size_t      GetTypeStackSize() const                {return state_->elemTypeStack_.size();}
-    Fb2EType    GetTypeStackAt(int i) const             {return state_->elemTypeStack_[i];}
-    String      Findhref(const AttrMap &attrmap) const  {return state_->nsLookup_->Findhref(attrmap);}
+//-----------------------------------------------------------------------
+void AutoHandler::EndTag()
+{
+    if(!ph_->EndTag(false, this))
+        prsState_->s_->EndElement();
+    prsState_->elemTypeStack_.pop_back();
+}
 
-    //virtual
-    void RegisterNsLookup(Fb2NsLookup *lookup)
+//-----------------------------------------------------------------------
+const AttrMap& AutoHandler::GetAttributes() const
+{
+    if(!hasAttributes_)
     {
-        state_->nsLookup_ = lookup;
+        if(state_ != NOT_SCANNED)
+            InternalError(__FILE__, __LINE__, "attributes are skipped");
+
+        const ElementInfo &ei = einfo[type_];
+        if(prsState_->s_->BeginElement(ei.name_, &attrmap_))
+            state_ = SCANNED_NOTEMPTY;
+        else
+        {
+            if(ei.notempty_)
+                EmptyElementError(prsState_->s_, ei.name_);
+            state_ = SCANNED_EMPTY;
+        }
+        hasAttributes_ = true;
     }
-};
+    return attrmap_;
+}
+
 
 //-----------------------------------------------------------------------
 // Syntax parser
@@ -294,7 +396,13 @@ private:
 void Fb2ParserImpl::Parse(Fb2Ctxt *ctxt)
 {
     state_.s_->SkipXMLDeclaration();
-    FictionBook(ctxt);
+    try
+    {
+        FictionBook(ctxt);
+    }
+    catch(ExitParserException&)
+    {
+    }
 }
 
 //-----------------------------------------------------------------------
@@ -1406,22 +1514,24 @@ class Fb2StdCtxtImpl : public Fb2StdCtxt
         Entry() {}
         Entry(Fb2EHandler *h) : h_(h) {}
     };
-
-    typedef std::vector<Entry> EntryVector;
-    EntryVector entries_;
+    std::vector<Entry> entries_;
 
     Fb2StdCtxtImpl() : entries_(E_COUNT, Entry(CreateRecursiveEHandler())) {}
 
 public:
     //virtual
-    Ptr<Fb2EHandler>    GetHandler(Fb2EType type)           {return entries_[type].h_;}
-    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
-        Ptr<Fb2Ctxt> ctxt = entries_[type].ctxt_;
+        if(h)
+            *h = entries_[type].h_;
         if(ctxt)
-            return ctxt;
-        else
-            return this;
+        {
+            Ptr<Fb2Ctxt> ret = entries_[type].ctxt_;
+            if(ret)
+                *ctxt = ret;
+            else
+                *ctxt = this;
+        }
     }
     void RegisterCtxt(Fb2EType type, Fb2Ctxt *ctxt)
     {
@@ -1483,18 +1593,14 @@ class RecursiveEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
+    bool StartTag(Fb2Host*)             {return false;}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool empty, Fb2Host *host)
     {
-        const ElementInfo &ei = einfo[type];
-        if(s->BeginElement(ei.name_))
-            return false;
-
-        if(ei.notempty_)
-            EmptyElementError(s, ei.name_);
+        if(!empty)
+            host->Scanner()->SkipRestOfElementContent();    // skip rest without processing
         return true;
     }
-    void Data(const String&, size_t)    {}
-    void EndTag(LexScanner *s)          {s->SkipRestOfElementContent();}
 
     static Fb2EHandler* Obj()
     {
@@ -1517,9 +1623,9 @@ class SkipEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag   (Fb2EType, LexScanner *s, Fb2Host*) {s->SkipElement(); return true;}
-    void Data       (const String&, size_t)             {}
-    void EndTag     (LexScanner*)                       {}
+    bool StartTag   (Fb2Host *host)         {host->Scanner()->SkipElement(); return true;}
+    void Data       (const String&, size_t) {}
+    bool EndTag     (bool, Fb2Host*)        {return false;}
 
     static Fb2EHandler* Obj()
     {
@@ -1539,25 +1645,25 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler()
 // NOP HANDLER
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
-class NopEHandler : public Fb2EHandler
+class ExitEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag   (Fb2EType, LexScanner*, Fb2Host*)   {return true;}
-    void Data       (const String&, size_t)             {}
-    void EndTag     (LexScanner*)                       {}
+    bool StartTag   (Fb2Host *host)         {host->Exit(); return true;}
+    void Data       (const String&, size_t) {}
+    bool EndTag     (bool, Fb2Host*)        {return false;}
 
     static Fb2EHandler* Obj()
     {
-        static Ptr<Fb2EHandler> obj_ = new NopEHandler();
+        static Ptr<Fb2EHandler> obj_ = new ExitEHandler();
         return obj_;
     }
 };
 
 //-----------------------------------------------------------------------
-Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateNopEHandler()
+Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateExitEHandler()
 {
-    return NopEHandler::Obj();
+    return ExitEHandler::Obj();
 }
 
 
@@ -1568,20 +1674,8 @@ class TextHandlerBase : public Fb2TextHandler
 {
 public:
     //virtuals
-    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host*)
-    {
-        const ElementInfo &ei = einfo[type];
-        if(s->BeginElement(ei.name_))
-            return false;
-
-        if(ei.notempty_)
-            EmptyElementError(s, ei.name_);
-        return true;
-    }
-    void EndTag(LexScanner *s)
-    {
-        s->EndElement();
-    }
+    bool StartTag   (Fb2Host*)          {return false;}
+    bool EndTag     (bool, Fb2Host*)    {return false;}
 };
 //-----------------------------------------------------------------------
 class TextHandler : public TextHandlerBase
@@ -1628,127 +1722,32 @@ Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(String *text)
 
 
 //-----------------------------------------------------------------------
-template<class EE> class EHandlerAttr : public Fb2EHandler, Noncopyable
-{
-    Ptr<Fb2AttrHandler> pah_;
-public:
-    EHandlerAttr(Fb2AttrHandler *pah) : pah_(pah) {}
-
-    //virtuals
-    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
-    {
-        const ElementInfo &ei = einfo[type];
-        AttrMap attrmap;
-        if(s->BeginElement(ei.name_, &attrmap))
-        {
-            pah_->Begin(type, attrmap, host);
-            return false;
-        }
-
-        if(ei.notempty_)
-            EmptyElementError(s, ei.name_);
-        pah_->Begin(type, attrmap, host);
-        pah_->End();
-        return true;
-    }
-    void Data(const String &data, size_t size)
-    {
-        pah_->Contents(data, size);
-    }
-    void EndTag(LexScanner *s)
-    {
-        pah_->End();
-        EE::End(s);
-    }
-};
-
-//-----------------------------------------------------------------------
-template<class EE> class EHandlerNoAttr : public Fb2EHandler, Noncopyable
-{
-    Ptr<Fb2NoAttrHandler> pah_;
-public:
-    EHandlerNoAttr(Fb2NoAttrHandler *pah) : pah_(pah) {}
-
-    //virtuals
-    bool StartTag(Fb2EType type, LexScanner *s, Fb2Host *host)
-    {
-        const ElementInfo &ei = einfo[type];
-        if(s->BeginElement(ei.name_))
-        {
-            pah_->Begin(type, host);
-            return false;
-        }
-
-        if(ei.notempty_)
-            EmptyElementError(s, ei.name_);
-        pah_->Begin(type, host);
-        pah_->End();
-        return true;
-    }
-    void Data(const String &data, size_t size)
-    {
-        pah_->Contents(data, size);
-    }
-    void EndTag(LexScanner *s)
-    {
-        pah_->End();
-        EE::End(s);
-    }
-};
-
-//-----------------------------------------------------------------------
-struct EE_Normal
-{
-    static void End(LexScanner *s) {s->EndElement();}
-};
-struct EE_SkipRest
-{
-    static void End(LexScanner *s) {s->SkipRestOfElementContent();}
-};
-
-//-----------------------------------------------------------------------
-Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2AttrHandler> ph, bool skipRest)
-{
-    if(skipRest)
-        return new EHandlerAttr<EE_SkipRest>(ph);
-    else
-        return new EHandlerAttr<EE_Normal>(ph);
-}
-
-//-----------------------------------------------------------------------
-Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateEHandler(Ptr<Fb2NoAttrHandler> ph, bool skipRest)
-{
-    if(skipRest)
-        return new EHandlerNoAttr<EE_SkipRest>(ph);
-    else
-        return new EHandlerNoAttr<EE_Normal>(ph);
-}
-
-
-//-----------------------------------------------------------------------
 // ROOT ELEMENT HANDLER
 //-----------------------------------------------------------------------
 class FictionBoolElement : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag(Fb2EType, LexScanner *s, Fb2Host *host)
+    bool StartTag(Fb2Host *host)
     {
-        Ptr<Lookup> lookup = new Lookup(s, host);
-        host->RegisterNsLookup(lookup);
+        host->RegisterNsLookup(Ptr<Lookup>(new Lookup(host)));
         return false;
     }
-    void Data   (const String&, size_t) {}
-    void EndTag (LexScanner*)           {}      // skip rest without processing
+    void Data(const String&, size_t) {}
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        if(!empty)
+            host->Scanner()->SkipRestOfElementContent();    // skip rest without processing
+        return true;
+    }
 
 private:
     class Lookup : public Fb2NsLookup
     {
     public:
-        Lookup(LexScanner *s, Fb2Host *host)
+        Lookup(Fb2Host *host)
         {
-            AttrMap attrmap;
-            s->BeginNotEmptyElement("FictionBook", &attrmap);
+            const AttrMap &attrmap = host->GetAttributes();
 
             // namespaces
             AttrMap::const_iterator cit = attrmap.begin(), cit_end = attrmap.end();
@@ -1757,7 +1756,8 @@ private:
             {
                 static const String xmlns = "xmlns";
                 static const std::size_t xmlns_len = xmlns.length();
-                static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0", xlID = "http://www.w3.org/1999/xlink";
+                static const String fbID = "http://www.gribuser.ru/xml/fictionbook/2.0",
+                                    xlID = "http://www.w3.org/1999/xlink";
 
                 if(!cit->second.compare(fbID))
                 {

@@ -40,8 +40,9 @@ public:
         sections_.push_back(-1);
     }
 
-    const String* AddRefId(const AttrMap &attrmap, Fb2Host *host)
+    const String* AddRefId(Fb2Host *host)
     {
+        const AttrMap &attrmap = host->GetAttributes();
         AttrMap::const_iterator cit = attrmap.find("id");
         if(cit == attrmap.end())
             return NULL;
@@ -54,9 +55,9 @@ public:
         return &cit->second;
     }
 
-    void AddRef(const AttrMap &attrmap, Fb2Host *host)
+    void AddRef(Fb2Host *host)
     {
-        String id = host->Findhref(attrmap);
+        String id = host->Findhref();
         if(!id.empty() && id[0] == '#')
             units_->back().refs_.insert(id.substr(1));  // collect internal references
     }
@@ -84,11 +85,11 @@ public:
         }
     }
 
-    void BeginSection(const AttrMap &attrmap, Fb2Host *host)
+    void BeginSection(Fb2Host *host)
     {
         int idx = units_->size();
         units_->push_back(Unit(bodyType_, Unit::SECTION, sectionCnt_++, sections_.back()));
-        const String *id = AddRefId(attrmap, host);
+        const String *id = AddRefId(host);
 
         // check if it has anchor
         if (host->Scanner()->IsNextElement("title") &&
@@ -123,39 +124,50 @@ private:
 //-----------------------------------------------------------------------
 // HANDLER JUST TO ADD REF IDS
 //-----------------------------------------------------------------------
-class RefIdHandler : public Fb2AttrHandler
+class RefIdHandler : public Fb2EHandler
 {
     Engine *engine_;
 public:
     RefIdHandler(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)
-        {engine_->AddRefId(attrmap, host);}
-    void Contents(const String&, size_t)    {}
-    void End     ()                         {}
+    bool StartTag(Fb2Host *host)
+    {
+        engine_->AddRefId(host);
+        return false;
+    }
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool, Fb2Host*)         {return false;}
 };
 
 
 //-----------------------------------------------------------------------
 // HANDLERS TO START UNIT
 //-----------------------------------------------------------------------
-class StartUnitHandler : public Fb2NoAttrHandler
+class StartUnitHandler : public Fb2EHandler
 {
     Engine      *engine_;
     Unit::Type  unitType_;
+    bool        skipRest_;
 public:
-    StartUnitHandler(Engine *engine, Unit::Type unitType)
-        : engine_(engine), unitType_(unitType) {}
+    StartUnitHandler(Engine *engine, Unit::Type unitType, bool skipRest = false)
+        : engine_(engine), unitType_(unitType), skipRest_(skipRest) {}
 
     //virtuals
-    void Begin      (Fb2EType, Fb2Host*)    {engine_->StartUnit(unitType_);}
-    void Contents   (const String&, size_t) {}
-    void End        ()                      {}
+    bool StartTag(Fb2Host*)             {engine_->StartUnit(unitType_); return false;}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        if(!skipRest_)
+            return false;
+        if(!empty)
+            host->Scanner()->SkipRestOfElementContent();
+        return true;
+    }
 };
 //-----------------------------------------------------------------------
 // + Add ref ids
-class StartUnitRefIdHandler : public Fb2AttrHandler
+class StartUnitRefIdHandler : public Fb2EHandler
 {
     Engine      *engine_;
     Unit::Type  unitType_;
@@ -164,20 +176,21 @@ public:
         : engine_(engine), unitType_(unitType) {}
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)
+    bool StartTag(Fb2Host *host)
     {
         engine_->StartUnit(unitType_);
-        engine_->AddRefId(attrmap, host);
+        engine_->AddRefId(host);
+        return false;
     }
-    void Contents(const String&, size_t)    {}
-    void End     ()                         {}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool, Fb2Host*)         {return false;}
 };
 
 
 //-----------------------------------------------------------------------
 // HANDLERS TO CALCULATE SIZE AND (OPTIONALLY) INPUT TEXT
 //-----------------------------------------------------------------------
-class SizeTextHandler : public Fb2NoAttrHandler
+class SizeTextHandler : public Fb2EHandler
 {
     Engine  *engine_;
     String  *text_;
@@ -186,18 +199,18 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host*) {}
-    void Contents(const String &data, size_t size)
+    bool StartTag(Fb2Host*) {return false;}
+    void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    void End() {}
+    bool EndTag(bool, Fb2Host*) {return false;}
 };
 //-----------------------------------------------------------------------
 // + Add ref ids
-class SizeRefIdTextHandler : public Fb2AttrHandler
+class SizeRefIdTextHandler : public Fb2EHandler
 {
     Engine  *engine_;
     String  *text_;
@@ -206,19 +219,18 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)
-        {engine_->AddRefId(attrmap, host);}
-    void Contents(const String &data, size_t size)
+    bool StartTag(Fb2Host *host) {engine_->AddRefId(host); return false;}
+    void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    void End() {}
+    bool EndTag(bool, Fb2Host*) {return false;}
 };
 //-----------------------------------------------------------------------
 // <a> (i.e. + Add refs)
-class AHandler : public Fb2AttrHandler
+class AHandler : public Fb2EHandler
 {
     Engine  *engine_;
     String  *text_;
@@ -227,15 +239,14 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)
-        {engine_->AddRef(attrmap, host);}
-    void Contents(const String &data, size_t size)
+    bool StartTag(Fb2Host *host) {engine_->AddRef(host); return false;}
+    void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    void End() {}
+    bool EndTag(bool, Fb2Host*) {return false;}
 };
 
 
@@ -248,36 +259,38 @@ class TitleInfoCtxt : public Fb2Ctxt
     Engine          *engine_;
 public:
     TitleInfoCtxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
+
     //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type)
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
         switch(type)
         {
         case E_ANNOTATION:
-            return CreateEHandler(new StartUnitRefIdHandler(engine_, Unit::ANNOTATION));
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            if(h)
+                *h = new StartUnitRefIdHandler(engine_, Unit::ANNOTATION);
+            break;
+
         default:
-            return oldCtxt_->GetHandler(type);
+            oldCtxt_->GetNext(type, h, ctxt);
+            break;
         }
-    }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)
-    {
-        return oldCtxt_->GetCtxt(type);
     }
 };
 
 //-----------------------------------------------------------------------
 // BODY HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class Body : public Fb2NoAttrHandler
+class Body : public Fb2EHandler
 {
     Engine  *engine_;
 public:
     Body(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    void Begin(Fb2EType, Fb2Host*)          {engine_->BeginBody();}
-    void Contents(const String&, size_t)    {}
-    void End()                              {}
+    bool StartTag(Fb2Host*)             {engine_->BeginBody(); return false;}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool, Fb2Host*)         {return false;}
 };
 //-----------------------------------------------------------------------
 class BodyCtxt : public Fb2Ctxt
@@ -286,22 +299,28 @@ class BodyCtxt : public Fb2Ctxt
     Engine          *engine_;
 public:
     BodyCtxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
+
     //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type)
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
         switch(type)
         {
         case E_IMAGE:
-            return CreateEHandler(new StartUnitRefIdHandler(engine_, Unit::IMAGE));
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            if(h)
+                *h = new StartUnitRefIdHandler(engine_, Unit::IMAGE);
+            break;
+
         case E_TITLE:
-            return CreateEHandler(new StartUnitHandler(engine_, Unit::TITLE));
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            if(h)
+                *h = new StartUnitHandler(engine_, Unit::TITLE);
+            break;
+
         default:
-            return oldCtxt_->GetHandler(type);
+            oldCtxt_->GetNext(type, h, ctxt);
+            break;
         }
-    }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)
-    {
-        return oldCtxt_->GetCtxt(type);
     }
 };
 
@@ -309,16 +328,16 @@ public:
 //-----------------------------------------------------------------------
 // SECTION HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class Section : public Fb2AttrHandler
+class Section : public Fb2EHandler
 {
     Engine  *engine_;
 public:
     Section(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    void Begin(Fb2EType, AttrMap &attrmap, Fb2Host *host)   {engine_->BeginSection(attrmap, host);}
-    void Contents(const String&, size_t)                    {}
-    void End()                                              {engine_->EndSection();}
+    bool StartTag(Fb2Host *host)        {engine_->BeginSection(host); return false;}
+    void Data(const String&, size_t)    {}
+    bool EndTag(bool, Fb2Host*)         {engine_->EndSection(); return false;}
 };
 //-----------------------------------------------------------------------
 class SectionCtxt : public Fb2Ctxt
@@ -333,8 +352,9 @@ public:
             //title_(CreateEHandler(new SectionTitle(engine)))
     {
     }
+
     //virtual
-    Ptr<Fb2EHandler> GetHandler(Fb2EType type)
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
         switch(type)
         {
@@ -346,13 +366,13 @@ public:
         case E_CITE:
         case E_EMPTY_LINE:
         case E_TABLE:
+
         default:
-            return oldCtxt_->GetHandler(type);
+            oldCtxt_->GetNext(type, h, NULL);
+            break;
         }
-    }
-    Ptr<Fb2Ctxt> GetCtxt(Fb2EType type)
-    {
-        return this;
+        if(ctxt)
+            *ctxt = this;
     }
 };
 
@@ -379,8 +399,8 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 
     // <coverpage>
     {
-        Ptr<Fb2NoAttrHandler> ph = new StartUnitHandler(&engine, Unit::COVERPAGE);
-        ctxt->RegisterSubHandler(E_COVERPAGE, ph, true);
+        Ptr<Fb2EHandler> ph = new StartUnitHandler(&engine, Unit::COVERPAGE, true);
+        ctxt->RegisterHandler(E_COVERPAGE, ph);
     }
 
     // skip rest of <description>
@@ -392,58 +412,58 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
     // <body>
     {
         Ptr<Fb2Ctxt> pc = new BodyCtxt(ctxt, &engine);
-        Ptr<Fb2NoAttrHandler> ph = new Body(&engine);
-        ctxt->RegisterCtxtSubHandler(E_BODY, pc, ph);
+        Ptr<Fb2EHandler> ph = new Body(&engine);
+        ctxt->RegisterCtxtHandler(E_BODY, pc, ph);
     }
 
     // <section>
     {
         Ptr<Fb2Ctxt> pc = new SectionCtxt(ctxt, &engine);
-        Ptr<Fb2AttrHandler> ph = new Section(&engine);
-        ctxt->RegisterCtxtSubHandler(E_SECTION, pc, ph);
+        Ptr<Fb2EHandler> ph = new Section(&engine);
+        ctxt->RegisterCtxtHandler(E_SECTION, pc, ph);
     }
 
     // these text elements by default calculate unit size
     {
-        Ptr<Fb2NoAttrHandler> ph = new SizeTextHandler(&engine, NULL);
-        ctxt->RegisterSubHandler(E_CODE,                ph);
-        ctxt->RegisterSubHandler(E_EMPHASIS,            ph);
-        ctxt->RegisterSubHandler(E_STRIKETHROUGH,       ph);
-        ctxt->RegisterSubHandler(E_STRONG,              ph);
-        ctxt->RegisterSubHandler(E_STYLE,               ph);
-        ctxt->RegisterSubHandler(E_SUB,                 ph);
-        ctxt->RegisterSubHandler(E_SUP,                 ph);
+        Ptr<Fb2EHandler> ph = new SizeTextHandler(&engine, NULL);
+        ctxt->RegisterHandler(E_CODE,           ph);
+        ctxt->RegisterHandler(E_EMPHASIS,       ph);
+        ctxt->RegisterHandler(E_STRIKETHROUGH,  ph);
+        ctxt->RegisterHandler(E_STRONG,         ph);
+        ctxt->RegisterHandler(E_STYLE,          ph);
+        ctxt->RegisterHandler(E_SUB,            ph);
+        ctxt->RegisterHandler(E_SUP,            ph);
     }
     // these text elements by default calculate unit size and add refids
     {
-        Ptr<Fb2AttrHandler> ph = new SizeRefIdTextHandler(&engine, NULL);
-        ctxt->RegisterSubHandler(E_P,                   ph);
-        ctxt->RegisterSubHandler(E_SUBTITLE,            ph);
-        ctxt->RegisterSubHandler(E_TD,                  ph);
-        ctxt->RegisterSubHandler(E_TEXT_AUTHOR,         ph);
-        ctxt->RegisterSubHandler(E_TH,                  ph);
-        ctxt->RegisterSubHandler(E_V,                   ph);
+        Ptr<Fb2EHandler> ph = new SizeRefIdTextHandler(&engine, NULL);
+        ctxt->RegisterHandler(E_P,              ph);
+        ctxt->RegisterHandler(E_SUBTITLE,       ph);
+        ctxt->RegisterHandler(E_TD,             ph);
+        ctxt->RegisterHandler(E_TEXT_AUTHOR,    ph);
+        ctxt->RegisterHandler(E_TH,             ph);
+        ctxt->RegisterHandler(E_V,              ph);
     }
     // <a>, default (calculates size and add refs)
     {
-        Ptr<Fb2AttrHandler> ph = new AHandler(&engine, NULL);
-        ctxt->RegisterSubHandler(E_A, ph);
+        Ptr<Fb2EHandler> ph = new AHandler(&engine, NULL);
+        ctxt->RegisterHandler(E_A, ph);
     }
     // these nontext elements by default add refids
     {
-        Ptr<Fb2AttrHandler> ph = new RefIdHandler(&engine);
-        ctxt->RegisterSubHandler(E_ANNOTATION,          ph);
-        ctxt->RegisterSubHandler(E_CITE,                ph);
-        ctxt->RegisterSubHandler(E_EPIGRAPH,            ph);
-        ctxt->RegisterSubHandler(E_HISTORY,             ph);
-        ctxt->RegisterSubHandler(E_IMAGE,               ph);
-        ctxt->RegisterSubHandler(E_IMAGE_SECTION_TOP,   ph);
-        ctxt->RegisterSubHandler(E_POEM,                ph);
-        ctxt->RegisterSubHandler(E_TABLE,               ph);
+        Ptr<Fb2EHandler> ph = new RefIdHandler(&engine);
+        ctxt->RegisterHandler(E_ANNOTATION,         ph);
+        ctxt->RegisterHandler(E_CITE,               ph);
+        ctxt->RegisterHandler(E_EPIGRAPH,           ph);
+        ctxt->RegisterHandler(E_HISTORY,            ph);
+        ctxt->RegisterHandler(E_IMAGE,              ph);
+        ctxt->RegisterHandler(E_IMAGE_SECTION_TOP,  ph);
+        ctxt->RegisterHandler(E_POEM,               ph);
+        ctxt->RegisterHandler(E_TABLE,              ph);
     }
 
     // skip rest of <FictionBook>
-    ctxt->RegisterHandler(E_BINARY, skip);
+    ctxt->RegisterHandler(E_BINARY, CreateExitEHandler());
 
     // parsing
     CreateFb2Parser(scanner)->Parse(ctxt);
