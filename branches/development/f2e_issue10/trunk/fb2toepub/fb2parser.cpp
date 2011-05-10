@@ -1649,7 +1649,7 @@ class ExitEHandler : public Fb2EHandler
 {
 public:
     //virtuals
-    bool StartTag   (Fb2Host *host)         {host->Exit(); return true;}
+    bool StartTag   (Fb2Host *host)         {host->Exit(); return false;}
     void Data       (const String&, size_t) {}
     bool EndTag     (bool, Fb2Host*)        {return false;}
 
