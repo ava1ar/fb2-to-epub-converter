@@ -127,7 +127,7 @@ public:
     //virtuals
     bool StartTag(Fb2Host*)             {return false;}
     void Data   (const String&, size_t) {}
-    bool EndTag (bool, Fb2Host*)        {return true;}
+    bool EndTag (bool, Fb2Host *host)   {host->Exit(); return false;}
 };
 
 
