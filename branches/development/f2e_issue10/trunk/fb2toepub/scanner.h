@@ -31,6 +31,14 @@ namespace Fb2ToEpub
 {
     //-----------------------------------------------------------------------
     typedef std::map<String, String> AttrMap;
+    inline String GetAttrValue(const AttrMap &attrmap, const String &attr)
+    {
+        AttrMap::const_iterator cit = attrmap.find(attr);
+        if(cit != attrmap.end())
+            return cit->second;
+        else
+            return "";
+    }
 
     //-----------------------------------------------------------------------
     class LexScanner : public Object

@@ -1589,19 +1589,9 @@ const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type)
 //-----------------------------------------------------------------------
 // RECURSIVE HANDLER
 //-----------------------------------------------------------------------
-class RecursiveEHandler : public Fb2EHandler
+class RecursiveEHandler : public Fb2BaseEHandler<true>
 {
 public:
-    //virtuals
-    bool StartTag(Fb2Host*)             {return false;}
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool empty, Fb2Host *host)
-    {
-        if(!empty)
-            host->Scanner()->SkipRestOfElementContent();    // skip rest without processing
-        return true;
-    }
-
     static Fb2EHandler* Obj()
     {
         static Ptr<Fb2EHandler> obj_ = new RecursiveEHandler();
@@ -1619,13 +1609,15 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateRecursiveEHandler()
 //-----------------------------------------------------------------------
 // SKIP HANDLER
 //-----------------------------------------------------------------------
-class SkipEHandler : public Fb2EHandler
+class SkipEHandler : public Fb2BaseEHandler<>
 {
 public:
     //virtuals
-    bool StartTag   (Fb2Host *host)         {host->Scanner()->SkipElement(); return true;}
-    void Data       (const String&, size_t) {}
-    bool EndTag     (bool, Fb2Host*)        {return false;}
+    bool StartTag(Fb2Host *host)
+    {
+        host->Scanner()->SkipElement();
+        return true;
+    }
 
     static Fb2EHandler* Obj()
     {
@@ -1645,13 +1637,15 @@ Ptr<Fb2EHandler> FB2TOEPUB_DECL CreateSkipEHandler()
 // NOP HANDLER
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
-class ExitEHandler : public Fb2EHandler
+class ExitEHandler : public Fb2BaseEHandler<>
 {
 public:
     //virtuals
-    bool StartTag   (Fb2Host *host)         {host->Exit(); return false;}
-    void Data       (const String&, size_t) {}
-    bool EndTag     (bool, Fb2Host*)        {return false;}
+    bool StartTag(Fb2Host *host)
+    {
+        host->Exit();
+        return false;
+    }
 
     static Fb2EHandler* Obj()
     {
@@ -1724,7 +1718,7 @@ Ptr<Fb2TextHandler> FB2TOEPUB_DECL CreateTextEHandler(String *text)
 //-----------------------------------------------------------------------
 // ROOT ELEMENT HANDLER
 //-----------------------------------------------------------------------
-class FictionBoolElement : public Fb2EHandler
+class FictionBoolElement : public Fb2BaseEHandler<true>
 {
 public:
     //virtuals
@@ -1732,13 +1726,6 @@ public:
     {
         host->RegisterNsLookup(Ptr<Lookup>(new Lookup(host)));
         return false;
-    }
-    void Data(const String&, size_t) {}
-    bool EndTag(bool empty, Fb2Host *host)
-    {
-        if(!empty)
-            host->Scanner()->SkipRestOfElementContent();    // skip rest without processing
-        return true;
     }
 
 private:
