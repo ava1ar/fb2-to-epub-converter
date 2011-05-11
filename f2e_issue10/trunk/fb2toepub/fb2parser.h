@@ -203,6 +203,32 @@ namespace Fb2ToEpub
     const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type);
 
     //-----------------------------------------------------------------------
+    // HELPER BASE HANDLER CLASS WITH TRIVIAL IMPLEMENTATION
+    //-----------------------------------------------------------------------
+    template <bool skipRest = false> class Fb2BaseEHandler;
+    template <> class Fb2BaseEHandler<false> : public Fb2EHandler
+    {
+    public:
+        //virtuals
+        bool StartTag(Fb2Host*)             {return false;}
+        void Data(const String&, size_t)    {}
+        bool EndTag(bool, Fb2Host*)         {return false;}
+    };
+    template <> class Fb2BaseEHandler<true> : public Fb2EHandler
+    {
+    public:
+        //virtuals
+        bool StartTag(Fb2Host*)             {return false;}
+        void Data(const String&, size_t)    {}
+        bool EndTag(bool empty, Fb2Host *host)
+        {
+            if(!empty)
+                host->Scanner()->SkipRestOfElementContent();
+            return true;
+        }
+    };
+
+    //-----------------------------------------------------------------------
     // HANDLER FOR RECIRSIVE PROCESSING
     // (Do nothing but allow recursive processing.)
     //

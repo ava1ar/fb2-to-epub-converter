@@ -31,7 +31,7 @@ namespace Fb2ToEpub
 //-----------------------------------------------------------------------
 // PASS 1 ENGINE
 //-----------------------------------------------------------------------
-class Engine
+class Engine : Noncopyable
 {
 public:
     Engine(UnitArray *units)
@@ -124,7 +124,7 @@ private:
 //-----------------------------------------------------------------------
 // HANDLER JUST TO ADD REF IDS
 //-----------------------------------------------------------------------
-class RefIdHandler : public Fb2EHandler
+class RefIdHandler : public Fb2BaseEHandler<>
 {
     Engine *engine_;
 public:
@@ -136,38 +136,31 @@ public:
         engine_->AddRefId(host);
         return false;
     }
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool, Fb2Host*)         {return false;}
 };
 
 
 //-----------------------------------------------------------------------
 // HANDLERS TO START UNIT
 //-----------------------------------------------------------------------
-class StartUnitHandler : public Fb2EHandler
+template <bool skipRest = false>
+class StartUnitHandler : public Fb2BaseEHandler<skipRest>
 {
     Engine      *engine_;
     Unit::Type  unitType_;
-    bool        skipRest_;
 public:
-    StartUnitHandler(Engine *engine, Unit::Type unitType, bool skipRest = false)
-        : engine_(engine), unitType_(unitType), skipRest_(skipRest) {}
+    StartUnitHandler(Engine *engine, Unit::Type unitType)
+        : engine_(engine), unitType_(unitType) {}
 
     //virtuals
-    bool StartTag(Fb2Host*)             {engine_->StartUnit(unitType_); return false;}
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool empty, Fb2Host *host)
+    bool StartTag(Fb2Host*)
     {
-        if(!skipRest_)
-            return false;
-        if(!empty)
-            host->Scanner()->SkipRestOfElementContent();
-        return true;
+        engine_->StartUnit(unitType_);
+        return false;
     }
 };
 //-----------------------------------------------------------------------
 // + Add ref ids
-class StartUnitRefIdHandler : public Fb2EHandler
+class StartUnitRefIdHandler : public Fb2BaseEHandler<>
 {
     Engine      *engine_;
     Unit::Type  unitType_;
@@ -182,15 +175,13 @@ public:
         engine_->AddRefId(host);
         return false;
     }
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool, Fb2Host*)         {return false;}
 };
 
 
 //-----------------------------------------------------------------------
 // HANDLERS TO CALCULATE SIZE AND (OPTIONALLY) INPUT TEXT
 //-----------------------------------------------------------------------
-class SizeTextHandler : public Fb2EHandler
+class SizeTextHandler : public Fb2BaseEHandler<>, Noncopyable
 {
     Engine  *engine_;
     String  *text_;
@@ -199,18 +190,16 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    bool StartTag(Fb2Host*) {return false;}
     void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    bool EndTag(bool, Fb2Host*) {return false;}
 };
 //-----------------------------------------------------------------------
 // + Add ref ids
-class SizeRefIdTextHandler : public Fb2EHandler
+class SizeRefIdTextHandler : public Fb2BaseEHandler<>, Noncopyable
 {
     Engine  *engine_;
     String  *text_;
@@ -219,18 +208,21 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host) {engine_->AddRefId(host); return false;}
+    bool StartTag(Fb2Host *host)
+    {
+        engine_->AddRefId(host);
+        return false;
+    }
     void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    bool EndTag(bool, Fb2Host*) {return false;}
 };
 //-----------------------------------------------------------------------
 // <a> (i.e. + Add refs)
-class AHandler : public Fb2EHandler
+class AHandler : public Fb2BaseEHandler<>, Noncopyable
 {
     Engine  *engine_;
     String  *text_;
@@ -239,21 +231,24 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host) {engine_->AddRef(host); return false;}
+    bool StartTag(Fb2Host *host)
+    {
+        engine_->AddRef(host);
+        return false;
+    }
     void Data(const String &data, size_t size)
     {
         engine_->AddUnitSize(size);
         if(text_)
             *text_ += data;
     }
-    bool EndTag(bool, Fb2Host*) {return false;}
 };
 
 
 //-----------------------------------------------------------------------
 // TITLE-INFO HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class TitleInfoCtxt : public Fb2Ctxt
+class TitleInfoCtxt : public Fb2Ctxt, Noncopyable
 {
     Ptr<Fb2Ctxt>    oldCtxt_;
     Engine          *engine_;
@@ -281,19 +276,21 @@ public:
 //-----------------------------------------------------------------------
 // BODY HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class Body : public Fb2EHandler
+class Body : public Fb2BaseEHandler<>
 {
     Engine  *engine_;
 public:
     Body(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    bool StartTag(Fb2Host*)             {engine_->BeginBody(); return false;}
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool, Fb2Host*)         {return false;}
+    bool StartTag(Fb2Host*)
+    {
+        engine_->BeginBody();
+        return false;
+    }
 };
 //-----------------------------------------------------------------------
-class BodyCtxt : public Fb2Ctxt
+class BodyCtxt : public Fb2Ctxt, Noncopyable
 {
     Ptr<Fb2Ctxt>    oldCtxt_;
     Engine          *engine_;
@@ -314,7 +311,7 @@ public:
         case E_TITLE:
             oldCtxt_->GetNext(type, NULL, ctxt);
             if(h)
-                *h = new StartUnitHandler(engine_, Unit::TITLE);
+                *h = new StartUnitHandler<>(engine_, Unit::TITLE);
             break;
 
         default:
@@ -328,7 +325,7 @@ public:
 //-----------------------------------------------------------------------
 // SECTION HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
-class Section : public Fb2EHandler
+class Section : public Fb2BaseEHandler<>
 {
     Engine  *engine_;
 public:
@@ -336,11 +333,10 @@ public:
 
     //virtuals
     bool StartTag(Fb2Host *host)        {engine_->BeginSection(host); return false;}
-    void Data(const String&, size_t)    {}
     bool EndTag(bool, Fb2Host*)         {engine_->EndSection(); return false;}
 };
 //-----------------------------------------------------------------------
-class SectionCtxt : public Fb2Ctxt
+class SectionCtxt : public Fb2Ctxt, Noncopyable
 {
     Ptr<Fb2Ctxt>    oldCtxt_;
     Engine          *engine_;
@@ -399,7 +395,7 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 
     // <coverpage>
     {
-        Ptr<Fb2EHandler> ph = new StartUnitHandler(&engine, Unit::COVERPAGE, true);
+        Ptr<Fb2EHandler> ph = new StartUnitHandler<true>(&engine, Unit::COVERPAGE);
         ctxt->RegisterHandler(E_COVERPAGE, ph);
     }
 

@@ -78,7 +78,7 @@ private:
 };
 
 //-----------------------------------------------------------------------
-class SeqAttrHandler : public Fb2EHandler, Noncopyable
+class SeqAttrHandler : public Fb2BaseEHandler<>
 {
 public:
     void Print()
@@ -112,8 +112,6 @@ public:
             sequences_.push_back(seqvector::value_type(name, host->GetAttrValue("number")));
         return false;
     }
-    void Data(const String&, size_t)    {}
-    bool EndTag(bool, Fb2Host*)         {return false;}
 
 private:
     typedef std::vector<std::pair<String, String> > seqvector;
@@ -121,12 +119,10 @@ private:
 };
 
 //-----------------------------------------------------------------------
-class RootEHandler : public Fb2EHandler
+class RootEHandler : public Fb2BaseEHandler<>
 {
 public:
     //virtuals
-    bool StartTag(Fb2Host*)             {return false;}
-    void Data   (const String&, size_t) {}
     bool EndTag (bool, Fb2Host *host)   {host->Exit(); return false;}
 };
 
