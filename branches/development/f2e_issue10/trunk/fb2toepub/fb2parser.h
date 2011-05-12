@@ -199,8 +199,23 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
 
     //-----------------------------------------------------------------------
-    // NAME BY TYPE
-    const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type);
+    // ELEMENT INFO
+    //-----------------------------------------------------------------------
+    struct Fb2ElementInfo
+    {
+        String  name_;      // element name
+        bool    notempty_;  // always not empty?
+        bool    refid_;     // can have refid (id=...)
+        bool    ref_;       // can have reference (href=...)
+        bool    lang_;      // can have xml::lang attribute
+
+        Fb2ElementInfo() {}
+        Fb2ElementInfo(const String &name, bool notempty, bool refid, bool ref, bool lang)
+            : name_(name), notempty_(notempty), refid_(refid), ref_(ref), lang_(lang) {}
+    };
+    //-----------------------------------------------------------------------
+    const Fb2ElementInfo& FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type);
+
 
     //-----------------------------------------------------------------------
     // HELPER BASE HANDLER CLASS WITH TRIVIAL IMPLEMENTATION
