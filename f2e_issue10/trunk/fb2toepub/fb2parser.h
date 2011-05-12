@@ -229,6 +229,20 @@ namespace Fb2ToEpub
     };
 
     //-----------------------------------------------------------------------
+    // HELPER BASE HANDLER CLASS FOR DELEGATION
+    //-----------------------------------------------------------------------
+    class Fb2DelegateHandler : public Fb2EHandler
+    {
+        Ptr<Fb2EHandler> delegate_;
+    public:
+        Fb2DelegateHandler(Fb2EHandler *d) : delegate_(d) {}
+        //virtuals
+        bool StartTag   (Fb2Host *host)                     {return delegate_->StartTag(host);}
+        void Data       (const String &data, size_t size)   {delegate_->Data(data, size);}
+        bool EndTag     (bool empty, Fb2Host *host)         {return delegate_->EndTag(empty, host);}
+    };
+
+    //-----------------------------------------------------------------------
     // HANDLER FOR RECIRSIVE PROCESSING
     // (Do nothing but allow recursive processing.)
     //
