@@ -28,85 +28,83 @@
 namespace Fb2ToEpub
 {
 
-struct ElementInfo
+static const Fb2ElementInfo einfo[E_COUNT] =
 {
-    String  name_;
-    bool    notempty_;
+    //              name                  notempty? id?     href?   lang?
+    Fb2ElementInfo("FictionBook",           true,   false,  false,  false),
+    Fb2ElementInfo("a",                     false,  false,  true,   false),
+    Fb2ElementInfo("annotation",            false,  true,   false,  true),
+    Fb2ElementInfo("author",                false,  false,  false,  false),
+    Fb2ElementInfo("binary",                true,   true,   false,  false),
+    Fb2ElementInfo("body",                  false,  false,  false,  true),
+    Fb2ElementInfo("book-name",             false,  false,  false,  true),
+    Fb2ElementInfo("book-title",            false,  false,  false,  true),
+    Fb2ElementInfo("cite",                  true,   true,   false,  true),
+    Fb2ElementInfo("city",                  false,  false,  false,  true),
+    Fb2ElementInfo("code",                  false,  false,  false,  false),
+    Fb2ElementInfo("coverpage",             false,  false,  false,  false),
+    Fb2ElementInfo("custom-info",           false,  false,  false,  false),
+    Fb2ElementInfo("date",                  false,  false,  false,  true),
+    Fb2ElementInfo("description",           true,   false,  false,  false),
+    Fb2ElementInfo("document-info",         false,  false,  false,  false),
+    Fb2ElementInfo("email",                 false,  false,  false,  false),
+    Fb2ElementInfo("emphasis",              false,  false,  false,  false),
+    Fb2ElementInfo("empty-line",            false,  false,  false,  false),
 
-    ElementInfo() {}
-    ElementInfo(const String &name, bool notempty) : name_(name), notempty_(notempty) {}
-};
+    //              name                  notempty? id?     href?   lang?
+    Fb2ElementInfo("epigraph",              false,  true,   false,  false),
+    Fb2ElementInfo("first-name",            false,  false,  false,  true),
+    Fb2ElementInfo("genre",                 false,  false,  false,  false),
+    Fb2ElementInfo("history",               false,  true,   false,  true),
+    Fb2ElementInfo("home-page",             false,  false,  false,  false),
+    Fb2ElementInfo("id",                    false,  false,  false,  false),
+    Fb2ElementInfo("isbn",                  false,  false,  false,  true),
+    Fb2ElementInfo("image",                 false,  true,   true,   false),     // <image> in <body>, <section> (except top image)
+    Fb2ElementInfo("image",                 false,  false,  true,   false),     // <image> in all others (inline)
+    Fb2ElementInfo("image",                 false,  true,   true,   false),     // <image> in the top of the <section>
+    Fb2ElementInfo("keywords",              false,  false,  false,  false),
+    Fb2ElementInfo("lang",                  false,  false,  false,  false),
+    Fb2ElementInfo("last-name",             false,  false,  false,  true),
+    Fb2ElementInfo("middle-name",           false,  false,  false,  true),
+    Fb2ElementInfo("nickname",              false,  false,  false,  true),
+    Fb2ElementInfo("output-document-class", false,  false,  false,  false),
+    Fb2ElementInfo("output",                false,  false,  false,  false),
+    Fb2ElementInfo("p",                     false,  true,   false,  true),
+    Fb2ElementInfo("part",                  false,  false,  true,   false),
 
-static const ElementInfo einfo[E_COUNT] =
-{
-    ElementInfo("FictionBook",          true),
-    ElementInfo("a",                    false),
-    ElementInfo("annotation",           false),
-    ElementInfo("author",               false),
-    ElementInfo("binary",               true),
-    ElementInfo("body",                 false),
-    ElementInfo("book-name",            false),
-    ElementInfo("book-title",           false),
-    ElementInfo("cite",                 true),
-    ElementInfo("city",                 false),
-    ElementInfo("code",                 false),
-    ElementInfo("coverpage",            false),
-    ElementInfo("custom-info",          false),
-    ElementInfo("date",                 false),
-    ElementInfo("description",          true),
-    ElementInfo("document-info",        false),
-    ElementInfo("email",                false),
-    ElementInfo("emphasis",             false),
-    ElementInfo("empty-line",           false),
-    ElementInfo("epigraph",             false),
-    ElementInfo("first-name",           false),
-    ElementInfo("genre",                false),
-    ElementInfo("history",              false),
-    ElementInfo("home-page",            false),
-    ElementInfo("id",                   false),
-    ElementInfo("isbn",                 false),
-    ElementInfo("image",                false),     // <image> in <body>, <section> (except top image)
-    ElementInfo("image",                false),     // <image> in all others (inline)
-    ElementInfo("image",                false),     // <image> in the top of the <section>
-    ElementInfo("keywords",             false),
-    ElementInfo("lang",                 false),
-    ElementInfo("last-name",            false),
-    ElementInfo("middle-name",          false),
-    ElementInfo("nickname",             false),
-    ElementInfo("output-document-class",false),
-    ElementInfo("output",               false),
-    ElementInfo("p",                    false),
-    ElementInfo("part",                 false),
-    ElementInfo("poem",                 false),
-    ElementInfo("program-used",         false),
-    ElementInfo("publish-info",         false),
-    ElementInfo("publisher",            false),     // <publisher> in <publish-info>
-    ElementInfo("publisher",            false),     // <publisher> in <document-info>
-    ElementInfo("section",              false),
-    ElementInfo("sequence",             false),
-    ElementInfo("src-lang",             false),
-    ElementInfo("src-ocr",              false),
-    ElementInfo("src-title-info",       false),
-    ElementInfo("src-url",              false),
-    ElementInfo("stanza",               false),
-    ElementInfo("strikethrough",        false),
-    ElementInfo("strong",               false),
-    ElementInfo("style",                false),
-    ElementInfo("stylesheet",           false),
-    ElementInfo("sub",                  false),
-    ElementInfo("subtitle",             false),
-    ElementInfo("sup",                  false),
-    ElementInfo("table",                false),
-    ElementInfo("td",                   false),
-    ElementInfo("text-author",          false),
-    ElementInfo("th",                   false),
-    ElementInfo("title",                false),
-    ElementInfo("title-info",           true),
-    ElementInfo("tr",                   false),
-    ElementInfo("translator",           false),
-    ElementInfo("v",                    false),
-    ElementInfo("version",              false),
-    ElementInfo("year",                 false)
+    //              name                  notempty? id?     href?   lang?
+    Fb2ElementInfo("poem",                  false,  true,   false,  true),
+    Fb2ElementInfo("program-used",          false,  false,  false,  true),
+    Fb2ElementInfo("publish-info",          false,  false,  false,  false),
+    Fb2ElementInfo("publisher",             false,  false,  false,  true),      // <publisher> in <publish-info>
+    Fb2ElementInfo("publisher",             false,  false,  false,  false),     // <publisher> in <document-info>
+    Fb2ElementInfo("section",               false,  true,   false,  true),
+    Fb2ElementInfo("sequence",              false,  false,  false,  true),
+    Fb2ElementInfo("src-lang",              false,  false,  false,  false),
+    Fb2ElementInfo("src-ocr",               false,  false,  false,  true),
+    Fb2ElementInfo("src-title-info",        false,  false,  false,  false),
+    Fb2ElementInfo("src-url",               false,  false,  false,  false),
+    Fb2ElementInfo("stanza",                false,  false,  false,  false),
+    Fb2ElementInfo("strikethrough",         false,  false,  false,  false),
+    Fb2ElementInfo("strong",                false,  false,  false,  false),
+    Fb2ElementInfo("style",                 false,  false,  false,  true),
+    Fb2ElementInfo("stylesheet",            false,  false,  false,  false),
+    Fb2ElementInfo("sub",                   false,  false,  false,  false),
+    Fb2ElementInfo("subtitle",              false,  false,  false,  false),
+    Fb2ElementInfo("sup",                   false,  false,  false,  false),
+
+    //              name                  notempty? id?     href?   lang?
+    Fb2ElementInfo("table",                 false,  true,   false,  false),
+    Fb2ElementInfo("td",                    false,  true,   false,  true),
+    Fb2ElementInfo("text-author",           false,  true,   false,  true),
+    Fb2ElementInfo("th",                    false,  true,   false,  true),
+    Fb2ElementInfo("title",                 false,  false,  false,  true),
+    Fb2ElementInfo("title-info",            true,   false,  false,  false),
+    Fb2ElementInfo("tr",                    false,  false,  false,  false),
+    Fb2ElementInfo("translator",            false,  false,  false,  false),
+    Fb2ElementInfo("v",                     false,  true,   false,  true),
+    Fb2ElementInfo("version",               false,  false,  false,  false),
+    Fb2ElementInfo("year",                  false,  false,  false,  false)
 };
 
 //-----------------------------------------------------------------------
@@ -243,7 +241,7 @@ bool AutoHandler::StartTag()
 
     if(state_ == NOT_SCANNED)
     {
-        const ElementInfo &ei = einfo[type_];
+        const Fb2ElementInfo &ei = einfo[type_];
         if(prsState_->s_->BeginElement(ei.name_))
             state_ = SCANNED_NOTEMPTY;
         else
@@ -286,7 +284,7 @@ const AttrMap& AutoHandler::GetAttributes() const
         if(state_ != NOT_SCANNED)
             InternalError(__FILE__, __LINE__, "attributes are skipped");
 
-        const ElementInfo &ei = einfo[type_];
+        const Fb2ElementInfo &ei = einfo[type_];
         if(prsState_->s_->BeginElement(ei.name_, &attrmap_))
             state_ = SCANNED_NOTEMPTY;
         else
@@ -1580,9 +1578,9 @@ Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt()
 
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
-const String& FB2TOEPUB_DECL Fb2EName(Fb2EType type)
+const Fb2ElementInfo& FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type)
 {
-    return einfo[type].name_;
+    return einfo[type];
 }
 
 
