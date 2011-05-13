@@ -139,11 +139,13 @@ private:
 template <bool skipRest = false>
 class BaseHandlerP1 : public Fb2BaseEHandler<skipRest>
 {
-    Engine *engine_;
+    Engine  *engine_;
+    String  *text_;
 protected:
     Engine* GetEngine() const {return engine_;}
 public:
-    BaseHandlerP1(Engine *engine) : engine_(engine) {}
+    BaseHandlerP1(Engine *engine, String *text = NULL)
+        : engine_(engine), text_(text) {}
 
     //virtuals
     bool StartTag(Fb2EType type, Fb2Host *host)
@@ -153,7 +155,14 @@ public:
             engine_->AddRefId(host);
         else if(info->ref_)
             engine_->AddRef(host);
-        return false;
+        return Fb2BaseEHandler<skipRest>::StartTag(type, host);
+    }
+    void Data(const String &data, size_t size)
+    {
+        GetEngine()->AddUnitSize(size);
+        if(text_)
+            *text_ += data;
+        Fb2BaseEHandler<skipRest>::Data(data, size);
     }
 };
 
@@ -174,27 +183,6 @@ public:
     {
         GetEngine()->StartUnit(unitType_);
         return BaseHandlerP1<skipRest>::StartTag(type, host);
-    }
-};
-
-
-//-----------------------------------------------------------------------
-// HANDLERS TO CALCULATE SIZE AND (OPTIONALLY) INPUT TEXT
-//-----------------------------------------------------------------------
-class SizeTextHandler : public BaseHandlerP1<>, Noncopyable
-{
-    String  *text_;
-public:
-    SizeTextHandler(Engine *engine, String *text)
-        : BaseHandlerP1<>(engine), text_(text) {}
-
-    //virtuals
-    void Data(const String &data, size_t size)
-    {
-        GetEngine()->AddUnitSize(size);
-        if(text_)
-            *text_ += data;
-        BaseHandlerP1<>::Data(data, size);
     }
 };
 
@@ -311,29 +299,34 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
     //Ptr<Fb2EHandler>    title_;
 
     //-----------------------------------------------------------------------
-    class SizeSwitch : public Fb2DelegateHandler
+    class SizeSwitch : public BaseHandlerP1<>
     {
-        Engine  *engine_;
-        size_t  size_;
+        size_t size_;
     public:
-        SizeSwitch(Fb2EHandler *d, Engine *engine, size_t size)
-            : Fb2DelegateHandler(d), engine_(engine), size_(size) {}
+        SizeSwitch(Engine *engine, size_t size)
+            : BaseHandlerP1<>(engine), size_(size) {}
 
         // virtuals
         bool StartTag(Fb2EType type, Fb2Host *host)
         {
             if(size_)
-                engine_->SwitchUnitIfSizeAbove(size_);
-            return Fb2DelegateHandler::StartTag(type, host);
+                GetEngine()->SwitchUnitIfSizeAbove(size_);
+            return BaseHandlerP1<>::StartTag(type, host);
         }
         // virtuals
         bool EndTag(bool empty, Fb2Host *host)
         {
-            bool ret = Fb2DelegateHandler::EndTag(empty, host);
-            engine_->SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
+            bool ret = BaseHandlerP1<>::EndTag(empty, host);
+            GetEngine()->SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
             return ret;
         }
     };
+
+    void GetNextForSizeSwitch(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt, size_t size)
+    {
+        oldCtxt_->GetNext(type, NULL, ctxt);
+        *h = new SizeSwitch(engine_, size);
+    }
 
 public:
     //-----------------------------------------------------------------------
@@ -348,21 +341,24 @@ public:
     //virtual
     void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
-        oldCtxt_->GetNext(type, h, ctxt);
         if(!h)
+        {
+            oldCtxt_->GetNext(type, NULL, ctxt);
             return;
+        }
 
         switch(type)
         {
-        case E_P:           *h = new SizeSwitch(*h, engine_, 0); return;
-        case E_SUBTITLE:    *h = new SizeSwitch(*h, engine_, UNIT_SIZE0); return;
+        case E_P:           GetNextForSizeSwitch(type, h, ctxt, 0); return;
+        case E_SUBTITLE:    GetNextForSizeSwitch(type, h, ctxt, UNIT_SIZE0); return;
         case E_IMAGE:
         case E_POEM:
-        case E_TABLE:       *h = new SizeSwitch(*h, engine_, UNIT_SIZE1); return;
+        case E_TABLE:       GetNextForSizeSwitch(type, h, ctxt, UNIT_SIZE1); return;
         case E_CITE:
-        case E_EMPTY_LINE:  *h = new SizeSwitch(*h, engine_, UNIT_SIZE2); return;
+        case E_EMPTY_LINE:  GetNextForSizeSwitch(type, h, ctxt, UNIT_SIZE2); return;
+
         case E_TITLE:       //return title_;
-        default:            return;
+        default:            oldCtxt_->GetNext(type, h, ctxt); return;
         }
     }
 };
@@ -407,35 +403,31 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
         ctxt->RegisterCtxtHandler(E_SECTION, pc, ph);
     }
 
-    // these text elements by default calculate unit size
-    {
-        Ptr<Fb2EHandler> ph = new SizeTextHandler(&engine, NULL);
-        ctxt->RegisterHandler(E_CODE,           ph);
-        ctxt->RegisterHandler(E_EMPHASIS,       ph);
-        ctxt->RegisterHandler(E_STRIKETHROUGH,  ph);
-        ctxt->RegisterHandler(E_STRONG,         ph);
-        ctxt->RegisterHandler(E_STYLE,          ph);
-        ctxt->RegisterHandler(E_SUB,            ph);
-        ctxt->RegisterHandler(E_SUP,            ph);
-        ctxt->RegisterHandler(E_P,              ph);
-        ctxt->RegisterHandler(E_SUBTITLE,       ph);
-        ctxt->RegisterHandler(E_TD,             ph);
-        ctxt->RegisterHandler(E_TEXT_AUTHOR,    ph);
-        ctxt->RegisterHandler(E_TH,             ph);
-        ctxt->RegisterHandler(E_V,              ph);
-        ctxt->RegisterHandler(E_A,              ph);
-    }
-    // these nontext elements by default add refids
+    // refids, refs, unit sizes 
     {
         Ptr<Fb2EHandler> ph = new BaseHandlerP1<>(&engine);
+        ctxt->RegisterHandler(E_A,                  ph);
         ctxt->RegisterHandler(E_ANNOTATION,         ph);
         ctxt->RegisterHandler(E_CITE,               ph);
+        ctxt->RegisterHandler(E_CODE,               ph);
+        ctxt->RegisterHandler(E_EMPHASIS,           ph);
         ctxt->RegisterHandler(E_EPIGRAPH,           ph);
         ctxt->RegisterHandler(E_HISTORY,            ph);
         ctxt->RegisterHandler(E_IMAGE,              ph);
         ctxt->RegisterHandler(E_IMAGE_SECTION_TOP,  ph);
+        ctxt->RegisterHandler(E_P,                  ph);
         ctxt->RegisterHandler(E_POEM,               ph);
+        ctxt->RegisterHandler(E_STRIKETHROUGH,      ph);
+        ctxt->RegisterHandler(E_STRONG,             ph);
+        ctxt->RegisterHandler(E_STYLE,              ph);
+        ctxt->RegisterHandler(E_SUB,                ph);
+        ctxt->RegisterHandler(E_SUBTITLE,           ph);
+        ctxt->RegisterHandler(E_SUP,                ph);
         ctxt->RegisterHandler(E_TABLE,              ph);
+        ctxt->RegisterHandler(E_TD,                 ph);
+        ctxt->RegisterHandler(E_TEXT_AUTHOR,        ph);
+        ctxt->RegisterHandler(E_TH,                 ph);
+        ctxt->RegisterHandler(E_V,                  ph);
     }
 
     // skip rest of <FictionBook>
