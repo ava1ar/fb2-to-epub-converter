@@ -143,7 +143,7 @@ namespace Fb2ToEpub
     class Fb2EHandler : public Object
     {
     public:
-        virtual bool            StartTag(Fb2Host *host)                     = 0;
+        virtual bool            StartTag(Fb2EType type, Fb2Host *host)      = 0;
         virtual void            Data    (const String &data, size_t size)   = 0;
         virtual bool            EndTag  (bool empty, Fb2Host *host)         = 0;
     };
@@ -214,7 +214,7 @@ namespace Fb2ToEpub
             : name_(name), notempty_(notempty), refid_(refid), ref_(ref), lang_(lang) {}
     };
     //-----------------------------------------------------------------------
-    const Fb2ElementInfo& FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type);
+    const Fb2ElementInfo* FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type);
 
 
     //-----------------------------------------------------------------------
@@ -225,7 +225,7 @@ namespace Fb2ToEpub
     {
     public:
         //virtuals
-        bool StartTag(Fb2Host*)             {return false;}
+        bool StartTag(Fb2EType, Fb2Host*)   {return false;}
         void Data(const String&, size_t)    {}
         bool EndTag(bool, Fb2Host*)         {return false;}
     };
@@ -233,7 +233,7 @@ namespace Fb2ToEpub
     {
     public:
         //virtuals
-        bool StartTag(Fb2Host*)             {return false;}
+        bool StartTag(Fb2EType, Fb2Host*)   {return false;}
         void Data(const String&, size_t)    {}
         bool EndTag(bool empty, Fb2Host *host)
         {
@@ -252,7 +252,7 @@ namespace Fb2ToEpub
     public:
         Fb2DelegateHandler(Fb2EHandler *d) : delegate_(d) {}
         //virtuals
-        bool StartTag   (Fb2Host *host)                     {return delegate_->StartTag(host);}
+        bool StartTag   (Fb2EType type, Fb2Host *host)      {return delegate_->StartTag(type, host);}
         void Data       (const String &data, size_t size)   {delegate_->Data(data, size);}
         bool EndTag     (bool empty, Fb2Host *host)         {return delegate_->EndTag(empty, host);}
     };

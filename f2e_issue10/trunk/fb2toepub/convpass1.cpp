@@ -146,7 +146,7 @@ public:
     RefIdHandler(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         engine_->AddRefId(host);
         return false;
@@ -167,7 +167,7 @@ public:
         : engine_(engine), unitType_(unitType) {}
 
     //virtuals
-    bool StartTag(Fb2Host*)
+    bool StartTag(Fb2EType, Fb2Host*)
     {
         engine_->StartUnit(unitType_);
         return false;
@@ -183,10 +183,10 @@ public:
         : RefIdHandler<>(engine), unitType_(unitType) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType type, Fb2Host *host)
     {
         GetEngine()->StartUnit(unitType_);
-        return RefIdHandler<>::StartTag(host);
+        return RefIdHandler<>::StartTag(type, host);
     }
 };
 
@@ -238,7 +238,7 @@ public:
         : engine_(engine), text_(text) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         engine_->AddRef(host);
         return false;
@@ -300,7 +300,7 @@ public:
     Body(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    bool StartTag(Fb2Host*)
+    bool StartTag(Fb2EType, Fb2Host*)
     {
         engine_->BeginBody();
         return false;
@@ -353,8 +353,8 @@ public:
     Section(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    bool StartTag(Fb2Host *host)        {engine_->BeginSection(host); return false;}
-    bool EndTag(bool, Fb2Host*)         {engine_->EndSection(); return false;}
+    bool StartTag(Fb2EType, Fb2Host *host)  {engine_->BeginSection(host); return false;}
+    bool EndTag(bool, Fb2Host*)             {engine_->EndSection(); return false;}
 };
 //-----------------------------------------------------------------------
 class SectionCtxt : public Fb2Ctxt, Noncopyable
@@ -390,10 +390,10 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
             : Fb2DelegateHandler(d), engine_(engine), size_(size) {}
 
         // virtuals
-        bool StartTag(Fb2Host *host)
+        bool StartTag(Fb2EType type, Fb2Host *host)
         {
             engine_->SwitchUnitIfSizeAbove(size_);
-            return Fb2DelegateHandler::StartTag(host);
+            return Fb2DelegateHandler::StartTag(type, host);
         }
         // virtuals
         bool EndTag(bool empty, Fb2Host *host)

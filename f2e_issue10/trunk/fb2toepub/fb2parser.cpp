@@ -233,7 +233,7 @@ AutoHandler::AutoHandler(Fb2EType type, ParserState *prsState, Fb2Ctxt *ctxt)
 bool AutoHandler::StartTag()
 {
     prsState_->elemTypeStack_.push_back(type_);
-    if (ph_->StartTag(this))
+    if (ph_->StartTag(type_, this))
     {
         prsState_->elemTypeStack_.pop_back();
         return true;    // handler has done all itself
@@ -1578,9 +1578,17 @@ Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt()
 
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
-const Fb2ElementInfo& FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type)
+const Fb2ElementInfo* FB2TOEPUB_DECL Fb2GetElementInfo(Fb2EType type)
 {
-    return einfo[type];
+#if defined(_DEBUG)
+    if(type < 0 || type >= E_COUNT)
+    {
+        std::ostringstream ss;
+        ss << "Bad index " << int(type);
+        InternalError(__FILE__, __LINE__, ss.str());
+    }
+#endif
+    return &einfo[type];
 }
 
 
@@ -1611,7 +1619,7 @@ class SkipEHandler : public Fb2BaseEHandler<>
 {
 public:
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         host->Scanner()->SkipElement();
         return true;
@@ -1639,7 +1647,7 @@ class ExitEHandler : public Fb2BaseEHandler<>
 {
 public:
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         host->Exit();
         return false;
@@ -1666,8 +1674,8 @@ class TextHandlerBase : public Fb2TextHandler
 {
 public:
     //virtuals
-    bool StartTag   (Fb2Host*)          {return false;}
-    bool EndTag     (bool, Fb2Host*)    {return false;}
+    bool StartTag   (Fb2EType, Fb2Host*)    {return false;}
+    bool EndTag     (bool, Fb2Host*)        {return false;}
 };
 //-----------------------------------------------------------------------
 class TextHandler : public TextHandlerBase
@@ -1720,7 +1728,7 @@ class FictionBoolElement : public Fb2BaseEHandler<true>
 {
 public:
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         host->RegisterNsLookup(Ptr<Lookup>(new Lookup(host)));
         return false;

@@ -62,7 +62,7 @@ public:
     }
 
     //virtuals
-    bool StartTag(Fb2Host*)             {pname_->Reset(); return false;}
+    bool StartTag(Fb2EType, Fb2Host*)   {pname_->Reset(); return false;}
     void Data(const String&, size_t)    {}
     bool EndTag(bool empty, Fb2Host *host)
     {
@@ -105,7 +105,7 @@ public:
     }
 
     //virtuals
-    bool StartTag(Fb2Host *host)
+    bool StartTag(Fb2EType, Fb2Host *host)
     {
         String name = host->GetAttrValue("name");
         if(!name.empty())
