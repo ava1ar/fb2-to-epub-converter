@@ -59,9 +59,14 @@ static const Fb2ElementInfo einfo[E_COUNT] =
     Fb2ElementInfo("home-page",             false,  false,  false,  false),
     Fb2ElementInfo("id",                    false,  false,  false,  false),
     Fb2ElementInfo("isbn",                  false,  false,  false,  true),
-    Fb2ElementInfo("image",                 false,  true,   true,   false),     // <image> in <body>, <section> (except top image)
-    Fb2ElementInfo("image",                 false,  false,  true,   false),     // <image> in all others (inline)
-    Fb2ElementInfo("image",                 false,  true,   true,   false),     // <image> in the top of the <section>
+
+    // "href" flag is used for building anchor reference only;
+    // <image> "href" attribute is used to refer to an image, there is no aqnchor here.
+    // So, "href" flag is set to false.
+    Fb2ElementInfo("image",                 false,  true,   false,  false),     // <image> in <body>, <section> (except top image)
+    Fb2ElementInfo("image",                 false,  false,  false,  false),     // <image> in all others (inline)
+    Fb2ElementInfo("image",                 false,  true,   false,  false),     // <image> in the top of the <section>
+
     Fb2ElementInfo("keywords",              false,  false,  false,  false),
     Fb2ElementInfo("lang",                  false,  false,  false,  false),
     Fb2ElementInfo("last-name",             false,  false,  false,  true),

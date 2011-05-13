@@ -134,21 +134,25 @@ private:
 
 
 //-----------------------------------------------------------------------
-// HANDLER JUST TO ADD REF IDS
+// BASE PASS 1 HANDLER (JUST ADD REF IDS OR HREF IF NECESSARY)
 //-----------------------------------------------------------------------
 template <bool skipRest = false>
-class RefIdHandler : public Fb2BaseEHandler<skipRest>
+class BaseHandlerP1 : public Fb2BaseEHandler<skipRest>
 {
     Engine *engine_;
 protected:
     Engine* GetEngine() const {return engine_;}
 public:
-    RefIdHandler(Engine *engine) : engine_(engine) {}
+    BaseHandlerP1(Engine *engine) : engine_(engine) {}
 
     //virtuals
-    bool StartTag(Fb2EType, Fb2Host *host)
+    bool StartTag(Fb2EType type, Fb2Host *host)
     {
-        engine_->AddRefId(host);
+        const Fb2ElementInfo *info = Fb2GetElementInfo(type);
+        if(info->refid_)
+            engine_->AddRefId(host);
+        else if(info->ref_)
+            engine_->AddRef(host);
         return false;
     }
 };
@@ -158,35 +162,18 @@ public:
 // HANDLERS TO START UNIT
 //-----------------------------------------------------------------------
 template <bool skipRest = false>
-class StartUnitHandler : public Fb2BaseEHandler<skipRest>
+class StartUnitHandler : public BaseHandlerP1<skipRest>
 {
-    Engine      *engine_;
     Unit::Type  unitType_;
 public:
     StartUnitHandler(Engine *engine, Unit::Type unitType)
-        : engine_(engine), unitType_(unitType) {}
-
-    //virtuals
-    bool StartTag(Fb2EType, Fb2Host*)
-    {
-        engine_->StartUnit(unitType_);
-        return false;
-    }
-};
-//-----------------------------------------------------------------------
-// + Add ref ids
-class StartUnitRefIdHandler : public RefIdHandler<>
-{
-    Unit::Type  unitType_;
-public:
-    StartUnitRefIdHandler(Engine *engine, Unit::Type unitType)
-        : RefIdHandler<>(engine), unitType_(unitType) {}
+        : BaseHandlerP1<skipRest>(engine), unitType_(unitType) {}
 
     //virtuals
     bool StartTag(Fb2EType type, Fb2Host *host)
     {
         GetEngine()->StartUnit(unitType_);
-        return RefIdHandler<>::StartTag(type, host);
+        return BaseHandlerP1<skipRest>::StartTag(type, host);
     }
 };
 
@@ -194,30 +181,12 @@ public:
 //-----------------------------------------------------------------------
 // HANDLERS TO CALCULATE SIZE AND (OPTIONALLY) INPUT TEXT
 //-----------------------------------------------------------------------
-class SizeTextHandler : public Fb2BaseEHandler<>, Noncopyable
+class SizeTextHandler : public BaseHandlerP1<>, Noncopyable
 {
-    Engine  *engine_;
     String  *text_;
 public:
     SizeTextHandler(Engine *engine, String *text)
-        : engine_(engine), text_(text) {}
-
-    //virtuals
-    void Data(const String &data, size_t size)
-    {
-        engine_->AddUnitSize(size);
-        if(text_)
-            *text_ += data;
-    }
-};
-//-----------------------------------------------------------------------
-// + Add ref ids
-class SizeRefIdTextHandler : public RefIdHandler<>, Noncopyable
-{
-    String  *text_;
-public:
-    SizeRefIdTextHandler(Engine *engine, String *text)
-        : RefIdHandler<>(engine), text_(text) {}
+        : BaseHandlerP1<>(engine), text_(text) {}
 
     //virtuals
     void Data(const String &data, size_t size)
@@ -225,29 +194,7 @@ public:
         GetEngine()->AddUnitSize(size);
         if(text_)
             *text_ += data;
-    }
-};
-//-----------------------------------------------------------------------
-// <a> (i.e. + Add refs)
-class AHandler : public Fb2BaseEHandler<>, Noncopyable
-{
-    Engine  *engine_;
-    String  *text_;
-public:
-    AHandler(Engine *engine, String *text)
-        : engine_(engine), text_(text) {}
-
-    //virtuals
-    bool StartTag(Fb2EType, Fb2Host *host)
-    {
-        engine_->AddRef(host);
-        return false;
-    }
-    void Data(const String &data, size_t size)
-    {
-        engine_->AddUnitSize(size);
-        if(text_)
-            *text_ += data;
+        BaseHandlerP1<>::Data(data, size);
     }
 };
 
@@ -275,7 +222,7 @@ public:
         {
         case E_ANNOTATION:
             oldCtxt_->GetNext(type, NULL, ctxt);
-            *h = new StartUnitRefIdHandler(engine_, Unit::ANNOTATION);
+            *h = new StartUnitHandler<>(engine_, Unit::ANNOTATION);
             break;
 
         case E_COVERPAGE:
@@ -327,7 +274,7 @@ public:
         {
         case E_IMAGE:
             oldCtxt_->GetNext(type, NULL, ctxt);
-            *h = new StartUnitRefIdHandler(engine_, Unit::IMAGE);
+            *h = new StartUnitHandler<>(engine_, Unit::IMAGE);
             break;
 
         case E_TITLE:
@@ -364,23 +311,6 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
     //Ptr<Fb2EHandler>    title_;
 
     //-----------------------------------------------------------------------
-    class P : public Fb2DelegateHandler
-    {
-        Engine  *engine_;
-    public:
-        P(Fb2EHandler *d, Engine *engine)
-            : Fb2DelegateHandler(d), engine_(engine) {}
-
-        // virtuals
-        bool EndTag(bool empty, Fb2Host *host)
-        {
-            bool ret = Fb2DelegateHandler::EndTag(empty, host);
-            engine_->SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
-            return ret;
-        }
-    };
-
-    //-----------------------------------------------------------------------
     class SizeSwitch : public Fb2DelegateHandler
     {
         Engine  *engine_;
@@ -392,7 +322,8 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
         // virtuals
         bool StartTag(Fb2EType type, Fb2Host *host)
         {
-            engine_->SwitchUnitIfSizeAbove(size_);
+            if(size_)
+                engine_->SwitchUnitIfSizeAbove(size_);
             return Fb2DelegateHandler::StartTag(type, host);
         }
         // virtuals
@@ -423,7 +354,7 @@ public:
 
         switch(type)
         {
-        case E_P:           *h = new P(*h, engine_); return;
+        case E_P:           *h = new SizeSwitch(*h, engine_, 0); return;
         case E_SUBTITLE:    *h = new SizeSwitch(*h, engine_, UNIT_SIZE0); return;
         case E_IMAGE:
         case E_POEM:
@@ -486,25 +417,17 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
         ctxt->RegisterHandler(E_STYLE,          ph);
         ctxt->RegisterHandler(E_SUB,            ph);
         ctxt->RegisterHandler(E_SUP,            ph);
-    }
-    // these text elements by default calculate unit size and add refids
-    {
-        Ptr<Fb2EHandler> ph = new SizeRefIdTextHandler(&engine, NULL);
         ctxt->RegisterHandler(E_P,              ph);
         ctxt->RegisterHandler(E_SUBTITLE,       ph);
         ctxt->RegisterHandler(E_TD,             ph);
         ctxt->RegisterHandler(E_TEXT_AUTHOR,    ph);
         ctxt->RegisterHandler(E_TH,             ph);
         ctxt->RegisterHandler(E_V,              ph);
-    }
-    // <a>, default (calculates size and add refs)
-    {
-        Ptr<Fb2EHandler> ph = new AHandler(&engine, NULL);
-        ctxt->RegisterHandler(E_A, ph);
+        ctxt->RegisterHandler(E_A,              ph);
     }
     // these nontext elements by default add refids
     {
-        Ptr<Fb2EHandler> ph = new RefIdHandler<>(&engine);
+        Ptr<Fb2EHandler> ph = new BaseHandlerP1<>(&engine);
         ctxt->RegisterHandler(E_ANNOTATION,         ph);
         ctxt->RegisterHandler(E_CITE,               ph);
         ctxt->RegisterHandler(E_EPIGRAPH,           ph);
