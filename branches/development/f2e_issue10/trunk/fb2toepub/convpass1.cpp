@@ -311,7 +311,7 @@ public:
         {
         case E_P:           *h = new P(engine_, title_, &paragraphBuf_); return;
         case E_EMPTY_LINE:  *h = new EmptyLine(title_); return;
-        default:            *h = new BaseHandlerP1<>(engine_, title_); return;
+        default:            *h = new BaseHandlerP1<>(engine_, &paragraphBuf_); return;
         }
     }
 };
