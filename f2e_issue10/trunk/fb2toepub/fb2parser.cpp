@@ -95,7 +95,7 @@ static const Fb2ElementInfo einfo[E_COUNT] =
     Fb2ElementInfo("style",                 false,  false,  false,  true),
     Fb2ElementInfo("stylesheet",            false,  false,  false,  false),
     Fb2ElementInfo("sub",                   false,  false,  false,  false),
-    Fb2ElementInfo("subtitle",              false,  false,  false,  false),
+    Fb2ElementInfo("subtitle",              false,  true,   false,  true),
     Fb2ElementInfo("sup",                   false,  false,  false,  false),
 
     //              name                  notempty? id?     href?   lang?
@@ -204,8 +204,8 @@ public:
     void            EndTag();
 
     //virtuals
-    const AttrMap&  GetAttributes() const;
-    String          Findhref() const                        {return prsState_->nsLookup_->Findhref(attrmap_);}
+    const AttrMap&  GetAttributes() const                   {return DoGetAttributes();}
+    String          Findhref() const                        {return prsState_->nsLookup_->Findhref(DoGetAttributes());}
     size_t          GetTypeStackSize() const                {return prsState_->elemTypeStack_.size();}
     Fb2EType        GetTypeStackAt(int i) const             {return prsState_->elemTypeStack_[i];}
     LexScanner*     Scanner() const                         {return prsState_->s_;}
@@ -222,6 +222,8 @@ private:
     mutable AttrMap     attrmap_;
     Ptr<Fb2EHandler>    ph_;
     Ptr<Fb2Ctxt>        newCtxt_;
+
+    const AttrMap& DoGetAttributes() const;
 };
 
 //-----------------------------------------------------------------------
@@ -282,7 +284,7 @@ void AutoHandler::EndTag()
 }
 
 //-----------------------------------------------------------------------
-const AttrMap& AutoHandler::GetAttributes() const
+const AttrMap& AutoHandler::DoGetAttributes() const
 {
     if(!hasAttributes_)
     {
