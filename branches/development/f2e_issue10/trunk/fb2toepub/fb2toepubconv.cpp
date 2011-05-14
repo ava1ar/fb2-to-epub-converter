@@ -37,6 +37,7 @@ int PrintInfo(const String &in)
 int Convert(InStm *pin, const strvector &css, const strvector &fonts, const strvector &mfonts,
             XlitConv *xlitConv, OutPackStm *pout)
 {
+    /*
     // test of new pass 1
     {
         UnitArray units;
@@ -55,11 +56,12 @@ int Convert(InStm *pin, const strvector &css, const strvector &fonts, const strv
         }
 #endif
     }
+    */
 
 
     // perform pass 1 to determine fb2 document structure and to collect all cross-references inside the fb2 file
     UnitArray units;
-    DoConvertionPass1(CreateScanner(pin), &units);
+    DoConvertionPass1_new(CreateScanner(pin), &units);
     pin->Rewind();
 
     // sanity check

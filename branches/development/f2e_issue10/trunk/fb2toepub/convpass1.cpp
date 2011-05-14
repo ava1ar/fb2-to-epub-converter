@@ -142,7 +142,8 @@ class BaseHandlerP1 : public Fb2BaseEHandler<skipRest>
     Engine  *engine_;
     String  *text_;
 protected:
-    Engine* GetEngine() const {return engine_;}
+    Engine* GetEngine() const   {return engine_;}
+    String* GetText() const     {return text_;}
 public:
     BaseHandlerP1(Engine *engine, String *text = NULL)
         : engine_(engine), text_(text) {}
@@ -225,6 +226,97 @@ public:
     }
 };
 
+
+//-----------------------------------------------------------------------
+// BODY TITLE AND SECTION TITLE HANDLERS AND CONTEXT
+//-----------------------------------------------------------------------
+class BodyTitle : public StartUnitHandler<>
+{
+    String *title_;
+public:
+    BodyTitle(Engine *engine, String *title)
+        : StartUnitHandler<>(engine, Unit::TITLE), title_(title) {}
+
+    //virtuals
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        GetEngine()->SetSectionTitle(*title_);
+        title_->clear();
+        return StartUnitHandler<>::EndTag(empty, host);
+    }
+};
+//-----------------------------------------------------------------------
+class SectionTitle : public BaseHandlerP1<>
+{
+    String *title_;
+public:
+    SectionTitle(Engine *engine, String *title)
+        : BaseHandlerP1<>(engine), title_(title) {}
+
+    //virtuals
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        GetEngine()->SetSectionTitle(*title_);
+        title_->clear();
+        return BaseHandlerP1<>::EndTag(empty, host);
+    }
+};
+//-----------------------------------------------------------------------
+class BSTitleCtxt : public Fb2Ctxt, Noncopyable
+{
+    Engine          *engine_;
+    String          *title_;
+    String          paragraphBuf_;
+
+    class P : public BaseHandlerP1<>
+    {
+        String *title_;
+    public:
+        P(Engine *engine, String *title, String *paragraph)
+            : BaseHandlerP1<>(engine, paragraph), title_(title) {}
+
+        //virtuals
+        bool EndTag(bool empty, Fb2Host *host)
+        {
+            *title_ = Concat(*title_, " ", *GetText());
+            GetText()->clear();
+            return BaseHandlerP1<>::EndTag(empty, host);
+        }
+    };
+    class EmptyLine : public Fb2BaseEHandler<>
+    {
+        String *title_;
+    public:
+        EmptyLine(String *title) : title_(title) {}
+        //virtuals
+        bool EndTag(bool empty, Fb2Host *host)
+        {
+            *title_ += " ";
+            return Fb2BaseEHandler<>::EndTag(empty, host);
+        }
+    };
+
+public:
+    BSTitleCtxt(Engine *engine, String *title) : engine_(engine), title_(title) {}
+
+    //virtual
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
+    {
+        if(ctxt)
+            *ctxt = this;
+        if(!h)
+            return;
+
+        switch(type)
+        {
+        case E_P:           *h = new P(engine_, title_, &paragraphBuf_); return;
+        case E_EMPTY_LINE:  *h = new EmptyLine(title_); return;
+        default:            *h = new BaseHandlerP1<>(engine_, title_); return;
+        }
+    }
+};
+
+
 //-----------------------------------------------------------------------
 // BODY HANDLER AND CONTEXT
 //-----------------------------------------------------------------------
@@ -246,33 +338,31 @@ class BodyCtxt : public Fb2Ctxt, Noncopyable
 {
     Ptr<Fb2Ctxt>    oldCtxt_;
     Engine          *engine_;
+    String          titleBuf_;
 public:
     BodyCtxt(Fb2Ctxt *oldCtxt, Engine *engine) : oldCtxt_(oldCtxt), engine_(engine) {}
 
     //virtual
     void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
-        if(!h)
-        {
-            oldCtxt_->GetNext(type, NULL, ctxt);
-            return;
-        }
-
         switch(type)
         {
         case E_IMAGE:
             oldCtxt_->GetNext(type, NULL, ctxt);
-            *h = new StartUnitHandler<>(engine_, Unit::IMAGE);
-            break;
+            if(h)
+                *h = new StartUnitHandler<>(engine_, Unit::IMAGE);
+            return;
 
         case E_TITLE:
-            oldCtxt_->GetNext(type, NULL, ctxt);
-            *h = new StartUnitHandler<>(engine_, Unit::TITLE);
-            break;
+            if(h)
+                *h = new BodyTitle(engine_, &titleBuf_);
+            if(ctxt)
+                *ctxt = new BSTitleCtxt(engine_, &titleBuf_);
+            return;
 
         default:
             oldCtxt_->GetNext(type, h, ctxt);
-            break;
+            return;
         }
     }
 };
@@ -296,7 +386,7 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
 {
     Ptr<Fb2Ctxt>    oldCtxt_;
     Engine          *engine_;
-    //Ptr<Fb2EHandler>    title_;
+    String          titleBuf_;
 
     //-----------------------------------------------------------------------
     class SizeSwitch : public BaseHandlerP1<>
@@ -325,28 +415,19 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
     void GetNextForSizeSwitch(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt, size_t size)
     {
         oldCtxt_->GetNext(type, NULL, ctxt);
-        *h = new SizeSwitch(engine_, size);
+        if(h)
+            *h = new SizeSwitch(engine_, size);
     }
 
 public:
     //-----------------------------------------------------------------------
     SectionCtxt(Fb2Ctxt *oldCtxt, Engine *engine)
-        :   oldCtxt_(oldCtxt),
-            engine_(engine)
-            //title_(CreateEHandler(new SectionTitle(engine)))
-    {
-    }
+        :   oldCtxt_(oldCtxt), engine_(engine) {}
 
     //-----------------------------------------------------------------------
     //virtual
     void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
-        if(!h)
-        {
-            oldCtxt_->GetNext(type, NULL, ctxt);
-            return;
-        }
-
         switch(type)
         {
         case E_P:           GetNextForSizeSwitch(type, h, ctxt, 0); return;
@@ -357,7 +438,13 @@ public:
         case E_CITE:
         case E_EMPTY_LINE:  GetNextForSizeSwitch(type, h, ctxt, UNIT_SIZE2); return;
 
-        case E_TITLE:       //return title_;
+        case E_TITLE:
+            if(h)
+                *h = new SectionTitle(engine_, &titleBuf_);
+            if(ctxt)
+                *ctxt = new BSTitleCtxt(engine_, &titleBuf_);
+            return;
+
         default:            oldCtxt_->GetNext(type, h, ctxt); return;
         }
     }
@@ -470,7 +557,7 @@ void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units)
 
 
 
-
+#if 1
 
 
 //-----------------------------------------------------------------------
@@ -1378,5 +1465,6 @@ void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units)
     conv->Scan();
 }
 
+#endif
 
 };  //namespace Fb2ToEpub
