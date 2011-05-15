@@ -97,7 +97,6 @@ namespace Fb2ToEpub
     // CONVERTION PASS 1 (DETERMINE DOCUMENT STRUCTURE AND COLLECT ALL CROSS-REFERENCES INSIDE THE FB2 FILE)
     //-----------------------------------------------------------------------
     void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units);
-    void FB2TOEPUB_DECL DoConvertionPass1_new(LexScanner *scanner, UnitArray *units);
 
     //-----------------------------------------------------------------------
     // CONVERTER PASS 2 (CREATE EPUB DOCUMENT)

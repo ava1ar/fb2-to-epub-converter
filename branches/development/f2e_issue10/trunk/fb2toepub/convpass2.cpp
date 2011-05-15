@@ -131,7 +131,7 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 1
+#if 0
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)
