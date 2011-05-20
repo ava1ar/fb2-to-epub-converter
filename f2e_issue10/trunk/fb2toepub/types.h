@@ -178,21 +178,6 @@ unsigned int FB2TOEPUB_DECL IsTestMode();
 
 //-----------------------------------------------------------------------
 
-#if 0
-//-----------------------------------------------------------------------
-// Location - pair of (path itself, path type).
-//-----------------------------------------------------------------------
-struct PathLoc
-{
-    String      path_;
-    bool        isFile_;
-    PathLoc() {}
-    PathLoc(const String &path, bool isFile) : path_(path), isFile_(isFile) {}
-};
-typedef std::vector<PathLoc> PathLocVector;
-#endif
-
-
 };  //namespace Fb2ToEpub
 
 #endif
