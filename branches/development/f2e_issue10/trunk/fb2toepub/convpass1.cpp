@@ -28,6 +28,10 @@
 namespace Fb2ToEpub
 {
 
+namespace Pass1
+{
+
+
 //-----------------------------------------------------------------------
 // PASS 1 ENGINE
 //-----------------------------------------------------------------------
@@ -137,7 +141,7 @@ private:
 // BASE PASS 1 HANDLER (JUST ADD REF IDS OR HREF IF NECESSARY)
 //-----------------------------------------------------------------------
 template <bool skipRest = false>
-class BaseHandlerP1 : public Fb2BaseEHandler<skipRest>
+class BaseHandler : public Fb2BaseEHandler<skipRest>
 {
     Engine  *engine_;
     String  *text_;
@@ -145,7 +149,7 @@ protected:
     Engine* GetEngine() const   {return engine_;}
     String* GetText() const     {return text_;}
 public:
-    BaseHandlerP1(Engine *engine, String *text = NULL)
+    BaseHandler(Engine *engine, String *text = NULL)
         : engine_(engine), text_(text) {}
 
     //virtuals
@@ -172,18 +176,18 @@ public:
 // HANDLERS TO START UNIT
 //-----------------------------------------------------------------------
 template <bool skipRest = false>
-class StartUnitHandler : public BaseHandlerP1<skipRest>
+class StartUnitHandler : public BaseHandler<skipRest>
 {
     Unit::Type  unitType_;
 public:
     StartUnitHandler(Engine *engine, Unit::Type unitType)
-        : BaseHandlerP1<skipRest>(engine), unitType_(unitType) {}
+        : BaseHandler<skipRest>(engine), unitType_(unitType) {}
 
     //virtuals
     bool StartTag(Fb2EType type, Fb2Host *host)
     {
         GetEngine()->StartUnit(unitType_);
-        return BaseHandlerP1<skipRest>::StartTag(type, host);
+        return BaseHandler<skipRest>::StartTag(type, host);
     }
 };
 
@@ -246,19 +250,19 @@ public:
     }
 };
 //-----------------------------------------------------------------------
-class SectionTitle : public BaseHandlerP1<>
+class SectionTitle : public BaseHandler<>
 {
     String *title_;
 public:
     SectionTitle(Engine *engine, String *title)
-        : BaseHandlerP1<>(engine), title_(title) {}
+        : BaseHandler<>(engine), title_(title) {}
 
     //virtuals
     bool EndTag(bool empty, Fb2Host *host)
     {
         GetEngine()->SetSectionTitle(*title_);
         title_->clear();
-        return BaseHandlerP1<>::EndTag(empty, host);
+        return BaseHandler<>::EndTag(empty, host);
     }
 };
 //-----------------------------------------------------------------------
@@ -268,19 +272,19 @@ class BSTitleCtxt : public Fb2Ctxt, Noncopyable
     String          *title_;
     String          paragraphBuf_;
 
-    class P : public BaseHandlerP1<>
+    class P : public BaseHandler<>
     {
         String *title_;
     public:
         P(Engine *engine, String *title, String *paragraph)
-            : BaseHandlerP1<>(engine, paragraph), title_(title) {}
+            : BaseHandler<>(engine, paragraph), title_(title) {}
 
         //virtuals
         bool EndTag(bool empty, Fb2Host *host)
         {
             *title_ = Concat(*title_, " ", *GetText());
             GetText()->clear();
-            return BaseHandlerP1<>::EndTag(empty, host);
+            return BaseHandler<>::EndTag(empty, host);
         }
     };
     class EmptyLine : public Fb2BaseEHandler<>
@@ -311,7 +315,7 @@ public:
         {
         case E_P:           *h = new P(engine_, title_, &paragraphBuf_); return;
         case E_EMPTY_LINE:  *h = new EmptyLine(title_); return;
-        default:            *h = new BaseHandlerP1<>(engine_, &paragraphBuf_); return;
+        default:            *h = new BaseHandler<>(engine_, &paragraphBuf_); return;
         }
     }
 };
@@ -389,24 +393,24 @@ class SectionCtxt : public Fb2Ctxt, Noncopyable
     String          titleBuf_;
 
     //-----------------------------------------------------------------------
-    class SizeSwitch : public BaseHandlerP1<>
+    class SizeSwitch : public BaseHandler<>
     {
         size_t size_;
     public:
         SizeSwitch(Engine *engine, size_t size)
-            : BaseHandlerP1<>(engine), size_(size) {}
+            : BaseHandler<>(engine), size_(size) {}
 
         // virtuals
         bool StartTag(Fb2EType type, Fb2Host *host)
         {
             if(size_)
                 GetEngine()->SwitchUnitIfSizeAbove(size_);
-            return BaseHandlerP1<>::StartTag(type, host);
+            return BaseHandler<>::StartTag(type, host);
         }
         // virtuals
         bool EndTag(bool empty, Fb2Host *host)
         {
-            bool ret = BaseHandlerP1<>::EndTag(empty, host);
+            bool ret = BaseHandler<>::EndTag(empty, host);
             GetEngine()->SwitchUnitIfSizeAbove(MAX_UNIT_SIZE);
             return ret;
         }
@@ -450,13 +454,15 @@ public:
     }
 };
 
+};  //namespace Pass1
+
 
 //-----------------------------------------------------------------------
 // Pass 1
 //-----------------------------------------------------------------------
 void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units)
 {
-    Engine engine(units);
+    Pass1::Engine engine(units);
     Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt();
 
     Ptr<Fb2EHandler> skip = CreateSkipEHandler();
@@ -466,7 +472,7 @@ void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units)
 
     // <title-info>
     {
-        Ptr<Fb2Ctxt> pc = new TitleInfoCtxt(ctxt, &engine);
+        Ptr<Fb2Ctxt> pc = new Pass1::TitleInfoCtxt(ctxt, &engine);
         ctxt->RegisterCtxt(E_TITLE_INFO, pc);
     }
 
@@ -478,21 +484,21 @@ void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units)
 
     // <body>
     {
-        Ptr<Fb2Ctxt> pc = new BodyCtxt(ctxt, &engine);
-        Ptr<Fb2EHandler> ph = new Body(&engine);
+        Ptr<Fb2Ctxt> pc = new Pass1::BodyCtxt(ctxt, &engine);
+        Ptr<Fb2EHandler> ph = new Pass1::Body(&engine);
         ctxt->RegisterCtxtHandler(E_BODY, pc, ph);
     }
 
     // <section>
     {
-        Ptr<Fb2Ctxt> pc = new SectionCtxt(ctxt, &engine);
-        Ptr<Fb2EHandler> ph = new Section(&engine);
+        Ptr<Fb2Ctxt> pc = new Pass1::SectionCtxt(ctxt, &engine);
+        Ptr<Fb2EHandler> ph = new Pass1::Section(&engine);
         ctxt->RegisterCtxtHandler(E_SECTION, pc, ph);
     }
 
     // refids, refs, unit sizes 
     {
-        Ptr<Fb2EHandler> ph = new BaseHandlerP1<>(&engine);
+        Ptr<Fb2EHandler> ph = new Pass1::BaseHandler<>(&engine);
         ctxt->RegisterHandler(E_A,                  ph);
         ctxt->RegisterHandler(E_ANNOTATION,         ph);
         ctxt->RegisterHandler(E_CITE,               ph);
