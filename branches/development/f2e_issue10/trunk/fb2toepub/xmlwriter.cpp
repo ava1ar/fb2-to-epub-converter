@@ -32,36 +32,27 @@ namespace Fb2ToEpub
 class XMLWriterImpl : public XMLWriter
 {
 public:
+    XMLWriterImpl(OutStm *out);
     XMLWriterImpl(OutStm *out, const String &encoding);
-    ~XMLWriterImpl() {DoFlush();}
 
     // virtuals
-    void StartFrame ();
-    void EmptyTag   (const String &name, bool newLn, const AttrVector *attrs);
-    void StartTag   (const String &name, bool newLn, const AttrVector *attrs);
-    void Data       (const String &data);
-    void EndTag     ();
-    void EndFrame   ();
-    void Flush      ()  {DoFlush();}
+    void EmptyElement   (const String &name, bool newLn, const AttrVector *attrs);
+    void StartElement   (const String &name, bool newLn, const AttrVector *attrs);
+    void Data           (const String &data);
+    void EndElements    (int cnt);
 
 private:
-    class Frame
-    {
-        typedef std::pair<String, bool> Tag;
-        typedef std::vector<Tag>        TagVector;
-        TagVector tags_;
-    public:
-        void StartTag(OutStm *out, const String &name, bool newLn, const AttrVector *attrs);
-        void EndTag(OutStm *out);
-        void End(OutStm *out);
-    };
-    typedef std::vector<Frame> FrameVector;
+    typedef std::vector<std::pair<String, bool> > ElementVector;
 
-    Ptr<OutStm> out_;
-    FrameVector frames_;
-
-    void DoFlush();
+    Ptr<OutStm>     out_;
+    ElementVector   elements_;
 };
+
+//-----------------------------------------------------------------------
+XMLWriterImpl::XMLWriterImpl(OutStm *out) : out_(out)
+{
+    out_->WriteStr("<?xml version=\"1.0\"?>\n");
+}
 
 //-----------------------------------------------------------------------
 XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding) : out_(out)
@@ -70,52 +61,7 @@ XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding) : out_(out)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::Frame::StartTag(OutStm *out, const String &name, bool newLn, const AttrVector *attrs)
-{
-    if(!attrs || attrs->empty())
-        out->WriteFmt("<%s>", name.c_str());
-    else
-    {
-        out->WriteFmt("<%s", name.c_str());
-        AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
-        for(; cit < cit_end; ++cit)
-            out->WriteFmt(" %s=\"%s\"", cit->first.c_str(), cit->second.c_str());
-        out->WriteStr(">");
-    }
-    tags_.push_back(TagVector::value_type(name, newLn));
-}
-
-//-----------------------------------------------------------------------
-void XMLWriterImpl::Frame::EndTag(OutStm *out)
-{
-    if(tags_.empty())
-        InternalError(__FILE__, __LINE__, "no XML writer frame tag");
-    
-    {
-        Tag &tag = tags_.back();
-        out->WriteFmt(tag.second ? "</%s>\n" : "</%s>", tag.first.c_str());
-    }
-
-    tags_.pop_back();
-}
-
-//-----------------------------------------------------------------------
-void XMLWriterImpl::Frame::End(OutStm *out)
-{
-    TagVector::const_reverse_iterator cit = tags_.rbegin(), cit_end = tags_.rend();
-    for(; cit < cit_end; ++cit)
-        out->WriteFmt(cit->second ? "</%s>\n" : "</%s>", cit->first.c_str());
-    tags_.clear();
-}
-
-//-----------------------------------------------------------------------
-void XMLWriterImpl::StartFrame()
-{
-    frames_.push_back(FrameVector::value_type());
-}
-
-//-----------------------------------------------------------------------
-void XMLWriterImpl::EmptyTag(const String &name, bool newLn, const AttrVector *attrs)
+void XMLWriterImpl::EmptyElement(const String &name, bool newLn, const AttrVector *attrs)
 {
     if(!attrs || attrs->empty())
         out_->WriteFmt("<%s/>", name.c_str());
@@ -130,11 +76,19 @@ void XMLWriterImpl::EmptyTag(const String &name, bool newLn, const AttrVector *a
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::StartTag(const String &name, bool newLn, const AttrVector *attrs)
+void XMLWriterImpl::StartElement(const String &name, bool newLn, const AttrVector *attrs)
 {
-    if(frames_.empty())
-        InternalError(__FILE__, __LINE__, "no XML writer frame 1");
-    frames_.back().StartTag(out_, name, newLn, attrs);
+    if(!attrs || attrs->empty())
+        out_->WriteFmt("<%s>", name.c_str());
+    else
+    {
+        out_->WriteFmt("<%s", name.c_str());
+        AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
+        for(; cit < cit_end; ++cit)
+            out_->WriteFmt(" %s=\"%s\"", cit->first.c_str(), cit->second.c_str());
+        out_->WriteStr(">");
+    }
+    elements_.push_back(ElementVector::value_type(name, newLn));
 }
 
 //-----------------------------------------------------------------------
@@ -144,29 +98,24 @@ void XMLWriterImpl::Data(const String &data)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::EndTag()
+void XMLWriterImpl::EndElements(int cnt)
 {
-    if(frames_.empty())
-        InternalError(__FILE__, __LINE__, "no XML writer frame 2");
-    frames_.back().EndTag(out_);
+    if(cnt < 0)
+        cnt = elements_.size();
+    else if(elements_.size() < static_cast<size_t>(cnt))
+        InternalError(__FILE__, __LINE__, "not enough count of XML writer elements");
+
+    ElementVector::const_reverse_iterator cit = elements_.rbegin();
+    for(; --cnt >= 0; ++cit)
+        out_->WriteFmt(cit->second ? "</%s>\n" : "</%s>", cit->first.c_str());
+
+    elements_.resize(elements_.size() - cnt);
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::EndFrame()
+Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out)
 {
-    if(frames_.empty())
-        InternalError(__FILE__, __LINE__, "no XML writer frame 3");
-    frames_.back().End(out_);
-    frames_.pop_back();
-}
-
-//-----------------------------------------------------------------------
-void XMLWriterImpl::DoFlush()
-{
-    FrameVector::reverse_iterator it = frames_.rbegin(), it_end = frames_.rend();
-    for(; it < it_end; ++it)
-        it->End(out_);
-   frames_.clear();
+    return new XMLWriterImpl(out);
 }
 
 //-----------------------------------------------------------------------

@@ -36,15 +36,17 @@ namespace Fb2ToEpub
     class XMLWriter : public Object
     {
     public:
-        virtual void StartFrame ()                                                                  = 0;
-        virtual void EmptyTag   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
-        virtual void StartTag   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
-        virtual void Data       (const String &data)                                                = 0;
-        virtual void EndTag     ()                                                                  = 0;
-        virtual void EndFrame   ()                                                                  = 0;
-        virtual void Flush      ()                                                                  = 0;
+        virtual void EmptyElement   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
+        virtual void StartElement   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
+        virtual void Data           (const String &data)                                                = 0;
+        virtual void EndElements    (int cnt)                                                           = 0;
+
+        // helper
+        void EndElement()   {EndElements(1);}       // end last element
+        void Flush()        {EndElements(-1);}      // end all elements
     };
     //-----------------------------------------------------------------------
+    Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out);
     Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encoding);
 
 };  //namespace Fb2ToEpub
