@@ -395,6 +395,10 @@
 				RelativePath=".\uuidmisc.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\xmlwriter.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -467,6 +471,10 @@
 			</File>
 			<File
 				RelativePath=".\uuidmisc.h"
+				>
+			</File>
+			<File
+				RelativePath=".\xmlwriter.h"
 				>
 			</File>
 		</Filter>
