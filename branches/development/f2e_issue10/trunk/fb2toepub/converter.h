@@ -99,6 +99,17 @@ namespace Fb2ToEpub
     void FB2TOEPUB_DECL DoConvertionPass1(LexScanner *scanner, UnitArray *units);
 
     //-----------------------------------------------------------------------
+    // TEST CONVERTER PASS 2 (CREATE EPUB DOCUMENT)
+    //-----------------------------------------------------------------------
+    void FB2TOEPUB_DECL DoConvertionPass2_new  (LexScanner *scanner,
+                                            const strvector &css,
+                                            const strvector &fonts,
+                                            const strvector &mfonts,
+                                            XlitConv *xlitConv,
+                                            UnitArray *units,
+                                            OutPackStm *pout);
+
+    //-----------------------------------------------------------------------
     // CONVERTER PASS 2 (CREATE EPUB DOCUMENT)
     //-----------------------------------------------------------------------
     void FB2TOEPUB_DECL DoConvertionPass2  (LexScanner *scanner,

@@ -63,8 +63,8 @@ XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding) : out_(out)
 //-----------------------------------------------------------------------
 void XMLWriterImpl::EmptyElement(const String &name, bool newLn, const AttrVector *attrs)
 {
-    if(!attrs || attrs->empty())
-        out_->WriteFmt("<%s/>", name.c_str());
+    if(!attrs)
+        out_->WriteFmt(newLn ? "<%s/>\n" : "<%s/>", name.c_str());
     else
     {
         out_->WriteFmt("<%s", name.c_str());
@@ -78,7 +78,7 @@ void XMLWriterImpl::EmptyElement(const String &name, bool newLn, const AttrVecto
 //-----------------------------------------------------------------------
 void XMLWriterImpl::StartElement(const String &name, bool newLn, const AttrVector *attrs)
 {
-    if(!attrs || attrs->empty())
+    if(!attrs)
         out_->WriteFmt("<%s>", name.c_str());
     else
     {
