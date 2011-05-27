@@ -20,13 +20,10 @@
 
 #include "hdr.h"
 
-#include "scanner.h"
 #include "streamconv.h"
 #include "streamzip.h"
 #include "fb2parser.h"
 #include <sstream>
-#include <vector>
-#include <sys/types.h>
 #include <sys/stat.h>
 
 namespace Fb2ToEpub

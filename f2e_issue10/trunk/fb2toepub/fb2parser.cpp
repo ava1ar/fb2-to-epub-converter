@@ -1521,9 +1521,9 @@ class Fb2StdCtxtImpl : public Fb2StdCtxt
     };
     std::vector<Entry> entries_;
 
+public:
     Fb2StdCtxtImpl() : entries_(E_COUNT, Entry(CreateRecursiveEHandler())) {}
 
-public:
     //virtual
     void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
     {
@@ -1567,19 +1567,13 @@ public:
 #endif
         entries_[idx].h_ = h;
     }
-
-    static Fb2StdCtxt* Obj()
-    {
-        static Ptr<Fb2StdCtxt> obj_ = new Fb2StdCtxtImpl();
-        return obj_;
-    }
 };
 
 
 //-----------------------------------------------------------------------
 Ptr<Fb2StdCtxt> FB2TOEPUB_DECL CreateFb2StdCtxt()
 {
-    return Fb2StdCtxtImpl::Obj();
+    return new Fb2StdCtxtImpl();
 }
 
 

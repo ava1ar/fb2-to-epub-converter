@@ -34,6 +34,8 @@
 #include <set>
 #include <ctype.h>
 
+#include "fb2parser.h"
+
 namespace Fb2ToEpub
 {
 
@@ -86,6 +88,435 @@ static String EncodeStr(const String &str)
     return &buf[0];
 }
 
+
+//-----------------------------------------------------------------------
+namespace Pass2
+{
+
+
+//-----------------------------------------------------------------------
+// PASS 2 ENGINE
+//-----------------------------------------------------------------------
+class Engine : Noncopyable
+{
+public:
+    Engine (LexScanner *scanner,
+            const strvector &css,
+            const strvector &fonts,
+            const strvector &mfonts,
+            XlitConv *xlitConv,
+            UnitArray *units,
+            OutPackStm *pout)
+                        :   s_                  (scanner),
+                            css_                (css),
+                            fonts_              (fonts),
+                            mfonts_             (mfonts),
+                            xlitConv_           (xlitConv),
+                            units_              (*units),
+                            pout_               (pout),
+                            tocLevels_          (0),
+                            coverPgIt_          (units->end()),
+                            //coverBinIdx_        (-1),
+                            uniqueIdIdx_        (0),
+                            //unitIdx_            (0),
+                            //unitActive_         (false),
+                            //unitHasId_          (false),
+
+                            sectionSize_        (0)
+    {
+        BuildOutputLayout();
+        {
+            std::set<String> noteRefIds;
+            BuildReferenceMaps(&noteRefIds);
+            BuildAnchors(noteRefIds);
+        }
+
+#if 1
+#if defined(_DEBUG)
+        {
+            for(std::size_t i = 0; i < units_.size(); ++i)
+                printf ("%d %d-%d-%d %s size=%d, parent=%d, level = %d, %s.xhtml, noteRefId = \"%s\"\n", i, units_[i].bodyType_, units_[i].type_,
+                        units_[i].id_, units_[i].title_.c_str(), units_[i].size_, units_[i].parent_, units_[i].level_, units_[i].file_.c_str(), units_[i].noteRefId_.c_str());
+
+            for(ReferenceMap::const_iterator cit = refidToNew_.begin(), cit_end = refidToNew_.end(); cit != cit_end; ++cit)
+                printf("%s -> %s\n", cit->first.c_str(), cit->second.c_str());
+            for(RefidInfoMap::const_iterator cit = refidToUnit_.begin(), cit_end = refidToUnit_.end(); cit != cit_end; ++cit)
+                printf("%s in %s\n", cit->first.c_str(), cit->second->file_.c_str());
+            for(ReferenceMap::const_iterator cit = noteidToAnchorId_.begin(), cit_end = noteidToAnchorId_.end(); cit != cit_end; ++cit)
+                printf("%s -> anchor %s\n", cit->first.c_str(), cit->second.c_str());
+        }
+        printf("\n\n\n\n\n\n\n\n");
+#endif
+#endif
+
+
+    }
+
+private:
+    Ptr<LexScanner>         s_;
+    const strvector         &css_, &fonts_, &mfonts_;
+    Ptr<XlitConv>           xlitConv_;
+    UnitArray               &units_;
+    Ptr<OutPackStm>         pout_;
+
+    struct Binary
+    {
+        String file_, type_;
+        Binary() {}
+        Binary(const String &file, const String type) : file_(file), type_(type) {}
+    };
+    typedef std::vector<Binary> binvector;
+
+    // external file - result of directory scanning
+    struct ExtFile
+    {
+        String fname_, ospath_; // file name and OS path
+        ExtFile() {}
+        ExtFile(const String &fname, const String &ospath) : fname_(fname), ospath_(ospath) {}
+    };
+    typedef std::vector<ExtFile> ExtFileVector;
+
+    typedef std::map<String, const Unit*> RefidInfoMap;    // reference id -> Unit containing this id
+
+    int                     tocLevels_;         // number of levels of table of content
+    UnitArray::iterator     coverPgIt_;         // pointer to unit describing cover image
+    //String                  coverFile_;         // cover image file name
+    //int                     coverBinIdx_;       // cover image index in binary section
+    int                     uniqueIdIdx_;       // unique id counter
+    ReferenceMap            refidToNew_;        // (re)mapping of original reference id to unique reference id
+    RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
+    ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
+    //std::set<String>        usedAnchorsids_;    // anchor ids already set
+    //strvector               cssfiles_;          // all stylesheet files
+    //ExtFileVector           ttffiles_, otffiles_; // all font file description
+    //binvector               binaries_;          // all binary files
+    //std::set<String>        xlns_;              // xlink namespaces
+    //std::set<String>        allRefIds_;         // all ref ids
+    //String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
+    //unsigned char           adobeKey_[16];      // adobe key
+    //strvector               authors_;           // book authors
+
+    //String                  prevUnitFile_;
+    //int                     unitIdx_;
+    //bool                    unitActive_;
+    //bool                    unitHasId_;
+    std::size_t             sectionSize_;
+    //String                  bodyXmlLang_, sectXmlLang_;
+
+
+    void AdjustUnitSizes        ();
+    void CalcTocLevels          ();
+    int CalcLevelToSplit        ();
+    String MakeUniqueId         (bool anchor = false);
+    void BuiltFileLayout        (int levelToSplit);
+    void BuildOutputLayout      ();
+    void BuildReferenceMaps     (std::set<String> *noteRefIds);
+    void BuildAnchors           (const std::set<String> &noteRefIds);
+};
+
+//-----------------------------------------------------------------------
+void Engine::AdjustUnitSizes()
+{
+    for(int i = units_.size(); --i >= 0;)
+    {
+        Unit &unit = units_[i];
+        if(unit.parent_ < 0)
+            continue;
+#if defined(_DEBUG)
+        if(unit.parent_ > i)
+            InternalError(__FILE__, __LINE__, "wrong unit order");
+#endif
+        units_[unit.parent_].size_ += unit.size_;
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::CalcTocLevels()
+{
+    int levels = 0;
+    UnitArray::iterator it = units_.begin(), it_end = units_.end();
+    for(; it < it_end; ++it)
+    {
+#if !FB2TOEPUB_SUPPRESS_EMPTY_TITLES
+        if(it->title_.empty() && it->bodyType_ != Unit::BODY_NONE)
+            it->title_ = "- - - - -";
+#endif
+        if(it->parent_ < 0)
+            it->level_ = 0;
+        else
+        {
+            int parentLevel = units_[it->parent_].level_;
+            int level = units_[it->parent_].title_.empty() ? parentLevel : parentLevel + 1;
+            it->level_ = level;
+            if(levels < level)
+                levels = level;
+        }
+    }
+
+    tocLevels_ = levels+1;
+}
+
+typedef std::vector<std::size_t> SizeVector;
+
+//-----------------------------------------------------------------------
+int Engine::CalcLevelToSplit()
+{
+    // calc max size for each level
+    SizeVector maxLevelSize(tocLevels_, 0);
+    {
+        UnitArray::iterator it = units_.begin(), it_end = units_.end();
+        for(; it < it_end; ++it)
+        {
+#if defined(_DEBUG)
+            if(it->level_ >= tocLevels_)
+                InternalError(__FILE__, __LINE__, "incorrect level");
+#endif
+            if(maxLevelSize[it->level_] < it->size_)
+                maxLevelSize[it->level_] = it->size_;
+        }
+    }
+
+    for(int i = maxLevelSize.size(); --i >= 0;)
+        if(maxLevelSize[i] > THRESHOLD_SIZE)
+            return i;
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+static String MakeFileName(const String &prefix, int idx)
+{
+    std::ostringstream fileName;
+    fileName << prefix;
+    fileName.width(4);
+    fileName.fill('0');
+    fileName << idx;
+    return fileName.str();
+}
+
+//-----------------------------------------------------------------------
+String Engine::MakeUniqueId(bool anchor)
+{
+    std::ostringstream fileId;
+    fileId << (anchor ? "anchor" : "id") << uniqueIdIdx_++;
+    return fileId.str();
+}
+
+//-----------------------------------------------------------------------
+void Engine::BuiltFileLayout(int levelToSplit)
+{
+    // find cover page
+    UnitArray::iterator it = units_.begin(), it_end = units_.end();
+    for(; it < it_end; ++it)
+        switch(it->type_)
+        {
+        case Unit::COVERPAGE:   coverPgIt_ = it; break;
+        //case Unit::IMAGE:       coverPgIt_ = it; break;
+        case Unit::SECTION:     break;
+        default:                continue;
+        }
+
+    // build layout
+    int fileIdx = 0;
+    String file;
+    int prevLevel = -1;
+    Unit::Type prevType = Unit::UNIT_NONE;
+    for(it = units_.begin(); it < it_end; ++it)
+    {
+#if FB2TOEPUB_TOC_REFERS_FILES_ONLY
+        if ((it->type_ != prevType && (prevType != Unit::TITLE || it->type_ != Unit::SECTION)) || it->level_ <= levelToSplit)
+#else
+        if ((it->type_ != prevType && (prevType != Unit::TITLE || it->type_ != Unit::SECTION)) ||
+            (it->level_ <= levelToSplit && prevLevel >= levelToSplit) ||
+            (it->level_ <= prevLevel && prevLevel <= levelToSplit))
+#endif
+        {
+            if(it == coverPgIt_)
+                file = "cover";
+            else
+                file = MakeFileName("txt", fileIdx++);
+        }
+
+#if FB2TOEPUB_TOC_REFERS_FILES_ONLY
+        // force exclusion from TOC for all units above split level
+        if(it->level_ > levelToSplit)
+            it->title_.clear();
+#endif
+
+        // assing unit file name
+        it->file_ = file;
+
+#if !FB2TOEPUB_TOC_REFERS_FILES_ONLY
+        // make and assing new unit id
+        it->fileId_ = MakeUniqueId();
+#endif
+
+        prevLevel = it->level_;
+        prevType = it->type_;
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::BuildOutputLayout()
+{
+    // adjust sizes
+    AdjustUnitSizes();
+
+    // calculate # of toc levels
+    CalcTocLevels();
+
+    // determine which level will be splitted to different files, and build file layout
+    BuiltFileLayout(CalcLevelToSplit());
+}
+
+//-----------------------------------------------------------------------
+void Engine::BuildReferenceMaps(std::set<String> *noteRefIds)
+{
+    ReferenceMap::iterator refidToNew_end = refidToNew_.end();
+    RefidInfoMap::iterator refidToUnit_end = refidToUnit_.end();
+
+    UnitArray::const_iterator cit = units_.begin(), cit_end = units_.end();
+    for(; cit < cit_end; ++cit)
+    {
+        strvector::const_iterator cit1 = cit->refIds_.begin(), cit1_end = cit->refIds_.end();
+        for(; cit1 < cit1_end; ++cit1)
+        {
+            const String &id = *cit1;
+
+            // map original id to new id
+            String newId;
+            {
+                ReferenceMap::iterator it = refidToNew_.lower_bound(id);
+                if(it != refidToNew_end && it->first == id)
+                    newId = it->second;
+                else
+                {
+                    newId = MakeUniqueId();
+                    refidToNew_.insert(it, ReferenceMap::value_type(id, newId));
+                }
+            }
+
+            // map new unique id to unit
+            {
+                // The input unit array should not contatin duplicate ids.
+                // Actually we are supposed to skip all dup refs in AddId method, pass 1.
+                // So if we found one then it is internal error.
+                RefidInfoMap::iterator it = refidToUnit_.lower_bound(newId);
+#if defined(_DEBUG)
+                if(it != refidToUnit_end && it->first == id)
+                    InternalError(__FILE__, __LINE__, "duplicate reference id");
+#endif
+                refidToUnit_.insert(it, RefidInfoMap::value_type(newId, &*cit));
+            }
+        }
+
+        // store note id
+        if(!cit->noteRefId_.empty())
+            noteRefIds->insert(cit->noteRefId_);
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::BuildAnchors(const std::set<String> &noteRefIds)
+{
+    UnitArray::const_iterator cit = units_.begin(), cit_end = units_.end();
+    for(; cit < cit_end; ++cit)
+    {
+        std::set<String>::const_iterator cit1 = cit->refs_.begin(), cit1_end = cit->refs_.end();
+        for(; cit1 != cit1_end; ++cit1)
+            if(noteRefIds.find(*cit1) != noteRefIds.end())
+            {
+                // this is id to note/comment section
+                String id = refidToNew_[*cit1];
+
+                // make sure that this id appears first time
+                ReferenceMap::iterator it = noteidToAnchorId_.lower_bound(id);
+                if(it != noteidToAnchorId_.end() && it->first == id)
+                    continue;   // already has anchor
+
+                // create new unique anchor id
+                String anchorid = MakeUniqueId(true);
+                refidToUnit_[anchorid] = &*cit;
+                noteidToAnchorId_.insert(it, ReferenceMap::value_type(id, anchorid));
+            }
+    }
+}
+
+
+
+
+};  //namespace Pass2
+
+
+
+//-----------------------------------------------------------------------
+// Pass 2
+//-----------------------------------------------------------------------
+void FB2TOEPUB_DECL DoConvertionPass2_new(LexScanner *scanner,
+                                        const strvector &css,
+                                        const strvector &fonts,
+                                        const strvector &mfonts,
+                                        XlitConv *xlitConv,
+                                        UnitArray *units,
+                                        OutPackStm *pout)
+{
+    Pass2::Engine engine(scanner, css, fonts, mfonts, xlitConv, units, pout);
+    Ptr<Fb2StdCtxt> ctxt = CreateFb2StdCtxt();
+
+    Ptr<Fb2EHandler> skip = CreateSkipEHandler();
+
+    // <FictionBook>
+    ctxt->RegisterHandler(E_FICTIONBOOK, CreateRootEHandler());
+
+    //
+
+
+    // parsing
+    CreateFb2Parser(scanner)->Parse(ctxt);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //-----------------------------------------------------------------------
 static void AddContentManifestFile(OutPackStm *pout, const String &id, const String &ref, const String &media_type)
 {
@@ -131,7 +562,7 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 0
+#if 1
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)

@@ -22,7 +22,6 @@
 
 #include "converter.h"
 #include "fb2parser.h"
-#include <sstream>
 #include <set>
 
 namespace Fb2ToEpub

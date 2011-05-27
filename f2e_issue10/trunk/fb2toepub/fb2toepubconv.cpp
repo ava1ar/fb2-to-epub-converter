@@ -46,6 +46,13 @@ int Convert(InStm *pin, const strvector &css, const strvector &fonts, const strv
     if(units.size() == 0)
         InternalError(__FILE__, __LINE__, "I don't know why but it happened that there is no content in input file!");
 
+    // test new pass 2
+    {
+        UnitArray units1 = units;
+        DoConvertionPass2_new(CreateScanner(pin), css, fonts, mfonts, xlitConv, &units1, pout);
+    }
+    pin->Rewind();
+
     // perform pass 2 to create epub document
     DoConvertionPass2(CreateScanner(pin), css, fonts, mfonts, xlitConv, &units, pout);
     return 0;
