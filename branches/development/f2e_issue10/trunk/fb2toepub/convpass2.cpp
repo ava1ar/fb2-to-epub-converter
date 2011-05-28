@@ -39,6 +39,11 @@
 namespace Fb2ToEpub
 {
 
+//-----------------------------------------------------------------------
+namespace Pass2
+{
+
+
 const std::size_t THRESHOLD_SIZE = 0x6000UL;
 
 
@@ -90,11 +95,6 @@ static String EncodeStr(const String &str)
 
 
 //-----------------------------------------------------------------------
-namespace Pass2
-{
-
-
-//-----------------------------------------------------------------------
 // PASS 2 ENGINE
 //-----------------------------------------------------------------------
 class Engine : Noncopyable
@@ -124,6 +124,10 @@ public:
 
                             sectionSize_        (0)
     {
+    }
+
+    void Start()    
+    {
         BuildOutputLayout();
         {
             std::set<String> noteRefIds;
@@ -131,7 +135,7 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 1
+#if 0
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)
@@ -149,7 +153,31 @@ public:
 #endif
 #endif
 
+        // start epub
+        AddMimetype();
+        AddContainer();
 
+        // scan all embedded fonts
+        ScanFonts("ttf", &ttffiles_);
+        ScanFonts("otf", &otffiles_);
+
+        // add encryption.xml
+        AddEncryption();
+
+        // scan and add stylesheet files
+        AddStyles();
+    }
+
+    void End()
+    {
+        // add font files
+        AddFontFiles(ttffiles_);
+        AddFontFiles(otffiles_);
+
+        // rest of epub
+        MakeCoverPageFirst();
+        //AddContentOpf();
+        //AddTocNcx();
     }
 
 private:
@@ -187,13 +215,13 @@ private:
     RefidInfoMap            refidToUnit_;       // mapping unique reference id to unit containing this id
     ReferenceMap            noteidToAnchorId_;  // mapping of note ref id to anchor ref id
     //std::set<String>        usedAnchorsids_;    // anchor ids already set
-    //strvector               cssfiles_;          // all stylesheet files
-    //ExtFileVector           ttffiles_, otffiles_; // all font file description
+    strvector               cssfiles_;          // all stylesheet files
+    ExtFileVector           ttffiles_, otffiles_; // all font file description
     //binvector               binaries_;          // all binary files
     //std::set<String>        xlns_;              // xlink namespaces
     //std::set<String>        allRefIds_;         // all ref ids
     //String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
-    //unsigned char           adobeKey_[16];      // adobe key
+    unsigned char           adobeKey_[16];      // adobe key
     //strvector               authors_;           // book authors
 
     //String                  prevUnitFile_;
@@ -212,6 +240,27 @@ private:
     void BuildOutputLayout      ();
     void BuildReferenceMaps     (std::set<String> *noteRefIds);
     void BuildAnchors           (const std::set<String> &noteRefIds);
+
+    //String Findhref             (const AttrMap &attrmap) const;
+
+    //void StartUnit              (Unit::Type unitType, AttrMap *attrmap = NULL);
+    //void EndUnit                ();
+    //void SwitchUnitIfSizeAbove  (std::size_t size);
+
+    void AddMimetype            ();
+    void AddContainer           ();
+    void ScanFonts              (const char *ext, ExtFileVector *fontfiles);
+    void AddEncryption          ();
+    void AddStyles              ();
+    void AddFontFiles           (const ExtFileVector &fontfiles);    
+    void MakeCoverPageFirst     ();
+    //void AddContentOpf          ();
+    //void AddTocNcx              ();
+    //const String* AddId         (const AttrMap &attrmap);
+    //void ParseTextAndEndElement (const String &element);
+    //void CopyAttribute          (const String &attr, const AttrMap &attrmap);
+    //void CopyXmlLang            (const AttrMap &attrmap);
+    //bool AddAnchorid            (const String &anchorid);
 };
 
 //-----------------------------------------------------------------------
@@ -441,6 +490,130 @@ void Engine::BuildAnchors(const std::set<String> &noteRefIds)
     }
 }
 
+//-----------------------------------------------------------------------
+void Engine::AddMimetype()
+{
+    static const char contents[] = "application/epub+zip";
+    pout_->BeginFile("mimetype", false);
+    pout_->Write(contents, sizeof(contents)/sizeof(char)-1);
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddContainer()
+{
+    static const char contents[] =  "<?xml version=\"1.0\"?>\n"
+                                    "<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n"
+                                    "  <rootfiles>\n"
+                                    "    <rootfile full-path=\"OPS/content.opf\" media-type=\"application/oebps-package+xml\"/>\n"
+                                    "  </rootfiles>\n"
+                                    "</container>";
+
+    pout_->BeginFile("META-INF/container.xml", true);
+    pout_->Write(contents, sizeof(contents)/sizeof(char)-1);
+}
+
+//-----------------------------------------------------------------------
+void Engine::ScanFonts(const char *ext, ExtFileVector *fontfiles)
+{
+    strvector::const_iterator cit = fonts_.begin(), cit_end = fonts_.end();
+    for(; cit < cit_end; ++cit)
+    {
+        Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), ext);
+        String fname;
+        for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
+            fontfiles->push_back(ExtFile(String("fonts/") + fname, ospath));
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddEncryption()
+{
+    if(ttffiles_.empty() && otffiles_.empty())
+        return;
+
+    pout_->BeginFile("META-INF/encryption.xml", true);
+    pout_->WriteStr("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    pout_->WriteStr("<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
+
+    {
+        int i;
+        ExtFileVector::const_iterator cit, cit_end;
+
+        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+        //AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
+
+        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
+        {
+            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
+            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
+            pout_->WriteStr("<CipherData>\n");
+            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
+            pout_->WriteStr("</CipherData>\n");
+            pout_->WriteStr("</EncryptedData>\n");
+        }
+    }
+
+    pout_->WriteStr("</encryption>\n");
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddStyles()
+{
+    strvector::const_iterator cit = css_.begin(), cit_end = css_.end();
+    for(; cit < cit_end; ++cit)
+    {
+        Ptr<ScanDir> sd = CreateScanDir(cit->c_str(), "css");
+        String fname;
+        for(String ospath = sd->GetNextFile(&fname); !ospath.empty(); ospath = sd->GetNextFile(&fname))
+        {
+            fname = String("css/") + fname;
+            pout_->AddFile(CreateInFileStm(ospath.c_str()), (String("OPS/") + fname).c_str(), true);
+            cssfiles_.push_back(fname);
+        }
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddFontFiles(const ExtFileVector &fontfiles)
+{
+    ExtFileVector::const_iterator cit = fontfiles.begin(), cit_end = fontfiles.end();
+    for(; cit < cit_end; ++cit)
+        if(!IsFontEmbedAllowed(cit->ospath_))
+            FontError(cit->ospath_, "embedding not allowed");
+
+    for(cit = fontfiles.begin(); cit < cit_end; ++cit)
+    {
+        // mangle (mangling == deflating + XORing), then store without compression
+        Ptr<InStm> stm = CreateManglingStm(CreateInFileStm(cit->ospath_.c_str()), adobeKey_, sizeof(adobeKey_), 1024);
+        pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), false);
+
+        // just compress
+        //Ptr<InStm> stm = CreateInFileStm(cit->ospath_.c_str());
+        //pout_->AddFile(stm, (String("OPS/") + cit->fname_).c_str(), true);
+    }
+}
+
+//-----------------------------------------------------------------------
+void Engine::MakeCoverPageFirst()
+{
+    if(coverPgIt_ != units_.end())
+    {
+        // move cover to begin
+        Unit coverUnit = *coverPgIt_;
+        units_.erase(coverPgIt_);
+        units_.insert(units_.begin(), coverUnit);
+        coverPgIt_ = units_.begin();
+    }
+}
+
 
 
 
@@ -471,7 +644,9 @@ void FB2TOEPUB_DECL DoConvertionPass2_new(LexScanner *scanner,
 
 
     // parsing
+    engine.Start();
     CreateFb2Parser(scanner)->Parse(ctxt);
+    engine.End();
 }
 
 
@@ -515,7 +690,32 @@ void FB2TOEPUB_DECL DoConvertionPass2_new(LexScanner *scanner,
 
 
 
+const std::size_t THRESHOLD_SIZE = 0x6000UL;
 
+class SetLanguage
+{
+    String *pstr_, old_;
+public:
+    SetLanguage(String *pstr, const AttrMap &attrmap) : pstr_(pstr), old_(*pstr)
+    {
+        AttrMap::const_iterator cit = attrmap.find("xml:lang");
+        if(cit != attrmap.end())
+            *pstr_ = cit->second;
+    }
+    ~SetLanguage()
+    {
+        *pstr_ = old_;
+    }
+};
+
+
+//-----------------------------------------------------------------------
+static String EncodeStr(const String &str)
+{
+    std::vector<char> buf;
+    LexScanner::Encode(str.c_str(), &buf);
+    return &buf[0];
+}
 
 //-----------------------------------------------------------------------
 static void AddContentManifestFile(OutPackStm *pout, const String &id, const String &ref, const String &media_type)
@@ -562,7 +762,7 @@ public:
             BuildAnchors(noteRefIds);
         }
 
-#if 1
+#if 0
 #if defined(_DEBUG)
         {
             for(std::size_t i = 0; i < units_.size(); ++i)
