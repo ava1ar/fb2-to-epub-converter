@@ -35,15 +35,31 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
     class XMLWriter : public Object
     {
+        typedef const String &S_;
     public:
-        virtual void EmptyElement   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
-        virtual void StartElement   (const String &name, bool newLn, const AttrVector *attrs = NULL)    = 0;
-        virtual void Data           (const String &data)                                                = 0;
-        virtual void EndElements    (int cnt)                                                           = 0;
+        virtual void EmptyElement   (const String &name, bool endLn, const AttrVector *attrs = NULL)                = 0;
+        virtual void StartElement   (const String &name, bool startLn, bool endLn, const AttrVector *attrs = NULL)  = 0;
+        virtual void Data           (const String &data)                                                            = 0;
+        virtual void EndElements    (int cnt)                                                                       = 0;
 
-        // helper
+        // helpers
+
         void EndElement()   {EndElements(1);}       // end last element
         void Flush()        {EndElements(-1);}      // end all elements
+
+        // StartElementN
+        void StartElement0(const String &name, bool startLn, bool endLn) {StartElement(name, startLn, endLn);}
+        void StartElement1(const String &name, bool startLn, bool endLn, S_ a1, S_ v1);
+        void StartElement2(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2);
+        void StartElement3(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
+        void StartElement4(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
+
+        // EmptyElementN
+        void EmptyElement0(const String &name, bool endLn) {EmptyElement(name, endLn);}
+        void EmptyElement1(const String &name, bool endLn, S_ a1, S_ v1);
+        void EmptyElement2(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2);
+        void EmptyElement3(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
+        void EmptyElement4(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
     };
     //-----------------------------------------------------------------------
     Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out);

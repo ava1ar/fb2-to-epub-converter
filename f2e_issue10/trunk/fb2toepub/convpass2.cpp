@@ -35,6 +35,7 @@
 #include <ctype.h>
 
 #include "fb2parser.h"
+#include "xmlwriter.h"
 
 namespace Fb2ToEpub
 {
@@ -532,8 +533,10 @@ void Engine::AddEncryption()
         return;
 
     pout_->BeginFile("META-INF/encryption.xml", true);
-    pout_->WriteStr("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    pout_->WriteStr("<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">\n");
+    Ptr<XMLWriter> wrt = CreateXMLWriter(pout_, "UTF-8");
+
+    wrt->StartElement1("encryption", true, true,
+        "xmlns", "urn:oasis:names:tc:opendocument:xmlns:container");
 
     {
         int i;
@@ -541,27 +544,23 @@ void Engine::AddEncryption()
 
         for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
         {
-            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
-            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
-            pout_->WriteStr("<CipherData>\n");
-            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
-            pout_->WriteStr("</CipherData>\n");
-            pout_->WriteStr("</EncryptedData>\n");
+            wrt->StartElement1("EncryptedData",     true, true,     "xmlns", "http://www.w3.org/2001/04/xmlenc#");
+            wrt->EmptyElement1("EncryptionMethod",        true,     "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
+            wrt->StartElement0("CipherData",        true, true);
+            wrt->EmptyElement1("CipherReference",         true,     "URI", String("OPS/") + cit->fname_);
+            wrt->EndElements(2);
         }
-        //AddContentManifestFile(pout_, MakeFileName("ttf", i++).c_str(), cit->c_str(), "application/x-font-ttf");
 
         for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
         {
-            pout_->WriteStr("<EncryptedData xmlns=\"http://www.w3.org/2001/04/xmlenc#\">\n");
-            pout_->WriteStr("<EncryptionMethod Algorithm=\"http://ns.adobe.com/pdf/enc#RC\"/>\n");
-            pout_->WriteStr("<CipherData>\n");
-            pout_->WriteFmt("<CipherReference URI=\"OPS/%s\"/>\n", cit->fname_.c_str());
-            pout_->WriteStr("</CipherData>\n");
-            pout_->WriteStr("</EncryptedData>\n");
+            wrt->StartElement1("EncryptedData",     true, true,     "xmlns", "http://www.w3.org/2001/04/xmlenc#");
+            wrt->EmptyElement1("EncryptionMethod",        true,     "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
+            wrt->StartElement0("CipherData",        true, true);
+            wrt->EmptyElement1("CipherReference",         true,     "URI", String("OPS/") + cit->fname_);
+            wrt->EndElements(2);
         }
     }
-
-    pout_->WriteStr("</encryption>\n");
+    wrt->Flush();
 }
 
 //-----------------------------------------------------------------------
