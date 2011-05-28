@@ -242,7 +242,8 @@ int main(int argc, char **argv)
         if(!xlit.empty())
             xlitConv = CreateXlitConverter(CreateInUnicodeStm(CreateUnpackStm(xlit.c_str())));
 
-        return Convert(pin, css, fonts, mfonts, xlitConv, pout);
+        Ptr<OutPackStm> pouttest = CreatePackStm((out + ".test.epub").c_str());
+        return Convert(pin, css, fonts, mfonts, xlitConv, pout, pouttest);
     }
     catch(const Exception &ex)
     {
