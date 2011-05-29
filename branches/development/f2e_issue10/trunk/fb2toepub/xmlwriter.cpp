@@ -185,64 +185,56 @@ Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encodin
 // StartElementN
 void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    DoStartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, NULL);
+    AddAttribute(a1, v1);
 }
 void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    DoStartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
 }
 void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    av.push_back(AttrVector::value_type(a3, v3));
-    DoStartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
+    AddAttribute(a3, v3);
 }
 void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    av.push_back(AttrVector::value_type(a3, v3));
-    av.push_back(AttrVector::value_type(a4, v4));
-    DoStartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
+    AddAttribute(a3, v3);
+    AddAttribute(a4, v4);
 }
 // EmptyElementN
 void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    DoEmptyElement(name, ln, &av);
+    DoEmptyElement(name, ln, NULL);
+    AddAttribute(a1, v1);
 }
 void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    DoEmptyElement(name, ln, &av);
+    DoEmptyElement(name, ln, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
 }
 void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    av.push_back(AttrVector::value_type(a3, v3));
-    DoEmptyElement(name, ln, &av);
+    DoEmptyElement(name, ln, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
+    AddAttribute(a3, v3);
 }
 void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
-    AttrVector av;
-    av.push_back(AttrVector::value_type(a1, v1));
-    av.push_back(AttrVector::value_type(a2, v2));
-    av.push_back(AttrVector::value_type(a3, v3));
-    av.push_back(AttrVector::value_type(a4, v4));
-    DoEmptyElement(name, ln, &av);
+    DoEmptyElement(name, ln, NULL);
+    AddAttribute(a1, v1);
+    AddAttribute(a2, v2);
+    AddAttribute(a3, v3);
+    AddAttribute(a4, v4);
 }
 
 
