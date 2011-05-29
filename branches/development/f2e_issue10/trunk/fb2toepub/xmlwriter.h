@@ -33,7 +33,7 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
     // Useful XML writer
     //-----------------------------------------------------------------------
-    class XMLWriter : public Object
+    class XMLWriter : public OutStm
     {
         typedef const String &S_;
 
@@ -44,7 +44,6 @@ namespace Fb2ToEpub
     public:
         virtual void AddAttribute   (const String &name, const String &val)                                 = 0;
         virtual void AddAttributes  (const AttrVector *attrs)                                               = 0;
-        virtual void Data           (const String &data)                                                    = 0;
         virtual void EndElements    (int cnt)                                                               = 0;
 
         virtual int  ElementNumber  () const                                                                = 0;

@@ -40,9 +40,12 @@ public:
     void DoStartElement (const String &name, bool startLn, bool endLn, const AttrVector *attrs);
     void AddAttribute   (const String &name, const String &val);
     void AddAttributes  (const AttrVector *attrs);
-    void Data           (const String &data);
     void EndElements    (int cnt);
     int ElementNumber   () const    {return elements_.size();}
+
+    // virtuals
+    void PutChar        (char c);
+    void Write          (const void *p, size_t cnt);
 
 private:
     typedef std::vector<std::pair<String, bool> > ElementVector;
@@ -79,14 +82,16 @@ XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding)
 //-----------------------------------------------------------------------
 void XMLWriterImpl::FlushCurrentElement()
 {
-    if(currExists_)
-    {
-        currExists_ = false;
-        if(currEmpty_)
-            out_->WriteStr(currLn_ ? "/>\n" : "/>");
-        else
-            out_->WriteStr(currLn_ ? ">\n" : ">");
-    }
+#if defined(_DEBUG)
+    if(!currExists_)
+        InternalError(__FILE__, __LINE__, "can't flush current element");
+#endif
+
+    currExists_ = false;
+    if(currEmpty_)
+        out_->WriteStr(currLn_ ? "/>\n" : "/>");
+    else
+        out_->WriteStr(currLn_ ? ">\n" : ">");
 }
 
 //-----------------------------------------------------------------------
@@ -100,7 +105,8 @@ void XMLWriterImpl::AddAttributesNoCheck(const AttrVector *attrs)
 //-----------------------------------------------------------------------
 void XMLWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector *attrs)
 {
-    FlushCurrentElement();
+    if(currExists_)
+        FlushCurrentElement();
     currExists_ = true;
     currEmpty_  = true;
     currLn_     = ln;
@@ -113,7 +119,8 @@ void XMLWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector
 //-----------------------------------------------------------------------
 void XMLWriterImpl::DoStartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs)
 {
-    FlushCurrentElement();
+    if(currExists_)
+        FlushCurrentElement();
     currExists_ = true;
     currEmpty_  = false;
     currLn_     = startLn;
@@ -142,16 +149,10 @@ void XMLWriterImpl::AddAttributes(const AttrVector *attrs)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::Data(const String &data)
-{
-    FlushCurrentElement();
-    out_->WriteStr(data.c_str());
-}
-
-//-----------------------------------------------------------------------
 void XMLWriterImpl::EndElements(int cnt)
 {
-    FlushCurrentElement();
+    if(currExists_)
+        FlushCurrentElement();
 
     if(cnt < 0)
         cnt = elements_.size();
@@ -163,6 +164,22 @@ void XMLWriterImpl::EndElements(int cnt)
         out_->WriteFmt(cit->second ? "</%s>\n" : "</%s>", cit->first.c_str());
 
     elements_.resize(elements_.size() - cnt);
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::PutChar(char c)
+{
+    if(currExists_)
+        FlushCurrentElement();
+    out_->PutChar(c);
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::Write(const void *p, size_t cnt)
+{
+    if(currExists_)
+        FlushCurrentElement();
+    out_->Write(p, cnt);
 }
 
 //-----------------------------------------------------------------------
