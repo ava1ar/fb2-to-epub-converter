@@ -535,31 +535,29 @@ void Engine::AddEncryption()
     pout_->BeginFile("META-INF/encryption.xml", true);
     Ptr<XMLWriter> wrt = CreateXMLWriter(pout_, "UTF-8");
 
-    wrt->StartElement1("encryption", true, true,
-        "xmlns", "urn:oasis:names:tc:opendocument:xmlns:container");
+    wrt->StartElement("encryption", true, true, "xmlns", "urn:oasis:names:tc:opendocument:xmlns:container");
 
+    ExtFileVector::const_iterator cit, cit_end;
+    for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(); cit < cit_end; ++cit)
     {
-        int i;
-        ExtFileVector::const_iterator cit, cit_end;
-
-        for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(), i = 0; cit < cit_end; ++cit)
-        {
-            wrt->StartElement1("EncryptedData",     true, true,     "xmlns", "http://www.w3.org/2001/04/xmlenc#");
-            wrt->EmptyElement1("EncryptionMethod",        true,     "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
-            wrt->StartElement0("CipherData",        true, true);
-            wrt->EmptyElement1("CipherReference",         true,     "URI", String("OPS/") + cit->fname_);
-            wrt->EndElements(2);
-        }
-
-        for(cit = otffiles_.begin(), cit_end = otffiles_.end(), i = 0; cit < cit_end; ++cit)
-        {
-            wrt->StartElement1("EncryptedData",     true, true,     "xmlns", "http://www.w3.org/2001/04/xmlenc#");
-            wrt->EmptyElement1("EncryptionMethod",        true,     "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
-            wrt->StartElement0("CipherData",        true, true);
-            wrt->EmptyElement1("CipherReference",         true,     "URI", String("OPS/") + cit->fname_);
-            wrt->EndElements(2);
-        }
+        XMLFrame frm(wrt);
+        wrt->StartElement("EncryptedData",      true, true, "xmlns", "http://www.w3.org/2001/04/xmlenc#");
+        wrt->EmptyElement("EncryptionMethod",   true,       "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
+        wrt->StartElement("CipherData",         true, true);
+        wrt->EmptyElement("CipherReference",    true,       "URI", String("OPS/") + cit->fname_);
+        frm.End();
     }
+
+    for(cit = otffiles_.begin(), cit_end = otffiles_.end(); cit < cit_end; ++cit)
+    {
+        XMLFrame frm(wrt);
+        wrt->StartElement("EncryptedData",      true, true, "xmlns", "http://www.w3.org/2001/04/xmlenc#");
+        wrt->EmptyElement("EncryptionMethod",   true,       "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
+        wrt->StartElement("CipherData",         true, true);
+        wrt->EmptyElement("CipherReference",    true,       "URI", String("OPS/") + cit->fname_);
+        frm.End();
+    }
+
     wrt->Flush();
 }
 
