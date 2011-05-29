@@ -36,70 +36,123 @@ public:
     XMLWriterImpl(OutStm *out, const String &encoding);
 
     // virtuals
-    void EmptyElement   (const String &name, bool endLn, const AttrVector *attrs);
-    void StartElement   (const String &name, bool startLn, bool endLn, const AttrVector *attrs);
+    void DoEmptyElement (const String &name, bool ln, const AttrVector *attrs);
+    void DoStartElement (const String &name, bool startLn, bool endLn, const AttrVector *attrs);
+    void AddAttribute   (const String &name, const String &val);
+    void AddAttributes  (const AttrVector *attrs);
     void Data           (const String &data);
     void EndElements    (int cnt);
+    int ElementNumber   () const    {return elements_.size();}
 
 private:
     typedef std::vector<std::pair<String, bool> > ElementVector;
 
-    Ptr<OutStm>     out_;
-    ElementVector   elements_;
+    Ptr<OutStm>     out_;                   // output stream
+    bool            currExists_;            // is element currently being written
+    bool            currEmpty_, currLn_;    // description
+    ElementVector   elements_;              // stack of open elements
+
+    void FlushCurrentElement();
+    void AddAttributesNoCheck(const AttrVector *attrs);
 };
 
 //-----------------------------------------------------------------------
-XMLWriterImpl::XMLWriterImpl(OutStm *out) : out_(out)
+XMLWriterImpl::XMLWriterImpl(OutStm *out)
+    :   out_(out),
+        currExists_(false),
+        currEmpty_(false),
+        currLn_(false)
 {
     out_->WriteStr("<?xml version=\"1.0\"?>\n");
 }
 
 //-----------------------------------------------------------------------
-XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding) : out_(out)
+XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding)
+    :   out_(out),
+        currExists_(false),
+        currEmpty_(false),
+        currLn_(false)
 {
     out_->WriteFmt("<?xml version=\"1.0\" encoding=\"%s\"?>\n", encoding.c_str());
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::EmptyElement(const String &name, bool endLn, const AttrVector *attrs)
+void XMLWriterImpl::FlushCurrentElement()
 {
-    if(!attrs)
-        out_->WriteFmt(endLn ? "<%s/>\n" : "<%s/>", name.c_str());
-    else
+    if(currExists_)
     {
-        out_->WriteFmt("<%s", name.c_str());
-        AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
-        for(; cit < cit_end; ++cit)
-            out_->WriteFmt(" %s=\"%s\"", cit->first.c_str(), cit->second.c_str());
-        out_->WriteStr(endLn ? "/>\n" : "/>");
+        currExists_ = false;
+        if(currEmpty_)
+            out_->WriteStr(currLn_ ? "/>\n" : "/>");
+        else
+            out_->WriteStr(currLn_ ? ">\n" : ">");
     }
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::StartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs)
+void XMLWriterImpl::AddAttributesNoCheck(const AttrVector *attrs)
 {
-    if(!attrs)
-        out_->WriteFmt(startLn ? "<%s>\n" : "<%s>", name.c_str());
-    else
-    {
-        out_->WriteFmt("<%s", name.c_str());
-        AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
-        for(; cit < cit_end; ++cit)
-            out_->WriteFmt(" %s=\"%s\"", cit->first.c_str(), cit->second.c_str());
-        out_->WriteStr(startLn ? ">\n" : ">");
-    }
+    AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
+    for(; cit < cit_end; ++cit)
+        out_->WriteFmt(" %s=\"%s\"", cit->first.c_str(), cit->second.c_str());
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector *attrs)
+{
+    FlushCurrentElement();
+    currExists_ = true;
+    currEmpty_  = true;
+    currLn_     = ln;
+
+    out_->WriteFmt("<%s", name.c_str());
+    if(attrs)
+        AddAttributesNoCheck(attrs);
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::DoStartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs)
+{
+    FlushCurrentElement();
+    currExists_ = true;
+    currEmpty_  = false;
+    currLn_     = startLn;
+
     elements_.push_back(ElementVector::value_type(name, endLn));
+    out_->WriteFmt("<%s", name.c_str());
+    if(attrs)
+        AddAttributesNoCheck(attrs);
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::AddAttribute(const String &name, const String &val)
+{
+    if(!currExists_)
+        InternalError(__FILE__, __LINE__, "no current element 1");
+    out_->WriteFmt(" %s=\"%s\"", name.c_str(), val.c_str());
+}
+
+//-----------------------------------------------------------------------
+void XMLWriterImpl::AddAttributes(const AttrVector *attrs)
+{
+    if(!currExists_)
+        InternalError(__FILE__, __LINE__, "no current element 2");
+    if(attrs)
+        AddAttributesNoCheck(attrs);
 }
 
 //-----------------------------------------------------------------------
 void XMLWriterImpl::Data(const String &data)
 {
+    FlushCurrentElement();
     out_->WriteStr(data.c_str());
 }
 
 //-----------------------------------------------------------------------
 void XMLWriterImpl::EndElements(int cnt)
 {
+    FlushCurrentElement();
+
     if(cnt < 0)
         cnt = elements_.size();
     else if(elements_.size() < static_cast<size_t>(cnt))
@@ -130,66 +183,66 @@ Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encodin
 //-----------------------------------------------------------------------
 
 // StartElementN
-void XMLWriter::StartElement1(const String &name, bool startLn, bool endLn, S_ a1, S_ v1)
+void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
-    StartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, &av);
 }
-void XMLWriter::StartElement2(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
+void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
-    StartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, &av);
 }
-void XMLWriter::StartElement3(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
+void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
     av.push_back(AttrVector::value_type(a3, v3));
-    StartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, &av);
 }
-void XMLWriter::StartElement4(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
+void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
     av.push_back(AttrVector::value_type(a3, v3));
     av.push_back(AttrVector::value_type(a4, v4));
-    StartElement(name, startLn, endLn, &av);
+    DoStartElement(name, startLn, endLn, &av);
 }
 // EmptyElementN
-void XMLWriter::EmptyElement1(const String &name, bool endLn, S_ a1, S_ v1)
+void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
-    EmptyElement(name, endLn, &av);
+    DoEmptyElement(name, ln, &av);
 }
-void XMLWriter::EmptyElement2(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
+void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
-    EmptyElement(name, endLn, &av);
+    DoEmptyElement(name, ln, &av);
 }
-void XMLWriter::EmptyElement3(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
+void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
     av.push_back(AttrVector::value_type(a3, v3));
-    EmptyElement(name, endLn, &av);
+    DoEmptyElement(name, ln, &av);
 }
-void XMLWriter::EmptyElement4(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
+void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
     AttrVector av;
     av.push_back(AttrVector::value_type(a1, v1));
     av.push_back(AttrVector::value_type(a2, v2));
     av.push_back(AttrVector::value_type(a3, v3));
     av.push_back(AttrVector::value_type(a4, v4));
-    EmptyElement(name, endLn, &av);
+    DoEmptyElement(name, ln, &av);
 }
 
 

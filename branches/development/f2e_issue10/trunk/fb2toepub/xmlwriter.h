@@ -36,34 +36,61 @@ namespace Fb2ToEpub
     class XMLWriter : public Object
     {
         typedef const String &S_;
+
+    protected:
+        virtual void DoEmptyElement (const String &name, bool ln, const AttrVector *attrs)                  = 0;
+        virtual void DoStartElement (const String &name, bool startLn, bool endLn, const AttrVector *attrs) = 0;
+
     public:
-        virtual void EmptyElement   (const String &name, bool endLn, const AttrVector *attrs = NULL)                = 0;
-        virtual void StartElement   (const String &name, bool startLn, bool endLn, const AttrVector *attrs = NULL)  = 0;
-        virtual void Data           (const String &data)                                                            = 0;
-        virtual void EndElements    (int cnt)                                                                       = 0;
+        virtual void AddAttribute   (const String &name, const String &val)                                 = 0;
+        virtual void AddAttributes  (const AttrVector *attrs)                                               = 0;
+        virtual void Data           (const String &data)                                                    = 0;
+        virtual void EndElements    (int cnt)                                                               = 0;
+
+        virtual int  ElementNumber  () const                                                                = 0;
+
+        // StartElement
+        void StartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs = NULL)
+            {DoStartElement(name, startLn, endLn, attrs);}
+
+        // EmptyElement
+        void EmptyElement(const String &name, bool ln, const AttrVector *attrs = NULL)
+            {DoEmptyElement(name, ln, attrs);}
 
         // helpers
 
+        void StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1);
+        void StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2);
+        void StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
+        void StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
+        void EmptyElement(const String &name, bool ln, S_ a1, S_ v1);
+        void EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2);
+        void EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
+        void EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
+
         void EndElement()   {EndElements(1);}       // end last element
         void Flush()        {EndElements(-1);}      // end all elements
-
-        // StartElementN
-        void StartElement0(const String &name, bool startLn, bool endLn) {StartElement(name, startLn, endLn);}
-        void StartElement1(const String &name, bool startLn, bool endLn, S_ a1, S_ v1);
-        void StartElement2(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2);
-        void StartElement3(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
-        void StartElement4(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
-
-        // EmptyElementN
-        void EmptyElement0(const String &name, bool endLn) {EmptyElement(name, endLn);}
-        void EmptyElement1(const String &name, bool endLn, S_ a1, S_ v1);
-        void EmptyElement2(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2);
-        void EmptyElement3(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3);
-        void EmptyElement4(const String &name, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4);
     };
     //-----------------------------------------------------------------------
     Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out);
     Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encoding);
+
+    //-----------------------------------------------------------------------
+    // Helper framing class
+    //-----------------------------------------------------------------------
+    class XMLFrame
+    {
+        XMLWriter   *wrt_;
+        int         initElementNumber_;
+    public:
+        XMLFrame(XMLWriter *wrt) :
+            wrt_(wrt), initElementNumber_(wrt->ElementNumber()) {}
+
+        void End()
+        {
+            wrt_->EndElements(wrt_->ElementNumber() - initElementNumber_);
+        }
+    };
 
 };  //namespace Fb2ToEpub
 
