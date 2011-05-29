@@ -181,6 +181,9 @@ public:
         //AddTocNcx();
     }
 
+    void SetBookId  (const String &id);
+    void SetIsbn    (const String &isbn) {isbn_ = isbn;}
+
 private:
     Ptr<LexScanner>         s_;
     const strvector         &css_, &fonts_, &mfonts_;
@@ -221,7 +224,14 @@ private:
     //binvector               binaries_;          // all binary files
     //std::set<String>        xlns_;              // xlink namespaces
     //std::set<String>        allRefIds_;         // all ref ids
+
     //String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
+    //String                  title_;
+    //String                  lang_;
+    String                  id_, id1_;
+    //String                  title_info_date_;
+    String                  isbn_;
+
     unsigned char           adobeKey_[16];      // adobe key
     //strvector               authors_;           // book authors
 
@@ -263,6 +273,24 @@ private:
     //void CopyXmlLang            (const AttrMap &attrmap);
     //bool AddAnchorid            (const String &anchorid);
 };
+
+//-----------------------------------------------------------------------
+void Engine::SetBookId(const String &id)
+{
+    static const String uuidpfx = "urn:uuid:";
+
+    String uuid = id;
+    if(!uuid.compare(0, uuidpfx.length(), uuidpfx))
+        uuid = uuid.substr(uuidpfx.length());
+    if(!IsValidUUID(uuid))
+    {
+        id1_ = id;
+        uuid = GenerateUUID();
+    }
+
+    id_ = uuidpfx + uuid;
+    MakeAdobeKey(uuid, adobeKey_);
+}
 
 //-----------------------------------------------------------------------
 void Engine::AdjustUnitSizes()
@@ -612,6 +640,74 @@ void Engine::MakeCoverPageFirst()
 }
 
 
+//-----------------------------------------------------------------------
+// DOCUMENT-INFO CONTEXT
+//-----------------------------------------------------------------------
+class DocumentInfoCtxt : public Fb2Ctxt, Noncopyable
+{
+    Engine *engine_;
+
+    class Id : public Fb2BaseEHandler<false>
+    {
+        Engine *engine_;
+    public:
+        Id(Engine *engine) : engine_(engine)    {}
+        //virtuals
+        void Data(const String &data, size_t)   {engine_->SetBookId(data);}
+    };
+
+public:
+    DocumentInfoCtxt(Engine *engine) : engine_(engine) {}
+
+    //virtual
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
+    {
+        if(h)
+        {
+            if(type == E_ID)
+                *h = new Id(engine_);
+            else
+                *h = CreateSkipEHandler();
+        }
+        if(ctxt)
+            *ctxt = this;
+    }
+};
+
+
+//-----------------------------------------------------------------------
+// PUBLISH-INFO CONTEXT
+//-----------------------------------------------------------------------
+class PublishInfoCtxt : public Fb2Ctxt, Noncopyable
+{
+    Engine *engine_;
+
+    class Isbn : public Fb2BaseEHandler<false>
+    {
+        Engine *engine_;
+    public:
+        Isbn(Engine *engine) : engine_(engine)    {}
+        //virtuals
+        void Data(const String &data, size_t)   {engine_->SetIsbn(data);}
+    };
+
+public:
+    PublishInfoCtxt(Engine *engine) : engine_(engine) {}
+
+    //virtual
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
+    {
+        if(h)
+        {
+            if(type == E_ISBN)
+                *h = new Isbn(engine_);
+            else
+                *h = CreateSkipEHandler();
+        }
+        if(ctxt)
+            *ctxt = this;
+    }
+};
 
 
 };  //namespace Pass2
@@ -637,7 +733,22 @@ void FB2TOEPUB_DECL DoConvertionPass2_new(LexScanner *scanner,
     // <FictionBook>
     ctxt->RegisterHandler(E_FICTIONBOOK, CreateRootEHandler());
 
-    //
+    // <document-info>
+    {
+        Ptr<Fb2Ctxt> pc = new Pass2::DocumentInfoCtxt(&engine);
+        ctxt->RegisterCtxt(E_DOCUMENT_INFO, pc);
+    }
+
+    // <publish-info>
+    {
+        Ptr<Fb2Ctxt> pc = new Pass2::PublishInfoCtxt(&engine);
+        ctxt->RegisterCtxt(E_PUBLISH_INFO, pc);
+    }
+
+    // skip rest of <description>
+    ctxt->RegisterHandler(E_SRC_TITLE_INFO, skip);
+    ctxt->RegisterHandler(E_CUSTOM_INFO,    skip);
+
 
 
     // parsing
