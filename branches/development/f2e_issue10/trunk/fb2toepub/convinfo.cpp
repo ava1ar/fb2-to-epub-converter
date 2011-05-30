@@ -29,6 +29,9 @@
 namespace Fb2ToEpub
 {
 
+namespace PassInfo
+{
+
 //-----------------------------------------------------------------------
 static void PrintInfo(const String &name, const String &value)
 {
@@ -123,6 +126,8 @@ public:
     bool EndTag (bool, Fb2Host *host)   {host->Exit(); return false;}
 };
 
+};  //namespace PassInfo
+
 
 //-----------------------------------------------------------------------
 void FB2TOEPUB_DECL DoPrintInfo (const String &in)
@@ -140,7 +145,7 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     Ptr<Fb2EHandler> nop = CreateExitEHandler();
 
     // <title-info><author>
-    Ptr<AuthorHandler> author = new AuthorHandler();
+    Ptr<PassInfo::AuthorHandler> author = new PassInfo::AuthorHandler();
     ctxt->RegisterHandler(E_AUTHOR, author);
 
     // <title-info><author> contents
@@ -163,7 +168,7 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     ctxt->RegisterHandler(E_TRANSLATOR, skip);
 
     // <title-info><sequence>
-    Ptr<SeqAttrHandler> sequence = new SeqAttrHandler();
+    Ptr<PassInfo::SeqAttrHandler> sequence = new PassInfo::SeqAttrHandler();
     ctxt->RegisterHandler(E_SEQUENCE, sequence);
 
     // skip rest without scanning
@@ -175,7 +180,7 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
     ctxt->RegisterHandler(E_BINARY,         nop);
 
     // drop rest of FictionBook contents without scanning
-    ctxt->RegisterHandler(E_FICTIONBOOK, Ptr<Fb2EHandler>(new RootEHandler()));
+    ctxt->RegisterHandler(E_FICTIONBOOK, Ptr<Fb2EHandler>(new PassInfo::RootEHandler()));
 
     // parsing
     Ptr<InStm> pin = CreateInUnicodeStm(CreateUnpackStm(in.c_str()));
@@ -183,14 +188,14 @@ void FB2TOEPUB_DECL DoPrintInfo (const String &in)
 
     // print info
     author->Print();                // author
-    PrintInfo("title", title);      // title
-    PrintInfo("date", date);        // date
-    //PrintInfo("lang", lang);      // lang
+    PassInfo::PrintInfo("title", title);      // title
+    PassInfo::PrintInfo("date", date);        // date
+    //PassInfo::PrintInfo("lang", lang);      // lang
     {
         // size
         std::ostringstream sizeStr;
         sizeStr << size;
-        PrintInfo("size", sizeStr.str());
+        PassInfo::PrintInfo("size", sizeStr.str());
     }
     sequence->Print();                  // sequence, number
 }
