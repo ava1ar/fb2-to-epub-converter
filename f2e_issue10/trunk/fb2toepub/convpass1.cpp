@@ -192,7 +192,7 @@ public:
 
 
 //-----------------------------------------------------------------------
-// TITLE-INFO HANDLER AND CONTEXT
+// TITLE-INFO CONTEXT
 //-----------------------------------------------------------------------
 class TitleInfoCtxt : public Fb2Ctxt, Noncopyable
 {

@@ -181,8 +181,10 @@ public:
         //AddTocNcx();
     }
 
-    void SetBookId  (const String &id);
-    void SetIsbn    (const String &isbn) {isbn_ = isbn;}
+    void SetBookTitle   (const String &title)   {title_ = title;}
+    void AddAuthor      (const String &author)  {authors_.push_back(author);}
+    void SetBookId      (const String &id);
+    void SetIsbn        (const String &isbn)    {isbn_ = isbn;}
 
 private:
     Ptr<LexScanner>         s_;
@@ -226,14 +228,14 @@ private:
     //std::set<String>        allRefIds_;         // all ref ids
 
     //String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
-    //String                  title_;
+    String                  title_;
     //String                  lang_;
     String                  id_, id1_;
     //String                  title_info_date_;
     String                  isbn_;
 
     unsigned char           adobeKey_[16];      // adobe key
-    //strvector               authors_;           // book authors
+    strvector               authors_;           // book authors
 
     //String                  prevUnitFile_;
     //int                     unitIdx_;
@@ -640,22 +642,123 @@ void Engine::MakeCoverPageFirst()
 }
 
 
+
+
+//-----------------------------------------------------------------------
+// TITLE-INFO CONTEXT
+//-----------------------------------------------------------------------
+class StoreText : public Fb2BaseEHandler<false>
+{
+    typedef void (Engine::*StoreTextFn)(const String &text);
+    Engine      *engine_;
+    StoreTextFn fn_;
+public:
+    StoreText(Engine *engine, StoreTextFn fn) : engine_(engine), fn_(fn) {}
+
+    //virtuals
+    void Data(const String &data, size_t)   {(engine_->*fn_)(data);}
+};
+
+
+//-----------------------------------------------------------------------
+// TITLE-INFO CONTEXT
+//-----------------------------------------------------------------------
+class TitleInfoCtxt : public Fb2Ctxt, Noncopyable
+{
+    Ptr<Fb2Ctxt>        oldCtxt_;
+    Engine              *engine_;
+    Ptr<Fb2TextHandler> authorname_;
+
+    class Author : public Fb2EHandler, Noncopyable
+    {
+    public:
+        Author(Fb2TextHandler *pname, Engine *engine) : engine_(engine), pname_(pname) {}
+
+        //virtuals
+        bool StartTag(Fb2EType, Fb2Host*)   {pname_->Reset(); return false;}
+        void Data(const String&, size_t)    {}
+        bool EndTag(bool empty, Fb2Host *host)
+        {
+            engine_->AddAuthor(pname_->Text());
+            if(!empty)
+                host->Scanner()->SkipRestOfElementContent();
+            return true;
+        }
+
+    private:
+        Ptr<Fb2TextHandler> pname_;
+        Engine              *engine_;
+    };
+
+public:
+    TitleInfoCtxt(Fb2Ctxt *oldCtxt, Engine *engine)
+        : oldCtxt_(oldCtxt), engine_(engine), authorname_(CreateTextEHandler(" ")) {}
+
+    //virtual
+    void GetNext(Fb2EType type, Ptr<Fb2EHandler> *h, Ptr<Fb2Ctxt> *ctxt)
+    {
+        switch(type)
+        {
+        case E_AUTHOR:
+            if(h)
+                *h = new Author(authorname_, engine_);
+            if(ctxt)
+                *ctxt = this;
+            return;
+
+        case E_FIRST_NAME:
+        case E_MIDDLE_NAME:
+        case E_LAST_NAME:
+        case E_NICKNAME:
+            if(h)
+                *h = authorname_;
+            if(ctxt)
+                *ctxt = this;
+            return;
+
+        default:
+            break;
+        }
+
+        if(!h)
+        {
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            return;
+        }
+
+        switch(type)
+        {
+        case E_BOOK_TITLE:
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            *h = new StoreText(engine_, &Engine::SetBookTitle);
+            break;
+
+        /*
+        case E_ANNOTATION:
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            *h = new StartUnitHandler<>(engine_, Unit::ANNOTATION);
+            break;
+
+        case E_COVERPAGE:
+            oldCtxt_->GetNext(type, NULL, ctxt);
+            *h = new StartUnitHandler<>(engine_, Unit::COVERPAGE);
+            break;
+        */
+
+        default:
+            oldCtxt_->GetNext(type, h, ctxt);
+            break;
+        }
+    }
+};
+
+
 //-----------------------------------------------------------------------
 // DOCUMENT-INFO CONTEXT
 //-----------------------------------------------------------------------
 class DocumentInfoCtxt : public Fb2Ctxt, Noncopyable
 {
     Engine *engine_;
-
-    class Id : public Fb2BaseEHandler<false>
-    {
-        Engine *engine_;
-    public:
-        Id(Engine *engine) : engine_(engine)    {}
-        //virtuals
-        void Data(const String &data, size_t)   {engine_->SetBookId(data);}
-    };
-
 public:
     DocumentInfoCtxt(Engine *engine) : engine_(engine) {}
 
@@ -665,7 +768,7 @@ public:
         if(h)
         {
             if(type == E_ID)
-                *h = new Id(engine_);
+                *h = new StoreText(engine_, &Engine::SetBookId);
             else
                 *h = CreateSkipEHandler();
         }
@@ -681,16 +784,6 @@ public:
 class PublishInfoCtxt : public Fb2Ctxt, Noncopyable
 {
     Engine *engine_;
-
-    class Isbn : public Fb2BaseEHandler<false>
-    {
-        Engine *engine_;
-    public:
-        Isbn(Engine *engine) : engine_(engine)    {}
-        //virtuals
-        void Data(const String &data, size_t)   {engine_->SetIsbn(data);}
-    };
-
 public:
     PublishInfoCtxt(Engine *engine) : engine_(engine) {}
 
@@ -700,7 +793,7 @@ public:
         if(h)
         {
             if(type == E_ISBN)
-                *h = new Isbn(engine_);
+                *h = new StoreText(engine_, &Engine::SetIsbn);
             else
                 *h = CreateSkipEHandler();
         }
@@ -732,6 +825,13 @@ void FB2TOEPUB_DECL DoConvertionPass2_new(LexScanner *scanner,
 
     // <FictionBook>
     ctxt->RegisterHandler(E_FICTIONBOOK, CreateRootEHandler());
+
+    // <title-info>
+    {
+        Ptr<Fb2Ctxt> pc = new Pass2::TitleInfoCtxt(ctxt, &engine);
+        ctxt->RegisterCtxt(E_TITLE_INFO, pc);
+    }
+    ctxt->RegisterHandler(E_KEYWORDS, skip);
 
     // <document-info>
     {
