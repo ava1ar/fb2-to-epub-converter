@@ -181,10 +181,16 @@ public:
         //AddTocNcx();
     }
 
-    void SetBookTitle   (const String &title)   {title_ = title;}
-    void AddAuthor      (const String &author)  {authors_.push_back(author);}
-    void SetBookId      (const String &id);
-    void SetIsbn        (const String &isbn)    {isbn_ = isbn;}
+    void SetBookTitle           (const String &title)   {title_ = title;}
+    void AddAuthor              (const String &author)  {authors_.push_back(author);}
+    void SetBookId              (const String &id);
+    void SetIsbn                (const String &isbn)    {isbn_ = isbn;}
+
+    void StartXmlFrame          ();
+    void EndXmlFrame            ();
+    Ptr<XmlWriter> Writer       ()                      {return pwrt_;}
+    void AddRefId               (Fb2Host *host);
+    void AddRef                 (Fb2Host *host);
 
 private:
     Ptr<LexScanner>         s_;
@@ -192,6 +198,8 @@ private:
     Ptr<XlitConv>           xlitConv_;
     UnitArray               &units_;
     Ptr<OutPackStm>         pout_;
+    Ptr<XmlWriter>          pwrt_;
+    std::vector<int>        xmlFrames_;
 
     struct Binary
     {
@@ -225,7 +233,7 @@ private:
     ExtFileVector           ttffiles_, otffiles_; // all font file description
     //binvector               binaries_;          // all binary files
     //std::set<String>        xlns_;              // xlink namespaces
-    //std::set<String>        allRefIds_;         // all ref ids
+    std::set<String>        allRefIds_;         // all ref ids
 
     //String                  title_, lang_, id_, id1_, title_info_date_, isbn_;  // book info
     String                  title_;
@@ -292,6 +300,47 @@ void Engine::SetBookId(const String &id)
 
     id_ = uuidpfx + uuid;
     MakeAdobeKey(uuid, adobeKey_);
+}
+
+//-----------------------------------------------------------------------
+void Engine::StartXmlFrame()
+{
+    xmlFrames_.push_back(pwrt_->ElementNumber());
+}
+
+//-----------------------------------------------------------------------
+void Engine::EndXmlFrame()
+{
+    pwrt_->EndElements(pwrt_->ElementNumber() - xmlFrames_.back());
+    xmlFrames_.pop_back();
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddRefId(Fb2Host *host)
+{
+    const AttrMap &attrmap = host->GetAttributes();
+    AttrMap::const_iterator cit = attrmap.find("id");
+    if(cit == attrmap.end())
+        return;
+
+    if(allRefIds_.find(cit->second) != allRefIds_.end())
+        return;    // ignore second instance
+
+    allRefIds_.insert(cit->second);
+
+    String id = cit->second;
+
+    // remap it to our new id
+    id = refidToNew_[id];
+    if(id.empty())
+        InternalError(__FILE__, __LINE__, "AddId error");
+
+    //pout_->WriteFmt(" id=\"%s\"", EncodeStr(id).c_str());
+}
+
+//-----------------------------------------------------------------------
+void Engine::AddRef(Fb2Host *host)
+{
 }
 
 //-----------------------------------------------------------------------
@@ -563,14 +612,14 @@ void Engine::AddEncryption()
         return;
 
     pout_->BeginFile("META-INF/encryption.xml", true);
-    Ptr<XMLWriter> wrt = CreateXMLWriter(pout_, "UTF-8");
+    Ptr<XmlWriter> wrt = CreateXmlWriter(pout_, "UTF-8");
 
     wrt->StartElement("encryption", true, true, "xmlns", "urn:oasis:names:tc:opendocument:xmlns:container");
 
     ExtFileVector::const_iterator cit, cit_end;
     for(cit = ttffiles_.begin(), cit_end = ttffiles_.end(); cit < cit_end; ++cit)
     {
-        XMLFrame frm(wrt);
+        XmlFrame frm(wrt);
         wrt->StartElement("EncryptedData",      true, true, "xmlns", "http://www.w3.org/2001/04/xmlenc#");
         wrt->EmptyElement("EncryptionMethod",   true,       "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
         wrt->StartElement("CipherData",         true, true);
@@ -580,7 +629,7 @@ void Engine::AddEncryption()
 
     for(cit = otffiles_.begin(), cit_end = otffiles_.end(); cit < cit_end; ++cit)
     {
-        XMLFrame frm(wrt);
+        XmlFrame frm(wrt);
         wrt->StartElement("EncryptedData",      true, true, "xmlns", "http://www.w3.org/2001/04/xmlenc#");
         wrt->EmptyElement("EncryptionMethod",   true,       "Algorithm", "http://ns.adobe.com/pdf/enc#RC");
         wrt->StartElement("CipherData",         true, true);
@@ -642,6 +691,119 @@ void Engine::MakeCoverPageFirst()
 }
 
 
+//-----------------------------------------------------------------------
+// EPUB ELEMENT DATABASE
+//-----------------------------------------------------------------------
+enum EpubEType
+{
+    EPUB_A,
+    EPUB_CODE,
+    EPUB_DEL,
+    EPUB_EM,
+    EPUB_H1,
+    EPUB_H2,
+    EPUB_P,
+    EPUB_SPAN,
+    EPUB_STRONG,
+    EPUB_SUB,
+    EPUB_SUP,
+    EPUB_TABLE,
+    EPUB_TD,
+    EPUB_TH,
+    EPUB_TR,
+    
+    EPUB_COUNT
+};
+//-----------------------------------------------------------------------
+// XML ELEMENT INFO
+struct EpubElementInfo
+{
+    String  name_;          // element name and class
+    bool    startLn_;       // new line after start tag?
+    bool    endLn_;         // new line after end tag?
+
+    EpubElementInfo() {}
+    EpubElementInfo(const String &name, bool startLn, bool endLn)
+        : name_(name), startLn_(startLn), endLn_(endLn) {}
+};
+static const EpubElementInfo epubeinfo[EPUB_COUNT] =
+{
+    EpubElementInfo("a",        false,  false),
+    EpubElementInfo("code",     false,  false),
+    EpubElementInfo("del",      false,  false),
+    EpubElementInfo("em",       false,  false),
+    EpubElementInfo("h1",       false,  true),
+    EpubElementInfo("h2",       false,  true),
+    EpubElementInfo("p",        false,  true),
+    EpubElementInfo("span",     false,  false),
+    EpubElementInfo("strong",   false,  false),
+    EpubElementInfo("sub",      false,  false),
+    EpubElementInfo("sup",      false,  false),
+    EpubElementInfo("table",    false,  true),
+    EpubElementInfo("td",       false,  true),
+    EpubElementInfo("th",       false,  true),
+    EpubElementInfo("tr",       false,  true)
+};
+
+
+
+//-----------------------------------------------------------------------
+// BASE PASS 2 HANDLER (WRITE ELEMENT TAGS, CLASS,
+// ADD REF IDS OR HREF IF NECESSARY)
+//-----------------------------------------------------------------------
+template <bool skipRest = false>
+class BaseHandler : public Fb2BaseEHandler<skipRest>
+{
+    Engine      *engine_;
+    String      element_, cls_;
+    bool        startLn_, endLn_;
+protected:
+    Engine* GetEngine() const   {return engine_;}
+public:
+    BaseHandler(Engine *engine,
+                const String &element,
+                const String &cls,
+                bool startLn,
+                bool endLn)
+                    :   engine_ (engine),
+                        element_(element),
+                        cls_    (cls),
+                        startLn_(startLn),
+                        endLn_  (endLn)
+    {
+    }
+    BaseHandler(Engine *engine, EpubEType type, const String &cls)
+                    :   engine_ (engine),
+                        element_(epubeinfo[type].name_),
+                        cls_    (cls),
+                        startLn_(epubeinfo[type].startLn_),
+                        endLn_  (epubeinfo[type].endLn_)
+    {
+    }
+
+    //virtuals
+    bool StartTag(Fb2EType type, Fb2Host *host)
+    {
+        engine_->StartXmlFrame();
+        engine_->Writer()->StartElement(element_, startLn_, endLn_, "class", cls_);
+
+        const Fb2ElementInfo *info = Fb2GetElementInfo(type);
+        if(info->refid_)
+            engine_->AddRefId(host);
+        else if(info->ref_)
+            engine_->AddRef(host);
+        return Fb2BaseEHandler<skipRest>::StartTag(type, host);
+    }
+    void Data(const String &data, size_t)
+    {
+        engine_->Writer()->WriteStr(data.c_str());
+    }
+    bool EndTag(bool empty, Fb2Host *host)
+    {
+        engine_->EndXmlFrame();
+        return Fb2BaseEHandler<skipRest>::EndTag(empty, host);
+    }
+};
 
 
 //-----------------------------------------------------------------------
