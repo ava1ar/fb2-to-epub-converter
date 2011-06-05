@@ -27,13 +27,13 @@ namespace Fb2ToEpub
 {
 
 //-----------------------------------------------------------------------
-// XMLWriter implementation
+// XmlWriter implementation
 //-----------------------------------------------------------------------
-class XMLWriterImpl : public XMLWriter
+class XmlWriterImpl : public XmlWriter
 {
 public:
-    XMLWriterImpl(OutStm *out);
-    XMLWriterImpl(OutStm *out, const String &encoding);
+    XmlWriterImpl(OutStm *out);
+    XmlWriterImpl(OutStm *out, const String &encoding);
 
     // virtuals
     void DoEmptyElement (const String &name, bool ln, const AttrVector *attrs);
@@ -60,7 +60,7 @@ private:
 };
 
 //-----------------------------------------------------------------------
-XMLWriterImpl::XMLWriterImpl(OutStm *out)
+XmlWriterImpl::XmlWriterImpl(OutStm *out)
     :   out_(out),
         currExists_(false),
         currEmpty_(false),
@@ -70,7 +70,7 @@ XMLWriterImpl::XMLWriterImpl(OutStm *out)
 }
 
 //-----------------------------------------------------------------------
-XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding)
+XmlWriterImpl::XmlWriterImpl(OutStm *out, const String &encoding)
     :   out_(out),
         currExists_(false),
         currEmpty_(false),
@@ -80,7 +80,7 @@ XMLWriterImpl::XMLWriterImpl(OutStm *out, const String &encoding)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::FlushCurrentElement()
+void XmlWriterImpl::FlushCurrentElement()
 {
 #if defined(_DEBUG)
     if(!currExists_)
@@ -95,7 +95,7 @@ void XMLWriterImpl::FlushCurrentElement()
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::AddAttributesNoCheck(const AttrVector *attrs)
+void XmlWriterImpl::AddAttributesNoCheck(const AttrVector *attrs)
 {
     AttrVector::const_iterator cit = attrs->begin(), cit_end = attrs->end();
     for(; cit < cit_end; ++cit)
@@ -103,7 +103,7 @@ void XMLWriterImpl::AddAttributesNoCheck(const AttrVector *attrs)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector *attrs)
+void XmlWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector *attrs)
 {
     if(currExists_)
         FlushCurrentElement();
@@ -117,7 +117,7 @@ void XMLWriterImpl::DoEmptyElement(const String &name, bool ln, const AttrVector
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::DoStartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs)
+void XmlWriterImpl::DoStartElement(const String &name, bool startLn, bool endLn, const AttrVector *attrs)
 {
     if(currExists_)
         FlushCurrentElement();
@@ -132,7 +132,7 @@ void XMLWriterImpl::DoStartElement(const String &name, bool startLn, bool endLn,
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::AddAttribute(const String &name, const String &val)
+void XmlWriterImpl::AddAttribute(const String &name, const String &val)
 {
     if(!currExists_)
         InternalError(__FILE__, __LINE__, "no current element 1");
@@ -140,7 +140,7 @@ void XMLWriterImpl::AddAttribute(const String &name, const String &val)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::AddAttributes(const AttrVector *attrs)
+void XmlWriterImpl::AddAttributes(const AttrVector *attrs)
 {
     if(!currExists_)
         InternalError(__FILE__, __LINE__, "no current element 2");
@@ -149,7 +149,7 @@ void XMLWriterImpl::AddAttributes(const AttrVector *attrs)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::EndElements(int cnt)
+void XmlWriterImpl::EndElements(int cnt)
 {
     if(currExists_)
         FlushCurrentElement();
@@ -167,7 +167,7 @@ void XMLWriterImpl::EndElements(int cnt)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::PutChar(char c)
+void XmlWriterImpl::PutChar(char c)
 {
     if(currExists_)
         FlushCurrentElement();
@@ -175,7 +175,7 @@ void XMLWriterImpl::PutChar(char c)
 }
 
 //-----------------------------------------------------------------------
-void XMLWriterImpl::Write(const void *p, size_t cnt)
+void XmlWriterImpl::Write(const void *p, size_t cnt)
 {
     if(currExists_)
         FlushCurrentElement();
@@ -183,42 +183,42 @@ void XMLWriterImpl::Write(const void *p, size_t cnt)
 }
 
 //-----------------------------------------------------------------------
-Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out)
+Ptr<XmlWriter> FB2TOEPUB_DECL CreateXmlWriter(OutStm *out)
 {
-    return new XMLWriterImpl(out);
+    return new XmlWriterImpl(out);
 }
 
 //-----------------------------------------------------------------------
-Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encoding)
+Ptr<XmlWriter> FB2TOEPUB_DECL CreateXmlWriter(OutStm *out, const String &encoding)
 {
-    return new XMLWriterImpl(out, encoding);
+    return new XmlWriterImpl(out, encoding);
 }
 
 
 //-----------------------------------------------------------------------
-// XMLWriter helpers
+// XmlWriter helpers
 //-----------------------------------------------------------------------
 
 // StartElementN
-void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1)
+void XmlWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1)
 {
     DoStartElement(name, startLn, endLn, NULL);
     AddAttribute(a1, v1);
 }
-void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
+void XmlWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2)
 {
     DoStartElement(name, startLn, endLn, NULL);
     AddAttribute(a1, v1);
     AddAttribute(a2, v2);
 }
-void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
+void XmlWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
     DoStartElement(name, startLn, endLn, NULL);
     AddAttribute(a1, v1);
     AddAttribute(a2, v2);
     AddAttribute(a3, v3);
 }
-void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
+void XmlWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
     DoStartElement(name, startLn, endLn, NULL);
     AddAttribute(a1, v1);
@@ -227,25 +227,25 @@ void XMLWriter::StartElement(const String &name, bool startLn, bool endLn, S_ a1
     AddAttribute(a4, v4);
 }
 // EmptyElementN
-void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1)
+void XmlWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1)
 {
     DoEmptyElement(name, ln, NULL);
     AddAttribute(a1, v1);
 }
-void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2)
+void XmlWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2)
 {
     DoEmptyElement(name, ln, NULL);
     AddAttribute(a1, v1);
     AddAttribute(a2, v2);
 }
-void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
+void XmlWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3)
 {
     DoEmptyElement(name, ln, NULL);
     AddAttribute(a1, v1);
     AddAttribute(a2, v2);
     AddAttribute(a3, v3);
 }
-void XMLWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
+void XmlWriter::EmptyElement(const String &name, bool ln, S_ a1, S_ v1, S_ a2, S_ v2, S_ a3, S_ v3, S_ a4, S_ v4)
 {
     DoEmptyElement(name, ln, NULL);
     AddAttribute(a1, v1);

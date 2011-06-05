@@ -33,7 +33,7 @@ namespace Fb2ToEpub
     //-----------------------------------------------------------------------
     // Useful XML writer
     //-----------------------------------------------------------------------
-    class XMLWriter : public OutStm
+    class XmlWriter : public OutStm
     {
         typedef const String &S_;
 
@@ -71,18 +71,18 @@ namespace Fb2ToEpub
         void Flush()        {EndElements(-1);}      // end all elements
     };
     //-----------------------------------------------------------------------
-    Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out);
-    Ptr<XMLWriter> FB2TOEPUB_DECL CreateXMLWriter(OutStm *out, const String &encoding);
+    Ptr<XmlWriter> FB2TOEPUB_DECL CreateXmlWriter(OutStm *out);
+    Ptr<XmlWriter> FB2TOEPUB_DECL CreateXmlWriter(OutStm *out, const String &encoding);
 
     //-----------------------------------------------------------------------
     // Helper framing class
     //-----------------------------------------------------------------------
-    class XMLFrame
+    class XmlFrame
     {
-        XMLWriter   *wrt_;
+        XmlWriter   *wrt_;
         int         initElementNumber_;
     public:
-        XMLFrame(XMLWriter *wrt) :
+        XmlFrame(XmlWriter *wrt) :
             wrt_(wrt), initElementNumber_(wrt->ElementNumber()) {}
 
         void End()
